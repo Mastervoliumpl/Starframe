@@ -1,0 +1,306 @@
+# Starframe: design direction
+
+Status: revision 0.4, 6 September 2026. Product name: Starframe. Visual direction and Tauri/Svelte/TypeScript/Rust stack accepted by the user.
+
+This is a design handoff. Implementation is not yet authorized. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
+
+## 1. Confirmed direction
+
+Build Starframe, an installable desktop mod manager for Sanctuary: Shattered Sun, Windows first. Users can download approved releases, manage installed mods, create and share collections, and launch the game. The owner curates individual releases. Downloads come from authors' locations; the app does not host mod binaries.
+
+Local imports are managed mods too. Developers must be able to load and manage their own local builds. Label their origin clearly as `Local import`; do not make their controls second-class or describe them as approved catalog downloads. Details of folder watching and development workflows remain for product planning.
+
+The visual direction is dark navy with orange accents. It should feel modern and related to Sanctuary, with its own identity. Draw from the game's visual character without reproducing its interface or logo. Motion and rounded corners must have a purpose.
+
+Responsiveness is the leading interaction requirement. The interface must respond while downloads, file operations, compatibility checks, and other background work take time. Data changes appear live without requiring a refresh. Unavailable actions explain their restriction. Visual effects must yield to input responsiveness, while file safety and accurate status remain required.
+
+The official repository is [Mastervoliumpl/Starframe](https://github.com/Mastervoliumpl/Starframe), which contains the [GNU AGPL v3 license](LICENSE). Distribute the app through that repository's GitHub Releases page. Check for a newer app release on launch and periodically while the app runs. Notify the user and let them choose when to update. This is separate from catalog checks, mod updates, and game updates.
+
+The user supplied these six colors:
+
+| Color | Value | Intended role |
+| --- | --- | --- |
+| Background | `#0F172A` | Main canvas |
+| Contrast orange | `#F97316` | Primary action and selected emphasis |
+| Pale orange | `#FB923C` | Accent hover and selected text on raised surfaces |
+| Gray | `#334155` | Selected surfaces and quiet dividers |
+| Light gray | `#CBD5E1` | Body text and secondary labels |
+| White | `#F8FAFC` | Titles and strongest text |
+
+Game compatibility and mod versions are separate concepts. Game-version compatibility belongs in the design. Whether shared collections pin exact mod releases is still undecided; do not represent that proposal as accepted.
+
+## 2. Visual character
+
+Reading this as a desktop mod-management tool for Sanctuary players and mod developers: precise, game-informed, dark navy, with concentrated orange emphasis. Dials: ENERGY 2 / RHYTHM 2 / MOTION 2.
+
+Use broad, flat regions with aligned edges and readable lists. The contrast between the dark work area and the orange action gives the interface its focal point. Density should support managing many mods without making the app feel like a spreadsheet.
+
+Game influence belongs in collection artwork, a restrained heading face, and the composition of major headers. The game's large engineered structures suggest strong alignment and deliberate divisions. This is a design interpretation of the official visual reference, not a claim that the game uses this palette.
+
+Identity treatment: collection detail headers may have one 8-unit cut at the trailing corner of their artwork frame. It separates collection identity from ordinary controls. Keep inputs, rows, and action buttons rectangular with the radii below. Validate this motif in the first visual review; it is not a logo decision.
+
+Keep decorative effects out of the working list. No background grids, orbiting elements, idle glows, particle effects, or translucent layers behind text. Shadows identify temporary elevation, such as a menu or dialog. A mod with no artwork gets a plain name or initial treatment, not invented game art.
+
+## 3. Reference interpretation
+
+| Reference | What to study | Application here |
+| --- | --- | --- |
+| [Beautiful UI](https://www.beautifului.dev/) | Records Table, Filter Table, Sidebar Nav, Search, Task Rows | Aligned information, compact controls, clear selection, expandable detail, and useful task status |
+| [Transitions.dev](https://transitions.dev/) | Menu dropdown, panel reveal, modal open/close, accordion, tabs sliding, spinner-to-check | Motion that preserves location or communicates a state change |
+| [Sanctuary official site](https://www.sanctuaryshatteredsun.com/) | Dark framing, engineered forms, strong wordmark, large-scale game imagery | Restrained game identity in headers and collection artwork |
+| [Skyve](https://github.com/JadHajjar/Skyve) | Mod details, playsets, compatibility information, pre-launch management | Useful information hierarchy for a desktop manager |
+
+These are references, not component or code commitments. A reference's marketing page, AI-specific controls, blue accents, or pill shapes do not transfer automatically. Check licensing before reusing code, fonts, or artwork. Prefer existing platform controls where they can express the approved design.
+
+## 4. Color tokens and contrast
+
+Preserve the six supplied colors. Two additional neutral shades are part of the accepted direction: `#1E293B` for raised surfaces and `#94A3B8` for low-emphasis text and functional control outlines. These add depth and readable secondary states without introducing another accent hue.
+
+| Token | Value | Use |
+| --- | --- | --- |
+| canvas | `#0F172A` | Main workspace and ordinary rows |
+| surface | `#1E293B` | Sidebar, menus, dialogs, hover fill |
+| surface-selected | `#334155` | Selected row or navigation destination |
+| divider | `#334155` | Nonessential section and row separators |
+| control-outline | `#94A3B8` | Input, checkbox, and secondary-button boundaries |
+| text-primary | `#F8FAFC` | Headings, names, key values |
+| text-body | `#CBD5E1` | Descriptions, labels, messages |
+| text-muted | `#94A3B8` | Metadata on canvas or surface only |
+| accent | `#F97316` | Primary action, focus, progress |
+| accent-hover | `#FB923C` | Hovered primary action; accent text on selected surface |
+| text-on-accent | `#0F172A` | Labels and icons on orange fills |
+
+Measured with the installed Anti-slop contrast checker, using opaque sRGB colors:
+
+| Foreground / background | Ratio | Design rule |
+| --- | --- | --- |
+| White / canvas | 17.06:1 | Main text allowed |
+| Light gray / canvas | 12.02:1 | Body text allowed |
+| Orange / canvas | 6.37:1 | Accent text allowed |
+| Pale orange / canvas | 7.89:1 | Accent text allowed |
+| Navy / orange | 6.37:1 | Primary button label |
+| White / orange | 2.68:1 | Do not use for button labels |
+| Gray / canvas | 1.72:1 | Decorative divider only; insufficient as the only control boundary |
+| Light gray / gray | 6.97:1 | Text in selected rows |
+| Orange / gray | 3.69:1 | Insufficient for normal-size text |
+| Pale orange / gray | 4.58:1 | Selected accent text allowed at full opacity |
+| Muted / surface | 5.71:1 | Secondary metadata allowed |
+| Muted / gray | 4.04:1 | Use light gray instead in selected rows |
+
+Require 4.5:1 for all ordinary UI text and 3:1 for visual information needed to identify controls and states. Decorative dividers can be quieter. This avoids relying on the large-text exception. Verify the final rendered pairs, including hover, selection, overlays, and any opacity. [Contrast guidance](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html)
+
+Orange is for action and selection, not a general claim of safety or success. Keep ready, local, unknown, and failed states distinguishable through labels and icons. For this draft, use white/light-gray text with a check, local-file, question, or error symbol respectively. A critical message remains persistent with an explicit action. A red error token may be considered during visual review; it is not silently added to the palette.
+
+Use one dominant orange-filled action in each active context. While a dialog is open, its action becomes the focus. Ordinary row actions remain neutral. No orange fill across the entire selected row.
+
+## 5. Typography, spacing, and shape
+
+All sizes below are logical design units at 100% scale, equivalent to Windows device-independent pixels. They must scale with display and text settings.
+
+Body face: Segoe UI Variable, with Segoe UI and system sans-serif fallbacks. The reason is readable small text and familiar Windows controls. Display face: Bahnschrift for page and collection headings only, with the body face as fallback. Its compact, engineered letterforms provide game character without turning mod names into display text. Use installed system faces; do not bundle Windows font files.
+
+| Text role | Size / line height | Weight |
+| --- | --- | --- |
+| Page or collection title | 28 / 34 | Semibold |
+| Section heading | 18 / 24 | Semibold |
+| Mod name and button | 14 / 20 | Semibold |
+| Body and navigation | 14 / 20 | Regular |
+| Metadata | 12 / 18 | Regular |
+| Paths and diagnostic values | 12 / 18 | System monospace |
+
+Use sentence case. Reserve monospace for paths, versions when alignment matters, and logs. Use tabular numerals for download progress. Do not add wide letter spacing to navigation or labels. Logo and wordmark typography remain open.
+
+Spacing scale: 4, 8, 12, 16, 24, 32, 48. Use 8 between related icon/label pairs, 12 within control groups, 16 within sections, 24 for page padding, and 32 between distinct sections. Alignment has priority over filling empty space.
+
+| Element | Radius | Reason |
+| --- | --- | --- |
+| App regions, tables, ordinary list rows | 0 | Continuous workspace and stable scan lines |
+| Checkboxes and small status labels | 3 | Small controls retain a defined shape |
+| Buttons, inputs, selected navigation fill | 6 | Clearly bounded interaction surfaces |
+| Menus, collection tiles | 8 | Grouped content and temporary surfaces |
+| Dialogs | 12 | A distinct foreground layer |
+| Switch track and thumb | Fully rounded | Shape communicates sliding on/off state |
+
+No nesting of rounded containers around every subsection. Let the operating system own the outer window corners and caption buttons. Use a 1-unit border by default; a 2-unit focus ring with 2 units of dark separation must remain visible on orange controls too.
+
+Standard control height: 36. Primary launch action: 40. Icon-only hit area: at least 32 square, with a visible tooltip and accessible name. Content rows: minimum 56, growing for wrapped names or larger text. Avoid fixed text clipping.
+
+## 6. Window composition
+
+Design first at 1280 × 800. Also review 1024 × 720 and 1600 × 1000. Resizing, Windows snapping, and display scaling are normal use cases. Compact behavior is a desktop requirement; mobile support is not in scope.
+
+```text
+┌────────────────── system title bar / window controls ─────────────────┐
+│                  │ Page title                   Search / view actions│
+│ Product identity ├───────────────────────────────────────────────────┤
+│                  │                                                   │
+│ My mods          │ Main list, catalog, or collection workspace        │
+│ Catalog          │                                  ┌───────────────┤
+│ Collections      │                                  │ Mod details   │
+│ Downloads        │                                  │ when opened   │
+│                  │                                  │               │
+│ Settings         ├──────────────────────────────────┴───────────────┤
+│ Help & logs      │ Active collection · readiness           Play      │
+└──────────────────┴───────────────────────────────────────────────────┘
+```
+
+This diagram records the accepted navigation direction and starting proportions. It is not a finished UI; product-specific terminology remains open.
+
+Sidebar width: 208. Keep labels visible in the standard window. The main header starts at 72 high; controls can wrap. The launch area starts at 64 high and spans the workspace. Both grow with content. The main list owns its scrolling region.
+
+At workspace widths that support it, mod details use a 360-unit side panel. Below 1280 window width, open details as a full workspace view with Back, preserving the list's search, selection, and scroll position. Under 1100, reduce the sidebar to 176 and move optional columns into detail. Under 900 effective units, use a collapsible navigation drawer. At high text scale, stack filters and launch controls and allow vertical scrolling instead of squeezing them into a fixed bar.
+
+Landing view: My mods. The visible active collection selector explains which setup the switches affect. Collections remain a separate destination for creating and sharing setups. Avoid a separate dashboard unless it answers a user need that these views cannot.
+
+## 7. Screen and component rules
+
+### My mods
+
+Use a list by default. A row contains a selection checkbox, mod name and author, version, origin, compatibility text, and an enabled switch. Selection chooses rows for bulk actions; the switch changes whether a mod is included in the active setup. These are separate controls with separate accessible labels.
+
+Show `Catalog release` or `Local import` as plain provenance text. Show compatibility as `Compatible with [game version]`, `Not checked for this version`, or a specific mismatch. Approval and compatibility are separate labels. Never display `Malware-free` or imply that curation guarantees safety.
+
+Keep frequent actions visible when relevant. Put uninstall and infrequent actions in a named row menu. Clicking the mod name opens its detail view. Hover changes only the row fill; selection uses the selected surface, a checked selector, and readable text. Do not make information appear only on hover.
+
+A bulk action bar occupies a reserved area below the filters when rows are selected. Its labels name the outcome, such as `Enable selected` or `Remove from collection`. Distinguish removal from a collection from uninstalling a mod.
+
+### Catalog and mod details
+
+Use compact list entries with optional author-supplied artwork. A large thumbnail grid is an alternative to evaluate, not the default for a small curated catalog. Lead with name, purpose, approved release, and compatibility. Install is a neutral row action; it becomes the primary action in the detail view.
+
+Details include description, author/source link, approved versions, dependencies, compatibility notes, and installation state. Put technical paths and diagnostics behind expandable sections. Download progress belongs beside the action it replaces and in Downloads. Keep labels stable in width as progress changes.
+
+### Collections
+
+Tiles are appropriate here because each collection is an identifiable setup. Use an 8-unit radius, optional artwork, its name, and a concise mod summary. One active collection gets an explicit `Active` label and a check, not a glowing border. Use two or three columns where they fit; fall back to a list at narrow widths.
+
+Opening a collection shows its contents and `Use collection`, `Edit`, and `Share` actions as applicable. A collection summary may use the proposed cropped artwork header. Do not embed game art behind its editable list.
+
+The share/import review shows which mods can be obtained from approved catalog releases, which are local-only, and which are unavailable. An imported file must not silently grant approval to arbitrary download links. Exact release pinning, settings inclusion, and sharing format still require product decisions.
+
+### Local development
+
+Use the same list, details, switches, and collection controls as catalog mods. Show the local source path in details, with copy/open actions. Include an `Import local mod` entry point. Detect changes to a local build and update its visible state without requiring a refresh. The observation mechanism and development workflow remain engineering decisions. A changed file must not appear as a catalog update or imply that the running game has loaded the new build. Hot reload is not decided by this design.
+
+### Launch and setup
+
+The persistent launch area shows the active collection and a short readiness message. Typical labels are `Play`, `Preparing mods`, `Game running`, or `Finish setup`. The primary action changes only when the next useful action changes.
+
+Problems have a nearby `View issues` action and a count only when the count is real. Downloading and applying changes must not appear complete until they succeed. While the game runs, explain when a change requires closing it. The runtime policy and reconciliation with in-game switches remain separate engineering work.
+
+First-run setup uses one focused sequence: locate game, explain the loader requirement, review the planned setup, show progress, then show the resulting state. Reuse native file pickers. Do not make users navigate multiple settings pages for the initial setup.
+
+### Live behavior and responsiveness
+
+Open the app shell and available local data before waiting for network checks. Mark cached information where freshness matters. Startup checks must not cover the app with a blocking loading screen.
+
+- Give pressed, selection, navigation, and pending-state feedback immediately. Target visible input feedback within 100 ms under representative background load. This is a validation target, not a claim about measured performance.
+- Keep navigation, scrolling, search, detail views, and unrelated actions usable during background work. Network requests, archive extraction, hashing, and lengthy file operations must not occupy the UI thread.
+- Update every affected view from actual state changes. Counts, lists, details, collection readiness, and Downloads must agree without a page reload or manual refresh. Preserve focus, selection, scroll position, and unfinished edits when data changes.
+- Show requested changes immediately when safe, with a pending state until confirmed. Reversible edits may update optimistically; if they fail, restore the confirmed state and explain what happened. Never claim that installation, removal, or game launch succeeded before it did.
+- Restrict only actions that conflict with current work or cannot be completed. Use a subdued control treatment and a readable nearby reason, such as `Available when the game closes`. Do not make a tooltip on an unfocusable disabled button the only explanation.
+- Queue or serialize conflicting changes to the same files. Users can continue work elsewhere. Prevent duplicate jobs from repeated clicks, and do not let an older response overwrite a newer choice.
+- Show progress for long operations, with cancellation where it is safe. If an operation has entered a stage that cannot be canceled safely, explain that briefly. Errors remain attached to the affected task and offer a useful next action.
+- Reconcile external changes, such as a replaced local build or the game closing, without requiring the user to restart the app. Check again after resuming from sleep if observations may have been missed.
+
+Target smooth motion at 60 frames per second on the agreed baseline hardware. Input and useful state updates take priority over animation. Validate this behavior under slow downloads and file operations; choosing a framework alone does not establish responsiveness.
+
+### App updates from GitHub
+
+Run the startup check after the shell is usable, then check every five minutes while the app is open. Five minutes is the selected default within the user's suggested range. Checks also continue while the window is minimized. After sleep or connectivity returns, run one check if due, with no burst of missed checks. Keep requests from overlapping and delay retries if the server requests it. Settings also provides `Check for updates`, the installed version, and the last successful check time.
+
+All checking runs within the app's lifetime. Closing the app exits it and stops update checks. Do not install a service, scheduled task, startup agent, or separate background updater. Do not keep the app running in the system tray after its window closes. While the app is closed, it performs no work. If a file operation needs to finish safely before exit, explain that in the visible app instead of silently continuing after close.
+
+Use the official app repository's published releases. Compare release versions with the installed app version. The initial recommendation is stable releases only; a preview channel requires a separate product decision. Keep the repository address configurable by the maintainer, not an arbitrary imported collection.
+
+When a newer eligible version exists, show a persistent, quiet `Update available` notice near Settings or Help. Opening it shows the installed version, available version, release notes, and `View release` and `Later` actions. If the chosen distribution tooling supports an integrated updater, offer `Update` there. Keep the notice separate from the main Play action and do not interrupt a game launch with a modal. Dismissing the notice must not cause repeated prompts for the same release; the update remains accessible in Settings.
+
+The user chooses when to install or restart. Background checking does not authorize automatic installation. An app update must wait for active file changes to reach a safe stopping point. Failure to reach GitHub leaves mod management usable and shows a nonblocking check status. Do not label a failed check as `Up to date`.
+
+The installer and update installation method are still undecided. Evaluate Tauri's maintained [updater plugin](https://v2.tauri.app/plugin/updater/), including its artifact verification; GitHub can host its static update metadata and release artifacts. Any chosen tooling must respect the app-lifetime rule above. No custom updater is required by this design.
+
+## 8. Motion specification
+
+Motion communicates cause, location, or completion. Immediate pressed and focus feedback must not wait for a transition. Keep animation interruptible; a second action starts from the current visual position. Never delay work to let an animation finish.
+
+Default easing: cubic-bezier(0.2, 0, 0, 1), or the platform equivalent. Exits use cubic-bezier(0.4, 0, 1, 1). These are proposed timings to tune once with a representative screen, not a separate animation system to build.
+
+| Trigger | Transition | Duration | Purpose |
+| --- | --- | --- | --- |
+| Hover button or row | Background/color only | 100 ms | Confirm the target without moving it |
+| Change tab | Underline moves to selected tab | 160 ms | Preserve position between related views |
+| Open detail panel | Translate 16 units from right + fade | 200 ms | Explain the panel's relation to the list |
+| Close detail panel | Reverse toward right | 140 ms | Return attention to the selected row |
+| Open menu | Fade + 4-unit movement from its trigger | 120 ms | Show where the actions belong |
+| Open dialog | Fade + scale 0.98 to 1 | 180 ms | Establish a temporary foreground task |
+| Expand details | Height reveal + chevron rotation | 180 ms | Show information belonging to the parent |
+| Confirm a change | One icon crossfade to check | 140 ms | Acknowledge completion without celebration |
+| Start/finish download | Progress region appears; label changes on actual events | 120 ms | Make task state clear |
+| Apply list filter | Results replace in place | 80 ms fade, no travel | Preserve scanning position |
+
+Use a tab underline rather than a sliding pill. Do not animate each list row on initial load. Progress uses actual bytes when known; otherwise use a labeled indeterminate indicator. A busy indicator is the only repeated motion, and stops when work stops. No spring overshoot on switches, counters, or data rows. No blur on changing text, error shakes, confetti, parallax, or hover tilt.
+
+Respect the system reduced-motion preference. With reduced motion, remove translation, scaling, height animation, and moving tab indicators; update instantly or with an opacity change of at most 80 ms. Progress text and static busy labels must still communicate activity. Preserve all focus and state information.
+
+## 9. States, accessibility, and copy
+
+| State | Required presentation |
+| --- | --- |
+| No installed mods | `No mods installed` with `Browse catalog` and `Import local mod` |
+| Empty collection | Explain that it contains no mods; provide an add action |
+| Filter returns nothing | Keep the filters visible; offer `Clear filters` |
+| Catalog loading | Named loading status in the content region; keep navigation usable |
+| Offline | Keep installed mods and local collections usable; mark cached catalog information |
+| Download fails | Identify the mod and error; show retry and source link |
+| Game not found | Show the expected action: `Locate game` |
+| Compatibility unknown | State that it has not been checked; do not show a success check |
+| Blocking issue | Persistent issue text and a route to details; do not rely on a toast |
+| Long mod name/path | Allow wrapping or provide the full value in details and copy access |
+
+Use platform keyboard and accessibility semantics. Tab order follows the visual layout. Lists support arrow-key movement where the platform pattern supports it; Enter opens details and Space operates the focused selector. Escape closes dismissible surfaces and returns focus to their trigger. Menus and dialogs must not leak focus to hidden controls.
+
+Maintain visible focus, label every icon-only action, and announce download completion and errors without repeatedly interrupting the screen reader. Status must not depend on color. Test Windows high-contrast settings, 100%, 150%, and 200% display scale, and 200% text scaling. Preserve readable content through wrapping and layout changes.
+
+Write direct labels: `Install`, `Update`, `Enable`, `Disable`, `Uninstall`, `Import collection`, `Share collection`. Explain the consequence of uninstalling and how saved settings are handled once that policy is decided. Avoid alarmist copy for local imports; give the user source information and control.
+
+## 10. Chosen stack
+
+The user selected Tauri + Svelte + TypeScript, with Rust handling local operations. This is an installed desktop app with its interface bundled locally. [Tauri architecture](https://v2.tauri.app/start/)
+
+- Tauri provides the desktop shell and the connection between the interface and native operations.
+- Svelte and TypeScript define the interface, interaction states, and live presentation of data.
+- Rust handles local file operations and game launching. Long-running work must leave the interface responsive and report progress and results back to it.
+
+Validate accessible mod lists, live state updates, safe file operations, installer/update behavior, and purposeful motion against this design. Verify responsiveness under representative background load. Framework versions and additional dependencies will be chosen during implementation planning. Ponytail is required for all coding and dependency decisions: reuse established code, standard libraries, and platform features before custom solutions. Do not add a UI library solely to obtain one transition.
+
+## 11. Review and handoff
+
+The next design review should show one representative My mods screen, its detail view, and a collection view at standard and compact sizes. Show normal, selected, busy, error, and empty states. Include a small motion demonstration and its reduced-motion alternative. A visual specimen is design work; it must not connect to game files or download mods.
+
+Before implementation, settle:
+
+- Independent logo/wordmark for Starframe.
+- Visual validation of the accepted fonts, neutral shades, corner motif, navigation, and starting dimensions.
+- Approval of the representative visual screens and motion samples.
+- Collection version policy, settings sharing, and local-build sharing behavior.
+- Supported Windows versions.
+- Update installation method.
+
+Handoff acceptance criteria:
+
+- Palette, typography, spacing, radii, and motion follow the reviewed document.
+- Orange-filled controls use navy labels; selected-row text uses verified pairings.
+- Dense screens preserve readable names, versions, provenance, and state.
+- Local imports have working management controls and clear origin labels.
+- Every interactive element has a defined action and all required states.
+- Startup and periodic GitHub app-update checks are nonblocking; a newer release remains discoverable and installation stays under user control.
+- Update checks run every five minutes only while the app is open. Closing it stops checks and exits the app; no service, scheduled task, tray process, or background updater remains active.
+- Slow network and file operations leave navigation and unrelated actions responsive. Changes appear live without manual refresh and preserve the user's current context.
+- Pending, failed, canceled, and completed operations remain distinct. Stale responses and repeated input cannot misrepresent state or create duplicate conflicting jobs.
+- Keyboard, screen-reader semantics, high contrast, resizing, and reduced motion are verified in the actual UI.
+- Collection and game-version policies that are still open are not silently invented.
+- UI and runtime verification are recorded separately from design review.
+
+Design verification: supplied colors recorded; contrast pairs measured; reference pages inspected; UI structure and motion purposes documented. The user accepted the visual direction and stack. Revision 0.4 records Starframe as the product name, retaining Tauri/Svelte/TypeScript/Rust and five-minute update checks limited to the app's lifetime. No app UI or runtime was built, so keyboard, animation, layout, responsiveness, updates, and game behavior are not yet verified. Implementation remains on hold until planning and design are complete.
+
+Required working guidance: [Ponytail](https://github.com/dietrichgebert/ponytail), [Anti-slop](https://github.com/miqdadbadjuber/anti-slop), and [Avoid AI Writing](https://github.com/conorbronsdon/avoid-ai-writing). These are installed globally in Codex. Read the applicable skill instructions when beginning the corresponding work.
