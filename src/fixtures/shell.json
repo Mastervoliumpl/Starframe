@@ -1,8 +1,9 @@
 {
   "landmarks": [
-    "<main>",
-    "<h1>Starframe</h1>",
-    "aria-labelledby=\"build-status\""
+    "id=\"workspace\"",
+    "aria-label=\"Main navigation\"",
+    "aria-label=\"My mods\"",
+    "Launch Sanctuary Shattered Sun"
   ],
   "status": "Mod management is not available in this build."
 }

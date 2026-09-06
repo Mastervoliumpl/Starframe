@@ -6,18 +6,18 @@ import subprocess
 from urllib.parse import unquote, urlsplit
 import xml.etree.ElementTree as ET
 
+from versions import read_version
+
 
 def check(root: Path, tracked: list[str]) -> list[str]:
     errors = []
     if any(Path(name).name.lower() == "agents.md" for name in tracked):
         errors.append("Machine-local AGENTS.md must not be tracked")
 
-    version = (root / "VERSION").read_text(encoding="utf-8").strip()
-    number = r"(?:0|[1-9][0-9]*)"
-    identifier = rf"(?:{number}|[0-9]*[A-Za-z-][0-9A-Za-z-]*)"
-    semver = rf"{number}\.{number}\.{number}(?:-{identifier}(?:\.{identifier})*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
-    if not re.fullmatch(semver, version):
-        errors.append(f"Invalid product version: {version}")
+    try:
+        read_version(root)
+    except (OSError, ValueError) as exc:
+        errors.append(str(exc))
 
     for name in tracked:
         path = root / name

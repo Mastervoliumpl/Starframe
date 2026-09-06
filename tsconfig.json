@@ -14,5 +14,11 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src/**/*", "vite.config.ts", "svelte.config.js"]
+  "include": [
+    "src/**/*",
+    "tests/browser/**/*.ts",
+    "playwright.config.ts",
+    "vite.config.ts",
+    "svelte.config.js"
+  ]
 }

@@ -2,15 +2,33 @@
 
 ## Unreleased
 
-Development version `0.1.0-dev.1`; issue #6 only.
+No pending changes.
+
+## 0.1.0 — 2026-09-06
+
+Desktop foundation; internal build with no published installer or app release.
 
 - Added the minimal Tauri desktop shell with plain Svelte, TypeScript and Vite.
 - Added locked dependencies, frontend and Rust check commands, and configuration/rendering fixture tests.
 - Extended required CI with frontend checks and a Windows executable build; added grouped npm/Cargo dependency updates.
 - Deferred TypeScript 7 dependency updates until the Svelte and ESLint checkers support that major version.
 - Kept text file line endings consistent on Windows so clean checkouts pass formatting checks.
+- Added version checks and preparation for npm, Cargo, Tauri and root lockfile entries, with tests for malformed input, drift and failed writes (#7).
+- Added CI version enforcement and Windows executable artifacts named with the product version and commit SHA (#7).
 
-Mod management, live state, storage and game discovery remain planned. No app release or installer is published.
+- Added six desktop destinations, the full reserved launch label, keyboard navigation and text resizing (#8).
+- Added revisioned native state, reconnect handling, generated TypeScript contracts and bounded diagnostics with progress, cancellation and failure states (#8).
+- Added a single-instance guard, restricted native capabilities, browser interaction tests and a Windows integration check (#8).
+
+- Added pinned local Turso persistence for library entries, ordered collection references and active selection, with revision checks and record constraints (#9).
+- Added migration backups, restore into a new directory, and Windows tests for rollback, forced termination, busy handling and corrupt/newer data retention (#9).
+- Added nonblocking storage startup and visible saved-data status; native tests now use isolated temporary data directories (#9).
+
+- Added Steam discovery, native folder selection, executable/layout/build validation and one saved game installation (#10).
+- Added live process observation, unknown-state handling and periodic selected-build validation without repeated Steam library scans (#10).
+- Verified native picker cancellation/errors, external process start/exit, restart persistence, changing builds and read-only inspection of the installed playtest (#10).
+
+Mod management, game launch and runtime integration remain planned. Database schema 3 preserves earlier records through backed-up migrations.
 
 ## 0.0.2 — 2026-09-06
 

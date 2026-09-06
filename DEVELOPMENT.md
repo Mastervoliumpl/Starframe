@@ -1,12 +1,12 @@
 # Starframe development and checks
 
-Status: development policy adopted on 6 September 2026. Milestone 0.1.0 is active; the user has authorized only issue #6.
+Status: development policy adopted on 6 September 2026. Milestone 0.1.0 is complete; later milestones remain planned.
 
 Read [DESIGN.md](DESIGN.md) for behavior and presentation, [ARCHITECTURE.md](ARCHITECTURE.md) for structure and recovery rules, and [ROADMAP.md](ROADMAP.md) for the current milestone. GitHub issues hold task scope, dependencies, acceptance criteria and verification evidence.
 
 ## Work one milestone at a time
 
-The design handoff is complete. **0.1.0** is active, with implementation limited to **issue #6**. Stop after that issue; the other issues need a further user instruction. Later milestones are planned work, not permission to begin implementation. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
+The design handoff and desktop foundation **0.1.0** are complete. No later milestone is active. Start further implementation only after user authorization. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
 
 Work on an issue only when its milestone is active and its prerequisites are complete. Keep issue dependencies in a `Depends on` section with issue links. Each issue must state its scope, observable completion criteria and checks. Split an issue when it contains independently reviewable outcomes; avoid splitting one small change into tasks that cannot be tested separately.
 
@@ -45,7 +45,7 @@ The C# code must compile without checking proprietary game assemblies into the r
 
 ## GitHub Actions
 
-Use pull-request and `main` push workflows for required checks. The repository job validates tracked documentation links, fenced blocks, SVG XML, the version format and exclusion of machine-local instructions. The frontend job runs a clean npm install, formatting, lint, Svelte/TypeScript checks, fixture tests and a production build on Linux. The Windows job runs Rustfmt, Clippy, Rust tests and a Tauri executable build. All three run on documentation changes too and feed `Required checks`; no path filters can leave it pending. None accesses game files.
+Use pull-request and `main` push workflows for required checks. The repository job validates tracked documentation links, fenced blocks, SVG XML, product version agreement and exclusion of machine-local instructions. The frontend job runs a clean npm install, formatting, lint, Svelte/TypeScript checks, fixture tests and a production build on Linux. After repository checks pass, the Windows job runs Rustfmt, Clippy, Rust tests and a Tauri executable build. It retains the executable for seven days as `starframe-<VERSION>-windows-x64-<commit SHA>`, using the full SHA of the checked-out revision (the merge revision for pull requests). All three run on documentation changes too and feed `Required checks`; no path filters can leave it pending. None accesses game files.
 
 Extend CI as source projects arrive. Keep one stable final status, `Required checks`, that fails if any applicable job fails or is canceled. If language jobs use path filtering, a small final job must still report a result for documentation-only changes; skipped workflows must not leave a required check pending forever. Shared contracts, lockfiles and workflow changes trigger all affected jobs.
 
@@ -57,13 +57,23 @@ Continuous delivery first creates reviewable artifacts and draft releases. Publi
 
 ## Versions and change history
 
-[VERSION](VERSION) is the source of the product version. The current value is `0.1.0-dev.1`, the desktop foundation in development, not a shipped app. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. The initial npm, Cargo and Tauri values match manually; automated version synchronization remains issue #7.
+[VERSION](VERSION) is the source of the product version. The current value is `0.1.0`, the completed internal desktop foundation, not a shipped installer. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
 
 Use three-part versions: `0.MINOR.PATCH` during initial development. A capability milestone advances the minor version; a corrective release advances the patch version. The planning handoff uses `0.0.1`. Published content is immutable; never replace a release with different bytes under the same version. The `0.x` series makes no stable public API promise, but format migrations and compatibility changes still need explicit notes. [Semantic Versioning](https://semver.org/)
 
 At the start of an implementation milestone, use its target version with a development suffix, such as `0.2.0-dev.1`. Increment the suffix for a newly distributed preview build, not every local commit; use the commit SHA to identify ordinary CI artifacts. Release candidates can use `0.2.0-rc.1`. Strip the suffix only when that version's release checks pass. Planned milestone titles are targets, not evidence of releases. Internal milestones need not publish installers.
 
-When build manifests exist, derive or check package.json, Cargo package metadata, Tauri's app version, and C# informational version against VERSION. Keep installer-specific numeric representations consistent with their platform requirements. A tested release-preparation command should update all required representations; CI rejects drift. Keep database, catalog, collection and runtime-contract versions separate from the app version. Catalog edits advance catalog revision without an app-version bump.
+To prepare a version, edit VERSION, then run these commands with Python 3.11 or later:
+
+```sh
+python scripts/versions.py --write
+python scripts/versions.py
+python -m unittest discover -s scripts -p 'test_*.py'
+```
+
+The command checks by default. `--write` copies VERSION into the product fields after parsing every required file. It preserves dependency versions and lockfile format versions. JSON files that need changes use two-space indentation; Cargo files retain their comments and formatting. Each file is replaced atomically. If preparation stops between files, repeat the command to finish synchronization. Inspect the diff and update the changelog and any documented version values before committing. The command does not create commits, tags, installers or releases.
+
+When the C# project arrives, add its `InformationalVersion` to `version_updates` using the standard-library XML parser, with fixtures in [the version tests](scripts/test_versions.py). Reuse `read_version` and the existing preflight/write path. Keep installer-specific numeric representations consistent with their platform requirements when packaging arrives. Database, catalog, collection and runtime-contract versions remain separate from the app version. Catalog edits advance catalog revision without an app-version bump.
 
 For a release, finalize its changelog entry, validate version agreement, and create an immutable `vX.Y.Z` tag from the checked commit. Use `gh` to create or inspect the draft release and workflow results. Publish after its acceptance checks and maintainer authorization. Do not fabricate changelog entries for work that is only planned.
 
@@ -84,9 +94,13 @@ npm run tauri -- build --no-bundle -- --locked
 
 Use `npm run tauri dev` for the native development window, or `npm run dev` for the browser frontend at `http://127.0.0.1:1420`. Use `npm run format` to format frontend/configuration files and `cargo fmt --manifest-path src-tauri/Cargo.toml` for Rust. Vitest watch mode is `npm run test:watch`. Stop the development command when finished.
 
-The shell has no game access, native commands or plugin permissions. It uses the accepted logo and a visible build-status message; navigation and live state remain issue #8. The Rust entry point follows the Tauri template, with sample commands, mobile output and unused plugins removed. The frontend uses plain Svelte/Vite as required by #6. No SvelteKit or animation framework is included.
+The shell has six destinations and five focused native commands for live state, diagnostics, fixed external pages and game discovery. Rust opens local Turso storage in Tauri's per-user local app-data directory. The frontend has no SQL or game access. Help & logs provides an explicitly labelled 1,000-row fixture and a diagnostic workload. The launch action remains unavailable until game setup and launch are implemented.
 
-The initial tests are tooling smoke checks, not feature coverage. The frontend fixture checks that the real Svelte component compiles and renders its landmarks and status. Rust checks the actual Tauri configuration and rejects a malformed window fixture. Missing tests cause Vitest to fail. Add behavior tests when each feature arrives; do not count these checks as validation of mod loading, state, storage or native accessibility.
+Vitest checks stale revisions, retired subscriptions, lost acknowledgements, duplicate actions and cancellation state. Rust tests operation transitions, command validation and the generated contract. To regenerate types after editing `model.rs`, set `UPDATE_BINDINGS=1` for a Cargo test run, then unset it. Normal tests compare the checked-in types without writing them.
+
+Run `npx playwright install chromium` once, then `npm run test:browser` for navigation, reconnect, keyboard, text resizing and diagnostic checks. Browser fixtures require the development URL `/?fixture`; production builds omit the fixture transport. These tests do not establish native behavior. On Windows, build with `npm run tauri -- build --debug --no-bundle -- --locked`, then run `npm run test:native`. These checks open and close their own debug app, temporarily enable WebView test connections on ports 9223 and 9224, and test real IPC, permissions, single-instance behavior, cancellation, reconnect, process exit, saved-data failures, game selection, the native folder picker and live process/build changes. They use new temporary data directories through `STARFRAME_TEST_DATA_DIR` and temporary Steam metadata through `STARFRAME_TEST_STEAM_ROOT`; release builds ignore both. The native picker test uses Windows UI Automation and messages scoped to its own app process. The ports must be free and no other Starframe instance may be running. Screenshots and timing data go under ignored `test-results/native`. No test connection is configured in the shipped app. CI builds the release executable and a separate debug executable for these isolated native tests. See [desktop results](docs/verification/desktop-state.md), [storage results and recovery](docs/verification/storage.md) and [game discovery/milestone exit](docs/verification/game-discovery.md).
+
+Storage tests run as part of `npm run check:rust`. The process-interruption test starts the ignored `storage::tests::crash_worker` test in child processes, waits for a committed fixture and flushed unfinished work, then forcibly terminates each child. The ignored test is a worker entry point, not a skipped recovery check. Run `cargo test --manifest-path src-tauri/Cargo.toml --offline --locked --lib` to repeat the storage gate without registry access. Tests use temporary databases and never use the user's app-data or game directory.
 
 The build icons were generated from [the approved SVG](docs/design/starframe-mark.svg) using Tauri's icon command. Only the PNG and Windows ICO needed for this build are retained. Final installer/taskbar asset review remains part of packaging.
 

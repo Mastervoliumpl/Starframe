@@ -1,6 +1,6 @@
 # Starframe architecture
 
-Status: draft 0.3, revised after user review on 6 September 2026. Accepted behavior is identified below; implementation details remain a proposal. The user has authorized only issue #6, which introduces the desktop shell and language tooling. This document does not authorize the other proposed modules.
+Status: draft 0.3, revised after user review on 6 September 2026. Accepted behavior is identified below; unimplemented structures remain proposals. Milestone 0.1.0 is authorized. Its implemented state layer is described below; later modules remain subject to their milestone and prerequisites.
 
 Read [DESIGN.md](DESIGN.md) for the accepted user experience and [CONTEXT.md](CONTEXT.md) for terminology. [DEVELOPMENT.md](DEVELOPMENT.md) defines continuous checks and versioning; [ROADMAP.md](ROADMAP.md) assigns the work to version milestones and issues. The [README](README.md) introduces the project, and [LICENSE](LICENSE) contains its licensing terms. Diagrams below are part of this proposal.
 
@@ -9,6 +9,10 @@ Read [DESIGN.md](DESIGN.md) for the accepted user experience and [CONTEXT.md](CO
 The [0.0.1 implementation handoff](docs/HANDOFF.md) narrows the initial Windows target, performance checks, activation/report formats, capabilities and settings registration. It records what can be implemented next and what still requires runtime evidence.
 
 ## 1. Starting point
+
+The desktop foundation currently uses `src-tauri/src/app.rs` for in-memory diagnostic operations, `commands.rs` for four focused commands, and `model.rs` for serializable state and errors. A contract test generates the TypeScript types in `src/lib/generated/model.ts`. One replaceable Tauri channel sends the initial snapshot under the state lock, then revisions and a two-second heartbeat. Session IDs identify the native process; revision strings preserve the full Rust integer range. The frontend rejects older revisions and retired subscriptions. A silent connection is replaced after six seconds without an accepted snapshot. Search, selection, page scroll and draft notes stay in Svelte.
+
+Diagnostics run bounded memory hashing outside the state lock in a blocking worker. Three simulated transfers report progress at most ten times per second. Request UUIDs prevent duplicate starts; cancellation becomes final only when the worker reaches its next boundary. This code has no storage or game operations. The single-instance plugin focuses the existing window before a second state owner can start. Closing the visible window ends the process. The local main-window capability grants only state subscription, diagnostic start/cancel and fixed external-page commands. External pages open through Rust's opener plugin; the frontend has no general opener permission. See [verification and limits](docs/verification/desktop-state.md).
 
 Starframe has an installed desktop manager and a game-side runtime that we own. Svelte presents the user's setup; Rust owns saved manager state, downloads, and deployment. A C# runtime inside the game handles ordered mod activation and the in-game settings UI, with BepInEx providing the initial bootstrap. The game runs independently of the desktop manager.
 
@@ -196,6 +200,12 @@ Use async I/O for transfers and the embedded database interface, with bounded bl
 ## 5. Saved data and file ownership
 
 Prefer the embedded Turso Database engine through the Rust `turso` crate. Its local builder opens a database file inside the application; cloud synchronization is optional and is not part of Starframe. This is the Rust SQLite rewrite, not the older libSQL client or a hosted Turso database. No Turso account, token, server, or system service is required. [Turso Rust quickstart](https://docs.turso.tech/sdk/rust/quickstart)
+
+Issue #9 implements this choice with `turso = 0.7.2`, pinned exactly with default features disabled. The required Windows checks passed, so the SQLite fallback was not selected. All SQL and the ordered schema migrations live in `src-tauri/src/storage.rs`. Schema 1 stores library entries, collections, ordered references and a database revision; schema 2 adds the active collection. Collection references identify exact content independently of local availability. The schema does not require referenced artifacts to be downloaded. Artifact paths derive from validated lowercase SHA-256 values under `artifacts/`; no binary content is stored in SQL. Catalog metadata, game records and deployment records will arrive with their features.
+
+The storage module owns one connection and an OS file lock for the data directory. Short immediate transactions validate expected revisions before writing; failed edits roll back. The native app opens storage in a blocking worker after creating the shell and publishes ready/error status through the existing channel. Database revisions cross that channel as decimal strings. Library and collection editing commands are not exposed by this issue.
+
+Before upgrading an existing schema, the module checkpoints the WAL, copies the database and any remaining WAL into a new backup directory, syncs the files and marks the backup complete. Migration steps commit their schema version with their changes. Startup rejects invalid headers, newer versions, unknown database ownership and invalid records without replacing them with an empty library. Restore validates a completed backup in a new directory and leaves the source and damaged data intact. This uses Turso's tested file/checkpoint behavior; it does not reopen files with another database engine. See [storage verification and recovery](docs/verification/storage.md).
 
 The current upstream README reports production use and Windows support. It also distinguishes experimental features, including multi-process WAL coordination. Starframe only needs ordinary local queries, short transactions, constraints and migrations; keep database access in the desktop Rust process and avoid experimental features or a second database writer inside the game. There is no measured reason to claim Turso makes Starframe faster. [Turso status](https://github.com/tursodatabase/turso/blob/main/README.md)
 
@@ -408,6 +418,8 @@ When native support ships, verify it, map native mod IDs to stable Starframe ide
 
 Game discovery reads Steam library/install metadata, validates the executable and layout, and falls back to a native folder picker. Keep app IDs and release/playtest differences in game metadata. Earlier local inspection found a Unity/Mono x64 playtest installation, app 4511930, build 25135612; this is dated evidence, not a universal path or a runtime compatibility claim. Reverify supported game layouts before implementation.
 
+Issue #10 implements read-only discovery in `game.rs` with Windows registry/process calls in `windows_game.rs`. The installed playtest layout was reverified on 6 September 2026. `game_service.rs` owns the storage connection and a bounded request queue, publishes game state, observes processes every two seconds and revalidates only the selected installation every 30 seconds. Steam library discovery runs at startup or on request. Long observation gaps invalidate running-state evidence before a fresh check. Schema 3 persists one selected installation ID/path. Native selection is confirmed only after validation and the database commit; failed/cancelled selections retain the previous record. See [verification and limits](docs/verification/game-discovery.md).
+
 Launch through the supported Steam/executable route after final readiness checks. If the requested collection changed during preparation, prepare that newer revision before launch. A successful launch request is not evidence that the game started or loaded every mod. Observe the actual game process, including launches outside Starframe; treat an unknown runtime state as a reason to postpone writes. Starframe cannot fully prevent Steam or another program from starting the game during a file change. Recheck before applying, stop safely on a detected start, and make this limitation part of the integration test plan.
 
 ## 8. Collections and local development
@@ -501,7 +513,7 @@ ROADMAP.md gives these slices their release targets. Work only within the active
 
 | Area | Current direction | Remaining work |
 | --- | --- | --- |
-| Local persistence | Embedded Turso is the preferred engine. | Verify the pinned version's required SQL, durability, migrations and Windows packaging; use the fallback only if these fail. |
+| Local persistence | Embedded Turso 0.7.2 passed the issue #9 Windows gate. | Keep testing new SQL and migrations as features arrive; verify installer/update lifecycle and broader fault conditions before release. |
 | Collections and application | Name plus ordered references; reuse exact content; automatically apply when the game is closed. User confirmed. | Validate import recovery, dependency adjustments and pending-state UI. |
 | Load order | Resolve dependencies automatically; allow manual priority within valid orders. | Review the UI; verify actual activation and define supported content-overlay precedence. |
 | Local builds | Normal mod controls without catalog version checks; watched managed copies. | Test incomplete builds, missed notifications and exit-time application. |
@@ -511,4 +523,4 @@ ROADMAP.md gives these slices their release targets. Work only within the active
 | Catalog and compatibility | Independent five-minute refresh; older game-version declarations warn without blocking. User confirmed. | Validate metadata publication, caching, withdrawal and offline behavior. |
 | Windows distribution | Use Tauri NSIS, its uninstaller and signed updater. | Verify on supported Windows versions, including data retention and Starframe-owned game cleanup. |
 
-The remaining work concerns interface details and verification. The user-confirmed behavior above is not reopened as a product question. This is still a planning document; no game integration, database recovery, or installer behavior has been tested in Starframe.
+The remaining work concerns interface details and verification. The user-confirmed behavior above is not reopened as a product question. Desktop state and database recovery now have recorded implementation evidence. Game integration and installer behavior remain unverified proposals.

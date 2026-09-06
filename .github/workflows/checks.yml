@@ -18,6 +18,8 @@ jobs:
     name: Repository checks
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -27,6 +29,9 @@ jobs:
           python-version: '3.13'
       - run: python -m unittest discover -s scripts -p 'test_*.py'
       - run: python scripts/check_repository.py
+      - run: python scripts/versions.py
+      - id: version
+        run: python -c "from pathlib import Path; print('version=' + Path('VERSION').read_text().strip())" >> "$GITHUB_OUTPUT"
 
   frontend:
     name: Frontend checks
@@ -42,9 +47,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() }}
+        with:
+          name: desktop-browser-test-results
+          path: test-results/
+          retention-days: 7
 
   windows:
     name: Rust checks and Windows build
+    needs: repository
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -62,10 +76,29 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: src-tauri
+          cache-on-failure: true
+      - name: Prepare WebView2 for native tests
+        timeout-minutes: 5
+        run: ./scripts/prepare_windows_tests.ps1
       - run: npm ci
       - run: npm run build
       - run: npm run check:rust
+      - run: npm run tauri -- build --debug --no-bundle -- --locked
+      - run: npm run test:native
       - run: npm run tauri -- build --no-bundle -- --locked
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() }}
+        with:
+          name: desktop-native-test-results
+          path: test-results/native/
+          if-no-files-found: ignore
+          retention-days: 7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: starframe-${{ needs.repository.outputs.version }}-windows-x64-${{ github.sha }}
+          path: src-tauri/target/release/starframe.exe
+          if-no-files-found: error
+          retention-days: 7
 
   required:
     name: Required checks
