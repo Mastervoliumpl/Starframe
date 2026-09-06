@@ -121,6 +121,7 @@ fn revalidate(view: &mut GameView, selected: &Option<(String, String)>) {
             Ok(mut item) => {
                 if view.selected.is_none() {
                     view.error.clear();
+                    view.message = "Saved game location is available.".into();
                 }
                 item.id = id.clone();
                 view.selected = Some(item);

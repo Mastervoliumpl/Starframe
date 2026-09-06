@@ -127,6 +127,9 @@ await withDesktop(
   async (page) => {
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await expect(
+      page.getByText('Saved game location is available.'),
+    ).toBeVisible();
+    await expect(
       page.getByRole('heading', { name: 'Selected installation' }),
     ).toBeVisible();
     await expect(
