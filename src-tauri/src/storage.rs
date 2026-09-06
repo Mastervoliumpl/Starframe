@@ -10,15 +10,16 @@ use turso::{
 };
 use uuid::Uuid;
 
-const SCHEMA: i64 = 2;
+const SCHEMA: i64 = 3;
 const APPLICATION_ID: i64 = 0x53544652;
-const MIGRATIONS: [&str; 2] = [
+const MIGRATIONS: [&str; 3] = [
     "CREATE TABLE metadata (id INTEGER PRIMARY KEY CHECK(id = 1), engine TEXT NOT NULL CHECK(engine = 'turso'), revision INTEGER NOT NULL CHECK(revision >= 0));
      INSERT INTO metadata VALUES (1, 'turso', 0);
      CREATE TABLE library (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author) <= 200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(mod_id, hash), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL)));
      CREATE TABLE collections (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), revision INTEGER NOT NULL CHECK(revision > 0));
      CREATE TABLE collection_entries (collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE, position INTEGER NOT NULL CHECK(position >= 0), mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(collection_id, position), UNIQUE(collection_id, mod_id), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL)));",
     "CREATE TABLE preferences (id INTEGER PRIMARY KEY CHECK(id = 1), active_collection TEXT REFERENCES collections(id)); INSERT INTO preferences VALUES (1, NULL);",
+    "CREATE TABLE game_selection (singleton INTEGER PRIMARY KEY CHECK(singleton = 1), installation_id TEXT NOT NULL, path TEXT NOT NULL CHECK(length(path) BETWEEN 1 AND 32768));",
 ];
 
 #[derive(Debug)]
@@ -114,6 +115,19 @@ pub struct Storage {
     _lock: File,
 }
 
+fn validate_game_selection(id: &str, path: &str) -> Result<()> {
+    if Uuid::parse_str(id).is_err()
+        || path.len() > 32768
+        || !Path::new(path).is_absolute()
+        || path.chars().any(char::is_control)
+    {
+        return Err(Error::Invalid(
+            "The saved game selection is invalid.".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn lock(root: &Path) -> Result<File> {
     fs::create_dir_all(root)?;
     let file = OpenOptions::new()
@@ -153,6 +167,36 @@ async fn finish<T>(tx: Transaction<'_>, result: Result<T>) -> Result<T> {
 }
 
 impl Storage {
+    pub async fn selected_game(&self) -> Result<Option<(String, String)>> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT installation_id, path FROM game_selection WHERE singleton = 1",
+                (),
+            )
+            .await?;
+        let Some(row) = rows.next().await? else {
+            return Ok(None);
+        };
+        let id: String = row.get(0)?;
+        let path: String = row.get(1)?;
+        validate_game_selection(&id, &path)?;
+        Ok(Some((id, path)))
+    }
+
+    pub async fn select_game(&mut self, id: &str, path: &str) -> Result<i64> {
+        validate_game_selection(id, path)?;
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .await?;
+        let result = async {
+            tx.execute("INSERT INTO game_selection (singleton, installation_id, path) VALUES (1, ?, ?) ON CONFLICT(singleton) DO UPDATE SET installation_id=excluded.installation_id, path=excluded.path", [id, path]).await?;
+            bump(&tx).await
+        }.await;
+        finish(tx, result).await
+    }
+
     /// Open only from a background worker. File locks, backups and engine work can block.
     pub async fn open(root: &Path) -> Result<Self> {
         let guard = lock(root)?;
@@ -548,6 +592,29 @@ mod tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
+    async fn game_selection_survives_migration_and_restart() {
+        let root = tempfile::tempdir().unwrap();
+        let mut store = Storage::open(root.path()).await.unwrap();
+        store.put_library_entry(&entry(), 0).await.unwrap();
+        store
+            .conn
+            .execute_batch("DROP TABLE game_selection; PRAGMA user_version = 2;")
+            .await
+            .unwrap();
+        drop(store);
+        let mut store = Storage::open(root.path()).await.unwrap();
+        assert!(store.selected_game().await.unwrap().is_none());
+        let id = Uuid::new_v4().to_string();
+        let path = root.path().join("game").to_str().unwrap().to_owned();
+        assert_eq!(store.select_game(&id, &path).await.unwrap(), 2);
+        assert!(store.select_game("invalid", "relative/path").await.is_err());
+        drop(store);
+        let store = Storage::open(root.path()).await.unwrap();
+        assert_eq!(store.selected_game().await.unwrap(), Some((id, path)));
+        assert_eq!(store.load().await.unwrap().library, vec![entry()]);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
     async fn records_survive_restart_with_order_origin_and_revisions() {
         let root = tempfile::tempdir().unwrap();
         let mut store = Storage::open(root.path()).await.unwrap();
@@ -638,7 +705,9 @@ mod tests {
         store.put_library_entry(&entry(), 0).await.unwrap();
         store
             .conn
-            .execute_batch("DROP TABLE preferences; PRAGMA user_version = 1;")
+            .execute_batch(
+                "DROP TABLE preferences; DROP TABLE game_selection; PRAGMA user_version = 1;",
+            )
             .await
             .unwrap();
         let backup = store.backup().await.unwrap();
@@ -794,7 +863,7 @@ mod tests {
             if mode == "migration" {
                 store
                     .conn
-                    .execute_batch("DROP TABLE preferences; PRAGMA user_version = 1;")
+                    .execute_batch("DROP TABLE preferences; DROP TABLE game_selection; PRAGMA user_version = 1;")
                     .await
                     .unwrap();
                 store.backup().await.unwrap();
