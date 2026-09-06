@@ -4,6 +4,15 @@
 
 No application changes yet.
 
+## 0.0.2 — 2026-09-06
+
+Design amendments; no app binary released.
+
+- Retained the logo and accepted the desktop layout as the first-version baseline.
+- Replaced the in-game mockup with requirements for Sanctuary's own menu style and a monochrome Starframe Mods icon.
+- Specified the full launch label with faded, orange-tinted game artwork; artwork selection and in-game rendering remain implementation checks.
+- Added accessibility and motion skill guidance, updated runtime inventory requirements, and revised the future implementation issues.
+
 ## 0.0.1 — 2026-09-06
 
 Design and development handoff; no app binary released.
