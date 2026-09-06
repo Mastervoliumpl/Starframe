@@ -22,3 +22,5 @@ if (!$taskVersion) {
 }
 Write-Output "WebView2 Runtime: $taskVersion"
 Write-Output "Windows session: $([System.Diagnostics.Process]::GetCurrentProcess().SessionId); interactive: $([Environment]::UserInteractive)"
+$taskPrincipal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
+Write-Output "Elevated: $($taskPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))"

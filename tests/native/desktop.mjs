@@ -23,8 +23,7 @@ const child = spawn(executable, [], {
   env: {
     ...process.env,
     STARFRAME_TEST_DATA_DIR: dataDirectory,
-    WEBVIEW2_USER_DATA_FOLDER: join(dataDirectory, 'webview'),
-    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9223',
+    STARFRAME_TEST_DEBUG_PORT: '9223',
   },
 });
 let browser;
@@ -73,7 +72,6 @@ try {
     env: {
       ...process.env,
       STARFRAME_TEST_DATA_DIR: dataDirectory,
-      WEBVIEW2_USER_DATA_FOLDER: join(dataDirectory, 'second-webview'),
     },
   });
   await expect.poll(() => second.exitCode).toBe(0);

@@ -22,6 +22,23 @@ fn data_directory(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> 
 }
 
 fn main() {
+    let context = tauri::generate_context!();
+    #[cfg(debug_assertions)]
+    let context = {
+        let mut context = context;
+        if let Some(root) = std::env::var_os("STARFRAME_TEST_DATA_DIR") {
+            for window in &mut context.config_mut().app.windows {
+                window.data_directory = Some(std::path::PathBuf::from(&root).join("webview"));
+                if let Ok(port) = std::env::var("STARFRAME_TEST_DEBUG_PORT")
+                    && matches!(port.as_str(), "9223" | "9224")
+                {
+                    window.additional_browser_args =
+                        Some(format!("--remote-debugging-port={port}"));
+                }
+            }
+        }
+        context
+    };
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             if let Some(window) = app.get_webview_window("main") {
@@ -64,6 +81,6 @@ fn main() {
             commands::open_external,
             commands::game_action
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("Starframe could not start");
 }

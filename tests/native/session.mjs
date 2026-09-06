@@ -1,7 +1,7 @@
 import { chromium, expect } from '@playwright/test';
 import { spawn, execFileSync } from 'node:child_process';
 
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createServer } from 'node:net';
 
@@ -20,8 +20,7 @@ export async function withDesktop(root, check, env = {}) {
       ...process.env,
       ...env,
       STARFRAME_TEST_DATA_DIR: root,
-      WEBVIEW2_USER_DATA_FOLDER: join(root, 'webview'),
-      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9224',
+      STARFRAME_TEST_DEBUG_PORT: '9224',
     },
   });
   let browser;
