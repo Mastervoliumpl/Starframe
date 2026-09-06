@@ -1,6 +1,6 @@
 # Starframe: design direction
 
-Status: revision 0.4, 6 September 2026. Product name: Starframe. Visual direction and Tauri/Svelte/TypeScript/Rust stack accepted by the user.
+Status: revision 0.5, 6 September 2026. Product name: Starframe. Visual direction and Tauri/Svelte/TypeScript/Rust desktop stack accepted by the user.
 
 This is a design handoff. Implementation is not yet authorized. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
@@ -8,7 +8,9 @@ This is a design handoff. Implementation is not yet authorized. The user accepte
 
 Build Starframe, an installable desktop mod manager for Sanctuary: Shattered Sun, Windows first. Users can download approved releases, manage installed mods, create and share collections, and launch the game. The owner curates individual releases. Downloads come from authors' locations; the app does not host mod binaries.
 
-Local imports are managed mods too. Developers must be able to load and manage their own local builds. Label their origin clearly as `Local import`; do not make their controls second-class or describe them as approved catalog downloads. Details of folder watching and development workflows remain for product planning.
+Local imports are managed mods too. Developers must be able to load and manage their own local builds. Label their origin clearly as `Local import`; provide the same management controls without online catalog version checks. Watch imported sources and prepare updated copies as described in [ARCHITECTURE.md](ARCHITECTURE.md).
+
+Starframe owns its in-game mod runtime and settings UI, initially using BepInEx for bootstrap. Keep the desktop manager usable above the game's planned native mod support when that becomes available. Its interface is not yet published; supported controls must follow the active integration's capabilities.
 
 The visual direction is dark navy with orange accents. It should feel modern and related to Sanctuary, with its own identity. Draw from the game's visual character without reproducing its interface or logo. Motion and rounded corners must have a purpose.
 
@@ -27,7 +29,7 @@ The user supplied these six colors:
 | Light gray | `#CBD5E1` | Body text and secondary labels |
 | White | `#F8FAFC` | Titles and strongest text |
 
-Game compatibility and mod versions are separate concepts. Game-version compatibility belongs in the design. Whether shared collections pin exact mod releases is still undecided; do not represent that proposal as accepted.
+Game compatibility and mod releases are separate concepts. Warn when a catalog mod was made for an older game version, while still allowing the user to enable it and try launching. Collections contain a name and an ordered list of mod references. Sharing preserves those releases and their order, without mod settings. Refresh catalog data independently on launch and every five minutes while the desktop app is open; this does not require an app update.
 
 ## 2. Visual character
 
@@ -158,7 +160,7 @@ Landing view: My mods. The visible active collection selector explains which set
 
 Use a list by default. A row contains a selection checkbox, mod name and author, version, origin, compatibility text, and an enabled switch. Selection chooses rows for bulk actions; the switch changes whether a mod is included in the active setup. These are separate controls with separate accessible labels.
 
-Show `Catalog release` or `Local import` as plain provenance text. Show compatibility as `Compatible with [game version]`, `Not checked for this version`, or a specific mismatch. Approval and compatibility are separate labels. Never display `Malware-free` or imply that curation guarantees safety.
+Show `Catalog release` or `Local import` as plain provenance text. Catalog compatibility uses labels such as `Compatible with [game version]`, `Not checked for this version`, or `Made for a previous game version`. Show the declared and installed game versions in details. An older-version warning must not disable Enable or Play or repeatedly demand confirmation. Missing required dependencies and a missing runtime are separate issues. Local imports skip catalog compatibility-version checks. Approval and compatibility are separate labels. Never display `Malware-free` or imply that curation guarantees safety.
 
 Keep frequent actions visible when relevant. Put uninstall and infrequent actions in a named row menu. Clicking the mod name opens its detail view. Hover changes only the row fill; selection uses the selected surface, a checked selector, and readable text. Do not make information appear only on hover.
 
@@ -170,25 +172,39 @@ Use compact list entries with optional author-supplied artwork. A large thumbnai
 
 Details include description, author/source link, approved versions, dependencies, compatibility notes, and installation state. Put technical paths and diagnostics behind expandable sections. Download progress belongs beside the action it replaces and in Downloads. Keep labels stable in width as progress changes.
 
+Fetch catalog changes on startup and every five minutes while the app is open. A valid new catalog updates the list in place, preserving filters, focus and scroll position. Reuse cached data while offline and show when it was last checked. New approval metadata must not install a mod or update an installed release by itself.
+
 ### Collections
 
 Tiles are appropriate here because each collection is an identifiable setup. Use an 8-unit radius, optional artwork, its name, and a concise mod summary. One active collection gets an explicit `Active` label and a check, not a glowing border. Use two or three columns where they fit; fall back to a list at narrow widths.
 
 Opening a collection shows its contents and `Use collection`, `Edit`, and `Share` actions as applicable. A collection summary may use the proposed cropped artwork header. Do not embed game art behind its editable list.
 
-The share/import review shows which mods can be obtained from approved catalog releases, which are local-only, and which are unavailable. An imported file must not silently grant approval to arbitrary download links. Exact release pinning, settings inclusion, and sharing format still require product decisions.
+A collection is a name and an ordered list of mods. Do not add collection-level mod settings. Enabling a library mod adds it to the active collection; disabling removes it from that collection while keeping its downloaded files. Confirmed edits save automatically. Changes to the active collection apply automatically when the game is closed; while it runs, show `Waiting for game to close` and apply the latest saved revision after exit. There is no separate Apply button.
+
+If Starframe closes before the game, retain those pending changes until the desktop app next opens. Explain this in the pending status when closing; do not leave a process running to apply them.
+
+Show numbered load order and provide both drag handles and keyboard-accessible move actions. Resolve required dependencies automatically. Manual movement changes priority only where the dependency rules permit it. Explain adjustments beside the affected row, such as `Core Library must load before Terrain Tools`. Show the effective order that will run. A cycle identifies the affected mods and the next action. If a package or integration cannot honor manual order, explain that limitation and disable its reorder control.
+
+The share/import review shows which exact releases are already downloaded, which will be downloaded, which are local-only, and which are unavailable. Once the user accepts import, reuse verified matches and download missing approved releases automatically, preserving the shared order. Keep unavailable entries visible for repair; never silently substitute the latest release. An imported file cannot approve arbitrary download links. Local-only builds need matching imported content on the receiving computer. Sharing excludes binaries, local paths and mod settings.
 
 ### Local development
 
-Use the same list, details, switches, and collection controls as catalog mods. Show the local source path in details, with copy/open actions. Include an `Import local mod` entry point. Detect changes to a local build and update its visible state without requiring a refresh. The observation mechanism and development workflow remain engineering decisions. A changed file must not appear as a catalog update or imply that the running game has loaded the new build. Hot reload is not decided by this design.
+Use the same list, details, switches, load order, and collection controls as catalog mods. Show the local source path in details, with copy/open actions. Include an `Import local mod` entry point. Detect a rebuilt local mod and update its visible state without requiring a refresh. Apply a valid new copy automatically when it is active and the game is closed. While the game runs, show the pending build without claiming it has loaded. Incomplete builds retain the last usable copy. Do not show catalog update or compatibility-version checks for local imports. Uninstall removes the managed copy, never the source folder. DLL hot reload is not part of the first version.
 
 ### Launch and setup
 
 The persistent launch area shows the active collection and a short readiness message. Typical labels are `Play`, `Preparing mods`, `Game running`, or `Finish setup`. The primary action changes only when the next useful action changes.
 
-Problems have a nearby `View issues` action and a count only when the count is real. Downloading and applying changes must not appear complete until they succeed. While the game runs, explain when a change requires closing it. The runtime policy and reconciliation with in-game switches remain separate engineering work.
+Problems have a nearby `View issues` action and a count only when the count is real. Downloading and applying changes must not appear complete until they succeed. While the game runs, collection edits remain available and show that application is waiting for exit. Play waits for the latest valid active collection to finish preparation. A game-version warning alone leaves Play available.
 
 First-run setup uses one focused sequence: locate game, explain the loader requirement, review the planned setup, show progress, then show the resulting state. Reuse native file pickers. Do not make users navigate multiple settings pages for the initial setup.
+
+### In-game mod settings
+
+Provide a Starframe-owned mod list and settings view inside the game. Use its navy-and-orange identity where it remains legible over game content. Review the actual in-game screen separately; desktop window dimensions and controls do not transfer unchanged to a game overlay. Keep keyboard focus, mouse input, close/back behavior and text scaling explicit.
+
+Show each mod's named settings using suitable controls for its supported types, with descriptions and defaults where supplied. Save changes to that mod's configuration. Settings stay the same when a collection changes. A setting applies live only when the mod supports it; otherwise display `Takes effect after restart`. The desktop does not maintain a second copy to merge. Loading and collection membership changes still wait for a game restart rather than promising live DLL unloading.
 
 ### Live behavior and responsiveness
 
@@ -209,15 +225,15 @@ Target smooth motion at 60 frames per second on the agreed baseline hardware. In
 
 Run the startup check after the shell is usable, then check every five minutes while the app is open. Five minutes is the selected default within the user's suggested range. Checks also continue while the window is minimized. After sleep or connectivity returns, run one check if due, with no burst of missed checks. Keep requests from overlapping and delay retries if the server requests it. Settings also provides `Check for updates`, the installed version, and the last successful check time.
 
-All checking runs within the app's lifetime. Closing the app exits it and stops update checks. Do not install a service, scheduled task, startup agent, or separate background updater. Do not keep the app running in the system tray after its window closes. While the app is closed, it performs no work. If a file operation needs to finish safely before exit, explain that in the visible app instead of silently continuing after close.
+All desktop checking runs within the app's lifetime. Closing the app exits it and stops update checks. Do not install a service, scheduled task, startup agent, or separate background updater. Do not keep the app running in the system tray after its window closes. If a file operation needs to finish safely before exit, explain that in the visible app instead of silently continuing after close. The in-game runtime remains part of an already-running game and ends with that game.
 
 Use the official app repository's published releases. Compare release versions with the installed app version. The initial recommendation is stable releases only; a preview channel requires a separate product decision. Keep the repository address configurable by the maintainer, not an arbitrary imported collection.
 
-When a newer eligible version exists, show a persistent, quiet `Update available` notice near Settings or Help. Opening it shows the installed version, available version, release notes, and `View release` and `Later` actions. If the chosen distribution tooling supports an integrated updater, offer `Update` there. Keep the notice separate from the main Play action and do not interrupt a game launch with a modal. Dismissing the notice must not cause repeated prompts for the same release; the update remains accessible in Settings.
+When a newer eligible version exists, show a persistent, quiet `Update available` notice near Settings or Help. Opening it shows the installed version, available version, release notes, and `Update`, `View release` and `Later` actions. Keep the notice separate from the main Play action and do not interrupt a game launch with a modal. Dismissing the notice must not cause repeated prompts for the same release; the update remains accessible in Settings.
 
-The user chooses when to install or restart. Background checking does not authorize automatic installation. An app update must wait for active file changes to reach a safe stopping point. Failure to reach GitHub leaves mod management usable and shows a nonblocking check status. Do not label a failed check as `Up to date`.
+The user chooses when to install or restart. Background checking does not authorize automatic installation. An app update must wait for active file changes to reach a safe stopping point and, initially, for the game to close because the release can include a new in-game runtime. Explain that reason beside the action. Failure to reach GitHub leaves mod management usable and shows a nonblocking check status. Do not label a failed check as `Up to date`.
 
-The installer and update installation method are still undecided. Evaluate Tauri's maintained [updater plugin](https://v2.tauri.app/plugin/updater/), including its artifact verification; GitHub can host its static update metadata and release artifacts. Any chosen tooling must respect the app-lifetime rule above. No custom updater is required by this design.
+Use Tauri's NSIS installer, generated Windows uninstaller, and signed updater as specified in [ARCHITECTURE.md](ARCHITECTURE.md). Preserve user data by default. Provide `Remove Starframe from game` in Settings to remove owned integration files safely, with the game closed. App removal and game cleanup must state their different effects. No custom installer framework or persistent update service is required.
 
 ## 8. Motion specification
 
@@ -271,6 +287,8 @@ The user selected Tauri + Svelte + TypeScript, with Rust handling local operatio
 - Svelte and TypeScript define the interface, interaction states, and live presentation of data.
 - Rust handles local file operations and game launching. Long-running work must leave the interface responsive and report progress and results back to it.
 
+The in-game component uses C# for the verified Unity/Mono environment, with BepInEx providing bootstrap and reusable configuration support. Starframe owns its activation logic and settings presentation. The proposed local database is embedded Turso; details and validation requirements belong in ARCHITECTURE.md.
+
 Validate accessible mod lists, live state updates, safe file operations, installer/update behavior, and purposeful motion against this design. Verify responsiveness under representative background load. Framework versions and additional dependencies will be chosen during implementation planning. Ponytail is required for all coding and dependency decisions: reuse established code, standard libraries, and platform features before custom solutions. Do not add a UI library solely to obtain one transition.
 
 ## 11. Review and handoff
@@ -282,9 +300,9 @@ Before implementation, settle:
 - Independent logo/wordmark for Starframe.
 - Visual validation of the accepted fonts, neutral shades, corner motif, navigation, and starting dimensions.
 - Approval of the representative visual screens and motion samples.
-- Collection version policy, settings sharing, and local-build sharing behavior.
+- The in-game settings screen and accessible load-order interactions.
 - Supported Windows versions.
-- Update installation method.
+- Validation of the chosen Windows installation and update flow.
 
 Handoff acceptance criteria:
 
@@ -298,9 +316,13 @@ Handoff acceptance criteria:
 - Slow network and file operations leave navigation and unrelated actions responsive. Changes appear live without manual refresh and preserve the user's current context.
 - Pending, failed, canceled, and completed operations remain distinct. Stale responses and repeated input cannot misrepresent state or create duplicate conflicting jobs.
 - Keyboard, screen-reader semantics, high contrast, resizing, and reduced motion are verified in the actual UI.
-- Collection and game-version policies that are still open are not silently invented.
+- Collections preserve exact mod references and order; imports reuse downloaded matches before fetching missing approved releases. They contain no mod settings.
+- Active collection edits apply automatically when the game is closed and remain visibly pending while it runs.
+- Load-order controls respect dependencies and the actual integration capabilities; keyboard operation works without dragging.
+- Catalog changes appear without an app update. Older game-version declarations warn while still allowing enable and launch.
+- In-game settings have clear persistence and restart behavior, and remain usable after the desktop app closes.
 - UI and runtime verification are recorded separately from design review.
 
-Design verification: supplied colors recorded; contrast pairs measured; reference pages inspected; UI structure and motion purposes documented. The user accepted the visual direction and stack. Revision 0.4 records Starframe as the product name, retaining Tauri/Svelte/TypeScript/Rust and five-minute update checks limited to the app's lifetime. No app UI or runtime was built, so keyboard, animation, layout, responsiveness, updates, and game behavior are not yet verified. Implementation remains on hold until planning and design are complete.
+Design verification: supplied colors recorded; contrast pairs measured; reference pages inspected; UI structure and motion purposes documented. The user accepted the visual direction and desktop stack. Revision 0.5 records ordered collections without mod settings, automatic application after game exit, independent catalog refresh, permissive game-version warnings, and Starframe-owned in-game settings. No app UI or runtime was built, so keyboard, animation, layout, responsiveness, updates, and game behavior are not yet verified. Implementation remains on hold until planning and design are complete.
 
 Required working guidance: [Ponytail](https://github.com/dietrichgebert/ponytail), [Anti-slop](https://github.com/miqdadbadjuber/anti-slop), and [Avoid AI Writing](https://github.com/conorbronsdon/avoid-ai-writing). These are installed globally in Codex. Read the applicable skill instructions when beginning the corresponding work.

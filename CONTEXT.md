@@ -21,7 +21,7 @@ The maintainer's list of approved releases, their download locations, and releva
 _Avoid_: Marketplace, mod hosting service.
 
 **Local import**:
-A mod supplied from the user's computer rather than obtained through the curated catalog. It remains a managed mod with a distinct origin.
+A mod supplied from the user's computer rather than obtained through the curated catalog. It has the same management and load-order behavior, but no catalog release-update checks.
 _Avoid_: Unmanaged mod, approved release.
 
 **Local build**:
@@ -31,14 +31,20 @@ A particular revision of a locally developed mod. Replacing it does not make it 
 The mods and versions available locally through Starframe. Being in the library does not necessarily mean a mod is enabled or loaded by the game.
 
 **Collection**:
-A named mod setup that the user can edit, select, and share. Exact release pinning and settings inclusion are separate policy decisions.
+A named, ordered list of mod references that the user can edit, select, and share. It does not contain mod settings; sharing identifies the same releases or local content where available.
 _Avoid_: Switching between collection, profile, and playset for the same concept.
 
 **Active collection**:
 The collection selected as the user's intended setup for the next launch.
 
 **Enabled**:
-Included in the intended setup. A pending change to that setup does not mean the running game has applied it.
+Included in the active collection. A pending change to that collection does not mean the running game has applied it.
+
+**Load order**:
+The sequence in which the selected mods are activated or their content is applied. Required dependencies constrain the sequence; the user's order determines priority where those constraints allow it.
+
+**Mod settings**:
+Values that control a mod's behavior, such as a shortcut, display option, or feature toggle. They belong to the mod's configuration, not to a collection.
 
 **Deployment**:
 The mod files and loader configuration prepared in a particular game installation. It can differ from the active collection while changes are pending.
@@ -52,8 +58,11 @@ The identified revision of the game against which mod compatibility can be asses
 _Avoid_: Using mod version or app version to mean game build.
 
 **Loader**:
-Software that allows the game to load mods. BepInEx and Remmy's custom Mod Loader have separate roles in the loading chain.
+Software that allows the game to load mods. Starframe owns its in-game loading and settings experience, using BepInEx for the initial bootstrap.
 _Avoid_: Calling the desktop app itself the DLL loader.
+
+**Native mod support**:
+The game developer's planned mod loading or hosting facilities. Its interface is not yet specified here; Starframe will manage mods through it when supported.
 
 **App update**:
 A new release of Starframe itself, separate from a mod release, catalog change, or game update.
