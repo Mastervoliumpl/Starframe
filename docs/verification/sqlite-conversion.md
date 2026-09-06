@@ -1,5 +1,7 @@
 # Turso-to-SQLite conversion proof
 
+Historical #39 report. The implementation has since moved into production storage; see [current SQLite verification and recovery](sqlite.md). Statements below describe the proof revision.
+
 Issue [#39](https://github.com/Mastervoliumpl/Starframe/issues/39), 6 September 2026. Milestone 0.1.1 is active at 0.1.1-dev.1. This is an executable test-only proof, not an application migration command. The production storage module still uses Turso.
 
 ## Decision and pinned inputs

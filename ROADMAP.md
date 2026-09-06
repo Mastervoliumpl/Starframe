@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-Completed milestones: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)**, **[0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9)** and **[0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2)**. Current product version: **0.1.1-dev.1**, an internal desktop foundation build. No app release or installer has been published. The active milestone is **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)**, authorized on 6 September 2026. Issue #39 proves conversion in isolated tests; the app still uses Turso until #40.
+Completed milestones: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)**, **[0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9)** and **[0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2)**. Current product version: **0.1.1-dev.1**, an internal desktop foundation build. No app release or installer has been published. The active milestone is **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)**, authorized on 6 September 2026. SQLite persistence and legacy conversion are implemented; exit verification and build measurements remain in progress.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -53,7 +53,7 @@ Complete. Issues #6–#10 deliver the shell, synchronized versions, responsive l
 
 ### 0.1.1: SQLite transition
 
-Active before 0.2.0. [Decision and scope](docs/planning/sqlite-transition.md): prove recoverable conversion of existing Turso records/backups, replace the local engine with bundled SQLite, and verify recovery plus Windows build costs. The development version is 0.1.1-dev.1. [Conversion proof](docs/verification/sqlite-conversion.md) records issue #39's results; engine replacement remains #40. Exit requires preserved records/artifacts, passing affected checks and no Turso in the shipped app. No release publication or game-file changes are included.
+Active before 0.2.0. [Decision and scope](docs/planning/sqlite-transition.md): prove recoverable conversion of existing Turso records/backups, replace the local engine with bundled SQLite, and verify recovery plus Windows build costs. The development version is 0.1.1-dev.1. [Conversion proof](docs/verification/sqlite-conversion.md) records issue #39's results; production conversion and native checks now pass locally. Exit requires preserved records/artifacts, passing affected checks and no Turso in the shipped app. No release publication or game-file changes are included.
 
 - [#39: Prove recoverable conversion from Turso to SQLite](https://github.com/Mastervoliumpl/Starframe/issues/39)
 - [#40: Replace Turso persistence with bundled SQLite](https://github.com/Mastervoliumpl/Starframe/issues/40)

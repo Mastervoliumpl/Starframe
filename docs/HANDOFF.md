@@ -146,7 +146,7 @@ The runtime is the only settings writer during play. Validate values before savi
 
 ## Storage proof and dependency choices
 
-The 0.1.1 decision selects bundled SQLite through rusqlite, with one desktop database owner on the existing background worker. It supersedes the original Turso preference. The current 0.1.0 implementation still uses Turso 0.7.2. See the [decision and conversion plan](planning/sqlite-transition.md).
+The 0.1.1 decision selects bundled SQLite through rusqlite, with one desktop database owner on the existing background worker. It supersedes the original Turso preference. The 0.1.1 implementation uses bundled SQLite and retains original Turso files during conversion. See [current recovery instructions](verification/sqlite.md). See the [decision and conversion plan](planning/sqlite-transition.md).
 
 Issue #9 proved the original Turso implementation on Windows; retain that evidence. SQLite must pass required transactions/constraints, restart persistence, forced termination, backup/restore, successful/failed migrations, unsupported future schema and offline checks. Add retained-source conversion fixtures for schemas 1 through 3, WAL-bearing data and completed backups. Failure must retain data and expose recovery, never reset the library or silently ship both engines.
 

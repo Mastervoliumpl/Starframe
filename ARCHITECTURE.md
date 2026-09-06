@@ -1,6 +1,6 @@
 # Starframe architecture
 
-Status: draft 0.4, revised on 6 September 2026. Accepted behavior is identified below; unimplemented structures remain proposals. Milestone 0.1.0 is complete. Milestone 0.1.1 is active. Its development binary still uses Turso; issue #39's [test-only conversion proof](docs/verification/sqlite-conversion.md) precedes engine replacement in #40. Its implemented state layer is described below; later modules remain subject to their milestone and prerequisites.
+Status: draft 0.4, revised on 6 September 2026. Accepted behavior is identified below; unimplemented structures remain proposals. Milestone 0.1.0 is complete. Milestone 0.1.1 is active. Its development binary uses bundled SQLite with retained-source conversion; see [implementation and recovery](docs/verification/sqlite.md). Its implemented state layer is described below; later modules remain subject to their milestone and prerequisites.
 
 Read [DESIGN.md](DESIGN.md) for the accepted user experience and [CONTEXT.md](CONTEXT.md) for terminology. [DEVELOPMENT.md](DEVELOPMENT.md) defines continuous checks and versioning; [ROADMAP.md](ROADMAP.md) assigns the work to version milestones and issues. The [README](README.md) introduces the project, and [LICENSE](LICENSE) contains its licensing terms. Diagrams below are part of this proposal.
 
@@ -26,7 +26,7 @@ The user reports that the game developers plan native mod loading/hosting. Desig
 | Plain Svelte with Vite | The app needs bundled screens; it does not need server rendering. |
 | Rust owns saved state and file changes | All views use the same confirmed state and the same validation rules. |
 | A local library outside game loader folders | Disabled mods can remain installed without being visible to a loader. |
-| Bundled SQLite for records; ordinary files for artifacts | Keeps local records in one embedded engine; archives and extracted content remain files. The current Turso build transitions in 0.1.1. |
+| Bundled SQLite for records; ordinary files for artifacts | Keeps local records in one embedded engine; archives and extracted content remain files. The 0.1.1 build uses bundled SQLite. |
 | Downloads can overlap; game-file changes have one writer | Users can keep working without competing operations changing the same installation. |
 | A portable collection file | Sharing can work without user accounts, cloud storage, or a Starframe server. |
 
@@ -199,17 +199,17 @@ Use async I/O for transfers and bounded background workers for SQLite, extractio
 
 ## 5. Saved data and file ownership
 
-Select bundled SQLite through rusqlite for milestone 0.1.1. The evaluated baseline is rusqlite 0.40.2 with default features disabled and bundled plus backup. One desktop worker owns the connection; synchronous SQL must not run on the UI thread. No database account, service, replication or cloud synchronization is required. See the [decision, dependency evidence and conversion plan](docs/planning/sqlite-transition.md).
+The 0.1.1 build uses bundled SQLite through pinned rusqlite 0.40.2 with default features disabled and bundled plus backup. One desktop worker owns the connection; synchronous SQL must not run on the UI thread. No database account, service, replication or cloud synchronization is required. See the [decision, dependency evidence and conversion plan](docs/planning/sqlite-transition.md).
 
-The current 0.1.0 implementation from issue #9 uses pinned Turso 0.7.2 with defaults disabled. Its required Windows checks passed. The SQLite decision is based on the accepted workload and dependency reduction, not a failed Turso gate. SQL and ordered migrations live in src-tauri/src/storage.rs. Schema 1 stores library entries, collections, ordered references and a database revision; schema 2 adds active selection; schema 3 adds the selected game installation. References retain exact content independently of local availability. Artifact paths derive from validated lowercase SHA-256 values; binaries remain outside SQL.
+The historical 0.1.0 implementation from issue #9 used pinned Turso 0.7.2 with defaults disabled. Its required Windows checks passed. The SQLite decision is based on the accepted workload and dependency reduction, not a failed Turso gate. SQL and ordered migrations live in src-tauri/src/storage.rs. Schema 1 stores library entries, collections, ordered references and a database revision; schema 2 adds active selection; schema 3 adds the selected game installation. References retain exact content independently of local availability. Artifact paths derive from validated lowercase SHA-256 values; binaries remain outside SQL.
 
 The storage module owns one connection and an OS file lock. Short immediate transactions validate expected revisions; failed edits roll back. The app opens storage after creating the shell and publishes ready/error status through the existing channel. Database revisions cross that channel as decimal strings. Library and collection editing commands remain later work.
 
-The current Turso migration path checkpoints its WAL, copies the database and any remaining WAL into a new backup directory, syncs files and marks completion. Migration steps commit their schema version with their changes. Startup rejects invalid headers, newer versions, unknown ownership and invalid records without resetting the library. Restore validates a completed backup in a fresh directory and retains the source. See the historical [Turso verification and recovery](docs/verification/storage.md).
+SQLite uses WAL, foreign keys, synchronous=FULL, immediate transactions and a 250 ms busy timeout. Backups use SQLite's backup API, sync the completed database and write a completion marker. Schema changes and version updates commit together. Startup validates ownership, engine, version, integrity and logical records. Invalid data produces a visible error without resetting the library.
 
-The workload through 0.7.0 needs ordinary local queries, constraints and short transactions. The game runtime reads prepared manifests without opening the database. Catalog refresh and collection sharing do not require database sync. The temporary Windows dependency comparison removes 102 net package versions; build-time improvement remains to be measured.
+The first 0.1.1 startup copies legacy state.db and its WAL into a unique staging directory under the locked app-data root. SQLite reads only that copy. The converter rebuilds schema 4 with engine='sqlite', preserving all logical records and revisions. After validation, close/reopen equality checks and file flushes, it marks the candidate complete and renames its directory to sqlite/. Original Turso files, legacy backups and artifact files remain in place. Startup uses an existing sqlite/ directory exclusively; incomplete or invalid contents cause an error rather than a fallback to stale legacy records. Interrupted staging directories are retained, and retry uses a new directory. See [recovery and verification](docs/verification/sqlite.md).
 
-Milestone 0.1.1 must prove conversion of populated Turso schemas 1 through 3 and existing backups on retained copies before replacing the application engine. Keep originals and artifacts intact; verify records and revisions, stage and validate the SQLite destination, and test interrupted promotion and retry. Do not reopen the user's original Turso files with SQLite or ship two runtime engines. Keep SQL in storage.rs, ordered migrations, ownership checks and recovery messages. Use SQLite's backup API and rerun required SQL, rollback, forced-termination, backup/restore, busy and offline checks on Windows. The [transition plan](docs/planning/sqlite-transition.md) defines the exit gate.
+The workload through 0.7.0 needs ordinary local queries, constraints and short transactions. The game runtime reads prepared manifests without opening the database. Catalog refresh and collection sharing do not require database sync. The [transition decision](docs/planning/sqlite-transition.md) records the choice; original [Turso checks](docs/verification/storage.md) remain historical evidence.
 
 Use the operating system's per-user app-data directory resolved through Tauri. The installation root selected by the user is separate. Do not hardcode the developer's Steam path or put user data beside the Starframe executable.
 
@@ -464,7 +464,7 @@ The repository has no application dependencies yet. The following are candidates
 | Desktop integration | Tauri commands/channels; maintained dialog, opener, single-instance and updater plugins only where needed. |
 | Serialization and shared data types | Serde/serde_json; evaluate ts-rs to generate TypeScript data types from Rust. |
 | Work scheduling | Tauri's existing async runtime and bounded Tokio blocking tasks. |
-| HTTP and local records | reqwest and bundled SQLite through rusqlite after 0.1.1; no cloud sync feature. |
+| HTTP and local records | planned reqwest and implemented bundled SQLite through rusqlite; no cloud sync feature. |
 | Archives, content identity and version checks | Maintained ZIP, SHA-256 and semantic-version libraries; select narrow features and compatible versions. |
 | File observation | notify, plus bounded reconciliation scans. |
 | In-game bootstrap and settings persistence | BepInEx; C# runtime built for the verified Unity/Mono environment. Reuse its config types behind Starframe's own settings UI. |
@@ -513,7 +513,7 @@ ROADMAP.md gives these slices their release targets. Work only within the active
 
 | Area | Current direction | Remaining work |
 | --- | --- | --- |
-| Local persistence | Select SQLite for 0.1.1; Turso remains the current implementation with recorded Windows evidence. | Prove legacy conversion, replace the engine, rerun recovery/native checks and measure build costs before 0.2.0. |
+| Local persistence | Bundled SQLite with retained-source legacy conversion is implemented. | Complete 0.1.1 exit verification and build measurements before 0.2.0. |
 | Collections and application | Name plus ordered references; reuse exact content; automatically apply when the game is closed. User confirmed. | Validate import recovery, dependency adjustments and pending-state UI. |
 | Load order | Resolve dependencies automatically; allow manual priority within valid orders. | Review the UI; verify actual activation and define supported content-overlay precedence. |
 | Local builds | Normal mod controls without catalog version checks; watched managed copies. | Test incomplete builds, missed notifications and exit-time application. |

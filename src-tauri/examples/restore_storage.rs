@@ -6,15 +6,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if paths.len() != 2 {
         return Err("Usage: restore_storage <backup-directory> <empty-destination>".into());
     }
-    tauri::async_runtime::block_on(async {
-        let restored = Storage::restore_into(&paths[0], &paths[1]).await?;
-        let records = restored.load().await?;
-        println!(
-            "Verified restore: {} library entries, {} collections. Destination: {}",
-            records.library.len(),
-            records.collections.len(),
-            paths[1].display()
-        );
-        Ok(())
-    })
+    let restored = Storage::restore_into(&paths[0], &paths[1])?;
+    let records = restored.load()?;
+    println!(
+        "Verified restore: {} library entries, {} collections. Destination: {}",
+        records.library.len(),
+        records.collections.len(),
+        paths[1].display()
+    );
+    Ok(())
 }

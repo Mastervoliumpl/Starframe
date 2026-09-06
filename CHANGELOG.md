@@ -2,9 +2,11 @@
 
 ## Unreleased
 
-- Selected bundled SQLite for the planned 0.1.1 transition, with preserved Turso data, updated prerequisites and Windows build/recovery verification. The current application still uses Turso; the application engine changes in issue #40.
-- Added a test-only Turso-to-SQLite conversion proof for schemas 1–3, committed WAL and completed backups, with logical-record equality, retained-source byte checks, invalid-data rejection and forced termination at conversion boundaries (#39).
-- Started milestone 0.1.1 at development version 0.1.1-dev.1.
+- Replaced local Turso persistence with pinned bundled SQLite through rusqlite 0.40.2, retaining the background owner and native state contract (#40).
+- Added schema-4 conversion of legacy schemas 1–3 on retained copies, with validated directory promotion, restart recovery, preserved artifacts and legacy backup restoration (#39, #40).
+- Used SQLite's backup API with completion markers, WAL, FULL synchronization, immediate transactions and bounded busy handling (#40).
+- Added pinned legacy fixtures without a Turso build dependency, production interruption tests and native conversion/responsiveness checks (#41).
+- Kept one branch per milestone and completed work on main.
 
 ## 0.1.0 — 2026-09-06
 

@@ -1,6 +1,6 @@
 # SQLite transition plan
 
-Decision: select bundled SQLite through rusqlite for milestone 0.1.1, before 0.2.0. The user delegated this choice on 6 September 2026. This replaces the Turso preference on workload and dependency grounds; it does not invalidate the successful Turso checks in issue #9. The application still uses Turso 0.7.2 until the migration issues are implemented and verified. Planning is complete. The user authorized implementation on 6 September 2026; VERSION is 0.1.1-dev.1. See the [issue #39 proof](../verification/sqlite-conversion.md).
+Decision: select bundled SQLite through rusqlite for milestone 0.1.1, before 0.2.0. The user delegated this choice on 6 September 2026. This replaces the Turso preference on workload and dependency grounds; it does not invalidate the successful Turso checks in issue #9. The 0.1.1 development application now uses bundled SQLite. Production conversion and native checks pass locally; exit measurements and CI remain in progress. See [current verification and recovery](../verification/sqlite.md). Planning is complete. The user authorized implementation on 6 September 2026; VERSION is 0.1.1-dev.1. See the [issue #39 proof](../verification/sqlite-conversion.md).
 
 ## Why switch
 
@@ -10,7 +10,7 @@ SQLite covers these requirements, including constraints, joins, ordered reads, i
 
 Use rusqlite 0.40.2 as the evaluated baseline, default features disabled, with bundled and backup. Pin the implementation and commit its lockfile after Windows validation. Bundled SQLite compiles its C source and links it into the application; users need no SQLite installation or service. Use the existing background worker and bounded request queue for synchronous database calls. Keep SQL and validation in storage.rs; no ORM, connection pool or second async database layer.
 
-The work from 0.1.0 remains useful: record types, SQL constraints, revision checks, ordered migrations, ownership, recovery tests and the native state interface. Most engine-specific code is in storage.rs; game_service.rs currently calls its async methods from a worker. Switching before catalog, deployment and import records grow limits conversion scope.
+The work from 0.1.0 remains useful: record types, SQL constraints, revision checks, ordered migrations, ownership, recovery tests and the native state interface. Most engine-specific code is in storage.rs; game_service.rs now calls synchronous methods from its existing blocking worker. Switching before catalog, deployment and import records grow limits conversion scope.
 
 ## Dependency evidence and limits
 
@@ -33,7 +33,7 @@ The current internal build writes schemas 1 through 3, with application_id 0x535
 
 Before replacing the engine, prepare populated fixtures using pinned Turso 0.7.2, including WAL-bearing data and completed backups. Verify conversion on isolated copies; never assume SQLite compatibility makes it safe to open the user's original database with another engine.
 
-Issue #39 proves that bundled SQLite can read isolated copies of pinned Turso 0.7.2 schemas 1–3 and their committed WAL. The chosen path copies under the existing source lock, validates the copy, and inserts its records into a fresh canonical SQLite schema. It does not retain the legacy SQL schema or require a shipping Turso reader. Production integration remains #40. Do not ship two runtime engines. Preserve originals, WAL/sidecars, backup markers and artifact directories.
+Issue #39 proves that bundled SQLite can read isolated copies of pinned Turso 0.7.2 schemas 1–3 and their committed WAL. The chosen path copies under the existing source lock, validates the copy, and inserts its records into a fresh canonical SQLite schema. It does not retain the legacy SQL schema or require a shipping Turso reader. Issue #40 integrates this path into startup and backup restoration. Do not ship two runtime engines. Preserve originals, WAL/sidecars, backup markers and artifact directories.
 
 Conversion must preserve library rows, exact origins/hashes/release IDs, collection IDs/names/order/revisions, active collection, database revision and selected game ID/path. Validate ownership, supported schema, constraints, integrity and every logical record before promotion. Use engine='sqlite' and schema 4 in the fresh validated destination. The proof builds schemas 1–3 with their existing constraints, imports all records, and sets the new marker/schema within the same transaction.
 
