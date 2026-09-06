@@ -19,19 +19,23 @@ await new Promise((accept, reject) => {
 await new Promise((accept) => probe.close(accept));
 const child = spawn(executable, [], {
   windowsHide: true,
-  stdio: 'ignore',
+  stdio: ['ignore', 'inherit', 'inherit'],
   env: {
     ...process.env,
     STARFRAME_TEST_DATA_DIR: dataDirectory,
+    WEBVIEW2_USER_DATA_FOLDER: join(dataDirectory, 'webview'),
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9223',
   },
 });
 let browser;
 let second;
 try {
-  for (let attempt = 0; attempt < 100; attempt++) {
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
     try {
-      browser = await chromium.connectOverCDP('http://127.0.0.1:9223');
+      browser = await chromium.connectOverCDP('http://127.0.0.1:9223', {
+        timeout: 1000,
+      });
       break;
     } catch {
       if (child.exitCode !== null)
@@ -63,7 +67,15 @@ try {
   expect(rejected.invalidPage.code).toBe('invalid_link');
   expect(rejected.rawOpener).toContain('not allowed');
   await page.screenshot({ path: resolve(output, 'my-mods.png') });
-  second = spawn(executable, [], { windowsHide: true, stdio: 'ignore' });
+  second = spawn(executable, [], {
+    windowsHide: true,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      STARFRAME_TEST_DATA_DIR: dataDirectory,
+      WEBVIEW2_USER_DATA_FOLDER: join(dataDirectory, 'second-webview'),
+    },
+  });
   await expect.poll(() => second.exitCode).toBe(0);
   if (child.exitCode !== null)
     throw new Error(

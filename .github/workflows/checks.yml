@@ -76,12 +76,16 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: src-tauri
+          cache-on-failure: true
+      - name: Prepare WebView2 for native tests
+        timeout-minutes: 5
+        run: ./scripts/prepare_windows_tests.ps1
       - run: npm ci
       - run: npm run build
       - run: npm run check:rust
-      - run: npm run tauri -- build --no-bundle -- --locked
       - run: npm run tauri -- build --debug --no-bundle -- --locked
       - run: npm run test:native
+      - run: npm run tauri -- build --no-bundle -- --locked
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ always() }}
         with:
