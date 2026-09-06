@@ -2,7 +2,7 @@
 
 Status: draft 0.2, revised after user review on 6 September 2026. Accepted behavior is identified below; implementation details remain a proposal. This document does not authorize application implementation. The repository contains documentation and a license, with no application code or installed project dependencies.
 
-Read [DESIGN.md](DESIGN.md) for the accepted user experience and [CONTEXT.md](CONTEXT.md) for terminology. The [README](README.md) introduces the project, and [LICENSE](LICENSE) contains its licensing terms. Diagrams below are part of this proposal.
+Read [DESIGN.md](DESIGN.md) for the accepted user experience and [CONTEXT.md](CONTEXT.md) for terminology. [DEVELOPMENT.md](DEVELOPMENT.md) defines continuous checks and versioning; [ROADMAP.md](ROADMAP.md) assigns the work to version milestones and issues. The [README](README.md) introduces the project, and [LICENSE](LICENSE) contains its licensing terms. Diagrams below are part of this proposal.
 
 [Open the visual overview](docs/architecture-overview.svg) for a single-page map. The diagrams in each section show the detailed flows.
 
@@ -463,7 +463,7 @@ Run as a normal user. If the game location cannot be written, explain the proble
 
 ## 11. Verification and delivery
 
-No runtime claims are verified by this document. When implementation starts, prioritize tests that cross the module interface and exercise actual temporary files:
+No runtime claims are verified by this document. Add tests alongside features and reproducible bug fixes, then verify integration at each milestone's exit. Follow DEVELOPMENT.md for required language checks and CI; do not defer the test suite until the release milestone. Prioritize tests that cross the module interface and exercise actual temporary files:
 
 | Scenario | Required result |
 | --- | --- |
@@ -489,9 +489,9 @@ No runtime claims are verified by this document. When implementation starts, pri
 
 Use Rust tests for package/deployment behavior, frontend tests for meaningful interaction logic, and C# tests plus in-game checks for activation and settings. Run shared contract fixtures through both Rust and C# readers. Use a small Windows desktop integration suite for the Tauri connection, installer, file permissions and game launch. Browser-only UI tests cannot establish native integration behavior. Accessibility, reduced motion, Windows scaling, keyboard focus, and full-path visibility follow DESIGN.md.
 
-Propose GitHub Actions for frontend checks, Rust formatting/lint/tests, C# build/tests, cross-language contract fixtures, catalog validation, and Windows packaging. Pin dependency versions in lockfiles. Publish an installer, matching source, and signed updater metadata through the official release workflow only after release authorization. The installer may include Starframe's own runtime; third-party mod binaries remain author-hosted downloads. Verify redistribution terms and integrity of bootstrap files and game reference assemblies before any packaging. Do not redistribute game assemblies merely because the runtime needs them to compile.
+Use GitHub Actions for frontend checks, Rust formatting/lint/tests, C# build/tests, cross-language contract fixtures, catalog validation, and Windows packaging as each source project arrives. Documentation checks start during planning. Pin dependency versions in lockfiles, keep action references immutable, and require relevant checks before merging. Publish an installer, matching source, and signed updater metadata through the official release workflow only after release authorization. The installer may include Starframe's own runtime; third-party mod binaries remain author-hosted downloads. Verify redistribution terms and integrity of bootstrap files and game reference assemblies before any packaging. Do not redistribute game assemblies merely because the runtime needs them to compile.
 
-After design approval, implement in useful slices: responsive shell and local storage; read-only game/library inspection; a minimal Starframe runtime with one test mod and settings; one install/disable/uninstall path with recovery; ordered activation and collections; local development; independent catalog refresh and signed app updates. Validate packaging early enough to catch Windows integration problems. Add modules when a slice needs them. Each completed slice gets a focused commit and relevant checks.
+ROADMAP.md gives these slices their release targets. Work only within the active milestone and satisfy each issue's dependencies before starting it. Add modules when a slice needs them. Each completed slice gets a focused commit and relevant checks; version preparation and milestone exit verify the integrated result.
 
 ## 12. Review status and remaining work
 
