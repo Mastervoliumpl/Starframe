@@ -1,12 +1,12 @@
 # Starframe development and checks
 
-Status: development policy adopted on 6 September 2026. Milestone 0.1.0 is complete; 0.1.1 is active.
+Status: development policy adopted on 6 September 2026. Milestones 0.1.0 and 0.1.1 are complete. Later milestones remain planned.
 
 Read [DESIGN.md](DESIGN.md) for behavior and presentation, [ARCHITECTURE.md](ARCHITECTURE.md) for structure and recovery rules, and [ROADMAP.md](ROADMAP.md) for the current milestone. GitHub issues hold task scope, dependencies, acceptance criteria and verification evidence.
 
 ## Work one milestone at a time
 
-The design handoff and desktop foundation **0.1.0** are complete. The user authorized milestone 0.1.1 on 6 September 2026. Work through #39, #40 and #41 before 0.2.0. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
+The design handoff and desktop foundation **0.1.0** are complete. The SQLite corrective milestone **0.1.1** is complete. Start 0.2.0 only after user authorization. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
 
 Work on an issue only when its milestone is active and its prerequisites are complete. Keep issue dependencies in a `Depends on` section with issue links. Each issue must state its scope, observable completion criteria and checks. Split an issue when it contains independently reviewable outcomes; avoid splitting one small change into tasks that cannot be tested separately.
 
@@ -59,7 +59,7 @@ Continuous delivery first creates reviewable artifacts and draft releases. Publi
 
 ## Versions and change history
 
-[VERSION](VERSION) is the source of the product version. The current value is `0.1.1-dev.1`, the SQLite-transition development build, not a shipped installer. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
+[VERSION](VERSION) is the source of the product version. The current value is `0.1.1`, the completed internal SQLite build, not a shipped installer. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
 
 Use three-part versions: `0.MINOR.PATCH` during initial development. A capability milestone advances the minor version; a corrective release advances the patch version. The planning handoff uses `0.0.1`. Published content is immutable; never replace a release with different bytes under the same version. The `0.x` series makes no stable public API promise, but format migrations and compatibility changes still need explicit notes. [Semantic Versioning](https://semver.org/)
 
@@ -102,7 +102,7 @@ Vitest checks stale revisions, retired subscriptions, lost acknowledgements, dup
 
 Run `npx playwright install chromium` once, then `npm run test:browser` for navigation, reconnect, keyboard, text resizing and diagnostic checks. Browser fixtures require the development URL `/?fixture`; production builds omit the fixture transport. These tests do not establish native behavior. On Windows, build with `npm run tauri -- build --debug --no-bundle -- --locked`, then run `npm run test:native`. These checks open and close their own debug app, temporarily enable WebView test connections on ports 9223 and 9224, and test real IPC, permissions, single-instance behavior, cancellation, reconnect, process exit, saved-data failures, game selection, the native folder picker and live process/build changes. They use new temporary data directories through `STARFRAME_TEST_DATA_DIR` and temporary Steam metadata through `STARFRAME_TEST_STEAM_ROOT`; release builds ignore both. The native picker test uses Windows UI Automation and messages scoped to its own app process. The ports must be free and no other Starframe instance may be running. Screenshots and timing data go under ignored `test-results/native`. No test connection is configured in the shipped app. CI builds the release executable and a separate debug executable for these isolated native tests. See [desktop results](docs/verification/desktop-state.md), [storage results and recovery](docs/verification/storage.md) and [game discovery/milestone exit](docs/verification/game-discovery.md).
 
-For 0.1.1, retain the existing storage/native checks and add populated legacy conversion and interruption cases. Verify that the shipped Cargo graph excludes Turso. Record comparable clean and warm Windows builds with identical toolchain, target, profiles and commands; identify cache state and separate compile time from tests. The implementation milestone uses VERSION 0.1.1-dev.1. Do not weaken CI to obtain a faster result.
+The 0.1.1 exit checks retain storage/native coverage and add populated legacy conversion and interruption cases. The shipped Cargo graph excludes Turso. [Windows results](docs/verification/sqlite.md) separate dependency resolution, clean/warm compilation, test execution and CI. Keep the existing caching and required checks; do not weaken them to obtain a faster result.
 
 Conversion regression tests run with `cargo test --manifest-path src-tauri/Cargo.toml --locked --lib storage::sqlite_proof`. They use [retained pinned Turso fixtures](src-tauri/tests/fixtures/turso-0.7.2/README.md), so Turso is absent from both current production and test graphs. Three ignored Rust test entries are subprocess workers invoked by parent interruption tests. The historical [proof](docs/verification/sqlite-conversion.md) records #39; [current verification](docs/verification/sqlite.md) records production behavior. The debug-only native startup gate requires STARFRAME_TEST_DATA_DIR and a hold-storage-startup file in that temporary directory. Release builds omit the gate.
 

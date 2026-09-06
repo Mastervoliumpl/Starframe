@@ -1,6 +1,6 @@
 # SQLite transition plan
 
-Decision: select bundled SQLite through rusqlite for milestone 0.1.1, before 0.2.0. The user delegated this choice on 6 September 2026. This replaces the Turso preference on workload and dependency grounds; it does not invalidate the successful Turso checks in issue #9. The 0.1.1 development application now uses bundled SQLite. Production conversion and native checks pass locally; exit measurements and CI remain in progress. See [current verification and recovery](../verification/sqlite.md). Planning is complete. The user authorized implementation on 6 September 2026; VERSION is 0.1.1-dev.1. See the [issue #39 proof](../verification/sqlite-conversion.md).
+Decision: select bundled SQLite through rusqlite for milestone 0.1.1, before 0.2.0. The user delegated this choice on 6 September 2026. This replaces the Turso preference on workload and dependency grounds; it does not invalidate the successful Turso checks in issue #9. The 0.1.1 application now uses bundled SQLite. Conversion, recovery, native checks and Windows build measurements are recorded. See [current verification and recovery](../verification/sqlite.md). Planning is complete. The user authorized implementation on 6 September 2026; VERSION is now 0.1.1. See the [issue #39 proof](../verification/sqlite-conversion.md).
 
 ## Why switch
 

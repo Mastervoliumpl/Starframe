@@ -1,6 +1,6 @@
 # Starframe architecture
 
-Status: draft 0.4, revised on 6 September 2026. Accepted behavior is identified below; unimplemented structures remain proposals. Milestone 0.1.0 is complete. Milestone 0.1.1 is active. Its development binary uses bundled SQLite with retained-source conversion; see [implementation and recovery](docs/verification/sqlite.md). Its implemented state layer is described below; later modules remain subject to their milestone and prerequisites.
+Status: draft 0.4, revised on 6 September 2026. Accepted behavior is identified below; unimplemented structures remain proposals. Milestone 0.1.0 is complete. Milestone 0.1.1 is complete. Its binary uses bundled SQLite with retained-source conversion; see [implementation and recovery](docs/verification/sqlite.md). Its implemented state layer is described below; later modules remain subject to their milestone and prerequisites.
 
 Read [DESIGN.md](DESIGN.md) for the accepted user experience and [CONTEXT.md](CONTEXT.md) for terminology. [DEVELOPMENT.md](DEVELOPMENT.md) defines continuous checks and versioning; [ROADMAP.md](ROADMAP.md) assigns the work to version milestones and issues. The [README](README.md) introduces the project, and [LICENSE](LICENSE) contains its licensing terms. Diagrams below are part of this proposal.
 
@@ -513,7 +513,7 @@ ROADMAP.md gives these slices their release targets. Work only within the active
 
 | Area | Current direction | Remaining work |
 | --- | --- | --- |
-| Local persistence | Bundled SQLite with retained-source legacy conversion is implemented. | Complete 0.1.1 exit verification and build measurements before 0.2.0. |
+| Local persistence | Bundled SQLite with retained-source legacy conversion is implemented. | Retain migration/recovery tests as record schemas grow. |
 | Collections and application | Name plus ordered references; reuse exact content; automatically apply when the game is closed. User confirmed. | Validate import recovery, dependency adjustments and pending-state UI. |
 | Load order | Resolve dependencies automatically; allow manual priority within valid orders. | Review the UI; verify actual activation and define supported content-overlay precedence. |
 | Local builds | Normal mod controls without catalog version checks; watched managed copies. | Test incomplete builds, missed notifications and exit-time application. |

@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 — 2026-09-06
+
+SQLite corrective milestone; internal build with no published installer or app release.
 
 - Replaced local Turso persistence with pinned bundled SQLite through rusqlite 0.40.2, retaining the background owner and native state contract (#40).
 - Added schema-4 conversion of legacy schemas 1–3 on retained copies, with validated directory promotion, restart recovery, preserved artifacts and legacy backup restoration (#39, #40).

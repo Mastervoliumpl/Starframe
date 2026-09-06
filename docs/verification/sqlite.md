@@ -1,6 +1,6 @@
 # SQLite verification and recovery
 
-Milestone 0.1.1, issues #40 and #41. The development application uses rusqlite 0.40.2, default features disabled, bundled plus backup. libsqlite3-sys 0.38.2 embeds SQLite 3.53.2. No system SQLite installation, network database or Turso runtime is required. Exit build measurements and CI results will be recorded here before completion.
+Milestone 0.1.1, issues #40 and #41. The 0.1.1 application uses rusqlite 0.40.2, default features disabled, bundled plus backup. libsqlite3-sys 0.38.2 embeds SQLite 3.53.2. No system SQLite installation, network database or Turso runtime is required. The local checks and build comparison below pass. Required CI is the final merge gate on [PR #42](https://github.com/Mastervoliumpl/Starframe/pull/42).
 
 ## Storage and conversion
 
@@ -36,3 +36,34 @@ cargo run --manifest-path src-tauri/Cargo.toml --locked --offline --example rest
 5. With Starframe closed, retain the old app-data directory under a separate name. Put the verified restored directory at the original location. Preserve the old artifacts directory there too; this tool does not copy or validate artifact bytes. Start Starframe and check Saved data and the saved game selection.
 
 Retain originals until restored records and artifacts have been checked. These tests cover process termination, not physical power loss, disk failure, disk-full conditions or every Windows filesystem. The app has no reset-on-error path. No installer or release has been published. Mod management, launch and runtime integration remain later milestones.
+
+## Windows build comparison
+
+Measured on 6 September 2026: Windows 11 Education 25H2 build 26200, Ryzen 7 7840HS (8 cores, 16 logical processors), about 31.3 GiB visible RAM. Both runs used Cargo 1.98.1, rustc 1.98.1, LLVM 22.1.8 and host x86_64-pc-windows-msvc. Builds ran sequentially in isolated detached checkouts, with separate initially absent target directories and a populated offline Cargo registry. No other compilation ran during these measurements.
+
+The baseline is e33dbef400d4708657643b4721f6d977ade59a5b. The migrated implementation is 4ba28a27ff367b268138a161ae798964b8dd3846, before the final version-label/documentation commit. [Structured results and package inventories](sqlite-builds.json) include binary SHA-256 values and toolchain identities.
+
+```sh
+cargo metadata --manifest-path src-tauri/Cargo.toml --locked --offline --filter-platform x86_64-pc-windows-msvc --format-version 1
+cargo build --manifest-path src-tauri/Cargo.toml --release --locked --offline --target-dir <separate-target-directory>
+# Repeat the identical build command for the first warm measurement.
+cargo tree --manifest-path src-tauri/Cargo.toml --locked --offline --target x86_64-pc-windows-msvc --edges normal,build,dev --prefix none --format '{p}'
+```
+
+| Measurement | Turso baseline | SQLite implementation |
+| --- | --- | --- |
+| Offline metadata resolution, wall seconds | 0.658 | 0.570 |
+| Clean Cargo release build, wall seconds | 199.292 | 111.859 |
+| First warm command, wall seconds | 36.244 | 31.893 |
+| Comparison executable, bytes | 27,538,432 | 11,354,624 |
+| Metadata graph package versions, excluding app | 385 | 282 |
+| Feature-selected tree, normal/build/dev | 367 | 261 |
+| Feature-selected tree, normal/build | 363 | 257 |
+
+The clean compile was 43.9% faster and the comparison executable was 58.8% smaller in this sample. These are raw Cargo release-profile builds with default features, not Tauri production packaging: custom-protocol was not enabled. Prepared frontend bytes were identical and excluded from the timed commands. The actual Tauri production executable is built separately by required CI. Do not distribute the comparison binaries or present their size as the installer size.
+
+Both first warm builds compiled only Starframe; dependencies were cached. A subsequent fingerprint-diagnostic build compiled nothing (Cargo reported 1.10 seconds for Turso and 0.55 seconds for SQLite). The first application-only rebuild was not isolated further, so the first-warm numbers do not establish a typical edit/build cost. This single clean sample does not predict every machine or CI run.
+
+The planning method resolves a broader metadata graph than the feature-selected cargo tree. Repeating that method gives 385 to 282, one fewer than the planned SQLite 283 after removing the unused direct Tokio test dependency. Neither count represents compiler invocations. Both the normal/build tree and the test tree exclude Turso; only legacy fixture names and the conversion engine marker retain its name.
+
+Test execution is separate: the final local Rust run passed 25 regular tests, with 0.74 seconds reported for the storage/game library tests and less than 0.01 seconds for the other suites. Frontend Vitest passed six tests in 1.81 seconds. Native integration, browser checks and total GitHub CI include additional work and are reported through the PR checks, not folded into clean compilation. The original proof CI Windows job took 12 minutes 5 seconds; that job also compiled both engines and ran tests, so it is not the baseline compile measurement.
