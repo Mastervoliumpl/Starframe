@@ -1,6 +1,6 @@
 # Starframe architecture
 
-Status: draft 0.2, revised after user review on 6 September 2026. Accepted behavior is identified below; implementation details remain a proposal. This document does not authorize application implementation. The repository contains documentation and a license, with no application code or installed project dependencies.
+Status: draft 0.3, revised after user review on 6 September 2026. Accepted behavior is identified below; implementation details remain a proposal. This document does not authorize application implementation. The repository contains documentation and a license, with no application code or installed project dependencies.
 
 Read [DESIGN.md](DESIGN.md) for the accepted user experience and [CONTEXT.md](CONTEXT.md) for terminology. [DEVELOPMENT.md](DEVELOPMENT.md) defines continuous checks and versioning; [ROADMAP.md](ROADMAP.md) assigns the work to version milestones and issues. The [README](README.md) introduces the project, and [LICENSE](LICENSE) contains its licensing terms. Diagrams below are part of this proposal.
 
@@ -265,7 +265,7 @@ A newly approved mod release appears live, but never silently replaces versions 
 
 When a detected game build changes, recalculate the displayed compatibility evidence for each catalog mod. If the last supported build is older, show `Made for a previous game version` with that build and the current build in details. If no useful evidence exists, show `Not checked for this game version`. A lack of testing is not proof that a mod is broken.
 
-These warnings do not disable a mod, remove it from the collection, or prevent trying a launch. The launch area can summarize warnings with a route to details while keeping Play available. Missing executable files, an unusable loader, missing required dependencies, invalid activation contracts, or an incomplete deployment are separate actionable failures. Do not disguise a game-version mismatch as a hard dependency failure to bypass the warning policy.
+These warnings do not disable a mod, remove it from the collection, or prevent trying a launch. The launch area can summarize warnings with a route to details while keeping launch available. Missing executable files, an unusable loader, missing required dependencies, invalid activation contracts, or an incomplete deployment are separate actionable failures. Do not disguise a game-version mismatch as a hard dependency failure to bypass the warning policy.
 
 Local imports skip catalog release and compatibility-version checks. They still participate in dependency, load-order and structural validation. Preserve any author version label as metadata without turning it into an online update check.
 
@@ -373,13 +373,15 @@ Keep the runtime's responsibilities narrow: validate manifest/contract versions,
 
 The runtime performs no catalog downloads or app-update checks and does not open the desktop database. It can run when the desktop app is closed because it is part of the running game. It exits with the game. This is distinct from a hidden desktop process or installed service.
 
-Use a versioned JSON activation document as the initial desktop/runtime handoff. It records deployment revision, selected runtime contract, ordered mod IDs, content hashes, and validated relative paths. Rust prepares it with the deployment; C# reads it at startup. Runtime reports include that revision and a game-session ID, so the desktop never treats an old success report as evidence for a new launch. Keep wire-format fixtures under `contracts` and test them in both languages. No socket server is needed for this initial handoff.
+Use a versioned JSON activation document as the initial desktop/runtime handoff. It records deployment revision, selected runtime contract, ordered mod IDs, content hashes, and validated relative paths. Include a metadata-only installed-mod inventory for the in-game list; only ordered activation entries authorize loading. Disabled mods need no deployed executable payload or assembly reflection to supply their names. Rust prepares the document with the deployment; C# reads it at startup. Runtime reports include that revision and a game-session ID, so the desktop never treats an old success report as evidence for a new launch. Keep wire-format fixtures under `contracts` and test them in both languages. No socket server is needed for this initial handoff.
 
 ### Mod settings have one owner
 
 Mod settings are values such as key bindings, UI scale, or feature options. They are not collection membership, load order, or copies of the whole game configuration.
 
-The Starframe in-game UI edits each mod's configuration through the runtime. Reuse BepInEx `ConfigFile`/`ConfigEntry` where suitable for types, defaults, descriptions and persistence, while writing our own presentation. Stable keys identify settings independently of their display labels. [BepInEx configuration](https://docs.bepinex.dev/articles/dev_guide/plugin_tutorial/4_configuration.html)
+Starframe adds a `Mods` entry to the game's main menu and owns its installed/enabled mod list and settings behavior. Reuse Sanctuary's menu components, styling, navigation and transitions where supported. Inspect the game's UI hooks before choosing the C# presentation implementation; the earlier browser overlay is superseded. Use Starframe's monochrome mark in the main-menu entry, tinted and sized like adjacent game icons. This remains our runtime; it does not depend on another community manager.
+
+The game-native Mods menu edits each mod's configuration through the runtime. Reuse BepInEx `ConfigFile`/`ConfigEntry` where suitable for types, defaults, descriptions and persistence. Stable keys identify settings independently of their display labels. Show enabled membership separately from actual activation outcomes. Disabled mods without registered settings explain that enabling and restarting is required. [BepInEx configuration](https://docs.bepinex.dev/articles/dev_guide/plugin_tutorial/4_configuration.html)
 
 Initially, the runtime is the only writer while the game is running. The desktop can show reported values or a path, but it does not independently write those same settings files. In-game changes save directly to the mod's configuration; there is no collection copy to adopt or merge. Apply a setting live only if its mod declares that behavior safe; otherwise show that it takes effect after restart. Preserve configurations when collections change.
 

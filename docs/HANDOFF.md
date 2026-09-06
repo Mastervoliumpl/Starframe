@@ -1,6 +1,6 @@
 # Starframe 0.0.1 implementation handoff
 
-Status: 0.0.1 handoff, 6 September 2026. The user approved the identity and visual specimen. This document defines the first implementation contract; it does not claim a working game integration or start the next implementation milestone.
+Status: initial 0.0.1 handoff amended for 0.0.2 on 6 September 2026. The logo and first-version desktop layout remain accepted. DESIGN.md revision 0.7 supersedes the earlier in-game screen and specifies the revised launch action. This document defines the first implementation contract; it does not claim a working game integration or start the next implementation milestone.
 
 Read [DESIGN.md](../DESIGN.md), [ARCHITECTURE.md](../ARCHITECTURE.md), [DEVELOPMENT.md](../DEVELOPMENT.md) and the [version roadmap](../ROADMAP.md). The [design specimen](design/review.html) demonstrates the UI with fictional data. [Design review evidence](design/REVIEW.md) distinguishes browser checks from later native verification.
 
@@ -61,6 +61,7 @@ The desktop writes this document as part of a verified deployment while the game
 | `deploymentRevision` | Decimal string identifying the confirmed setup. |
 | `runtimeContractVersion` | Integer lifecycle/settings contract, initially 1. Independent of app SemVer. |
 | `integrationId` | Stable adapter identifier, initially `starframe.bepinex`. |
+| `installedMods` | Display-only inventory of installed mods at preparation time: stable `modId`, `name` and display `version`. No executable paths. |
 | `mods` | Ordered entries. Array order is the effective activation order. |
 | `mods[].modId` | Unique stable mod identity. |
 | `mods[].source` | Approved release reference or local content reference; neither can instruct a download. |
@@ -77,6 +78,9 @@ Illustrative shape only; the zero hash is a placeholder, not an approved artifac
   "deploymentRevision": "12",
   "runtimeContractVersion": 1,
   "integrationId": "starframe.bepinex",
+  "installedMods": [
+    {"modId": "example.core", "name": "Example Core", "version": "1.0.0"}
+  ],
   "mods": [
     {
       "modId": "example.core",
@@ -100,6 +104,8 @@ Validate the whole document before invoking a mod. Reject duplicate IDs, unknown
 
 The deployment module validates files before launch; the runtime validates its handoff and payload integrity before activating entries. Keep this off the game's render loop where the integration permits, and report preparation while hashing. Dependency assemblies required by a listed mod may load, but an unlisted mod entry point must not execute.
 
+The in-game Mods menu uses `installedMods` for its list and derives enabled membership from `mods`; actual loaded/failed state comes from the current runtime session. Require unique inventory IDs and a matching inventory entry for every activation entry. Bound and validate display metadata without interpreting it as markup. A disabled inventory entry never authorizes loading or requires inspecting its DLL. The list is a snapshot of the prepared setup, not live desktop intent; this lets it work after the desktop closes without another process or a database connection.
+
 `source.kind=local` carries an opaque local content ID in place of a release ID. It is not an absolute developer path. Collection matching must compare the imported payload inventory/content identity, not the display version or filename. Define canonical inventory fixtures in issue #11 before treating local content IDs from different machines as interchangeable. The runtime does not need to reproduce the desktop's library database keys.
 
 ## Activation report and lifecycle
@@ -119,6 +125,8 @@ Keep the author-facing lifecycle small:
 Mod code still runs inside the game with that process's access. The context is a convenience interface, not a sandbox. No hot reload, live collection switching, or universal cleanup of third-party patches is promised by version 1.
 
 ## Settings registration, version 1
+
+Present the list and settings through Sanctuary's existing menu conventions. Add a `Mods` main-menu entry with the monochrome Starframe mark, matching the other icons' tint and states. Reuse game controls and input navigation where possible; verify actual menu hooks, focus, back/close behavior and scaling in issue #14. The old browser in-game panel is not an implementation reference. Settings unavailable for a disabled mod explain the enable/restart requirement without loading that mod to discover its UI.
 
 Keep per-mod configurations outside immutable payload folders so deployments and collection changes cannot overwrite them. Use BepInEx `ConfigFile` and typed entries where possible, including a separate ConfigFile for each managed mod. The library supports custom configuration-file paths and typed binding, so Starframe needs its own presentation and registration contract rather than a new settings persistence engine. [BepInEx configuration](https://docs.bepinex.dev/articles/dev_guide/plugin_tutorial/4_configuration.html)
 
