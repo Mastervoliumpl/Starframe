@@ -7,6 +7,8 @@ Development version `0.1.0-dev.1`; issue #6 only.
 - Added the minimal Tauri desktop shell with plain Svelte, TypeScript and Vite.
 - Added locked dependencies, frontend and Rust check commands, and configuration/rendering fixture tests.
 - Extended required CI with frontend checks and a Windows executable build; added grouped npm/Cargo dependency updates.
+- Deferred TypeScript 7 dependency updates until the Svelte and ESLint checkers support that major version.
+- Kept text file line endings consistent on Windows so clean checkouts pass formatting checks.
 
 Mod management, live state, storage and game discovery remain planned. No app release or installer is published.
 
