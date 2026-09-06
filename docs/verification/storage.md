@@ -2,6 +2,8 @@
 
 Issue [#9](https://github.com/Mastervoliumpl/Starframe/issues/9), checked on Windows 11 Education 25H2, build 26200, on 6 September 2026. Product version remains `0.1.0-dev.1`; database schema is version 2. The implementation is local and unreleased.
 
+This report records original Turso verification, not pending SQLite work. The [0.1.1 transition decision](../planning/sqlite-transition.md) supersedes the engine preference below. This Turso recovery procedure still applies to unconverted 0.1.0 data; SQLite conversion needs separate evidence.
+
 ## Engine decision
 
 Use **Turso 0.7.2**, pinned exactly, with default features disabled. The required checks passed on Windows, so the documented SQLite fallback was not selected. The app uses `Builder::new_local` and has no database account, token, service or synchronization configuration. It does not use the older libSQL client. [Pinned Rust API](https://docs.rs/turso/0.7.2/turso/), [local builder](https://docs.rs/turso/0.7.2/turso/struct.Builder.html).

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="930" viewBox="0 0 1280 930" role="img" aria-labelledby="title desc">
   <title id="title">Starframe architecture overview</title>
-  <desc id="desc">Svelte sends requests through Tauri to Rust and receives live state. Rust manages Turso records, ordered collections, downloads, deployment, and update checks. BepInEx starts Starframe's in-game runtime, which owns activation and settings. A replaceable integration interface allows future native game support. Desktop checks stop when the app closes; the runtime ends with the game.</desc>
+  <desc id="desc">Svelte sends requests through Tauri to Rust and receives live state. The planned SQLite transition keeps Rust responsible for local records, ordered collections, downloads, deployment, and update checks. BepInEx starts Starframe's in-game runtime, which owns activation and settings. A replaceable integration interface allows future native game support. Desktop checks stop when the app closes; the runtime ends with the game.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#FB923C"/></marker>
     <style>
@@ -84,7 +84,7 @@
 
   <rect x="56" y="708" width="262" height="98" rx="6" class="box"/>
   <text x="76" y="743" class="heading">Local app data</text>
-  <text x="76" y="773">Turso records + artifact files</text>
+  <text x="76" y="773">SQLite records + artifact files</text>
 
   <rect x="348" y="708" width="262" height="98" rx="6" class="box"/>
   <text x="368" y="743" class="heading">Catalog and authors</text>

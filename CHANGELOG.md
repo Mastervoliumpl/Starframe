@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-No pending changes.
+- Selected bundled SQLite for the planned 0.1.1 transition, with preserved Turso data, updated prerequisites and Windows build/recovery verification. The current application still uses Turso; this planning change implements no migration.
 
 ## 0.1.0 — 2026-09-06
 
