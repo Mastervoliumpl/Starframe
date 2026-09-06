@@ -50,4 +50,4 @@ Measured contrast includes muted text on the sidebar (5.71:1), body text on sele
 - Review the implementation visually with the user. The earlier specimen approval is recorded separately in [design review](../design/REVIEW.md). Final launch artwork and installer/taskbar assets remain later work.
 - Run the changed GitHub workflow after publication. Local checks do not establish hosted-runner behavior.
 
-Storage (#9) and read-only game discovery (#10) remain within the active milestone. Mod management and game integration belong to later milestones.
+Storage (#9) and read-only game discovery (#10) were completed after this original check. The [milestone exit record](game-discovery.md) describes the integrated result. Mod management and game integration belong to later milestones.

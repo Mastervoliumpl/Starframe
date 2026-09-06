@@ -1,8 +1,8 @@
 # Starframe version roadmap
 
-Completed handoff: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)** with **[0.0.2 design amendments](https://github.com/Mastervoliumpl/Starframe/milestone/9)**. Current development version: **0.1.0-dev.1**. The user authorized work on milestone **0.1.0** on 6 September 2026. Issue #6 is complete; continue with eligible issues in this milestone. No app release has been published.
+Completed milestones: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)**, **[0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9)** and **[0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2)**. Current product version: **0.1.0**, an internal desktop foundation build. No app release or installer has been published. No later milestone is active.
 
-Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not override the planning-only phase or required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
+Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
 ## Delivery sequence
 
@@ -10,7 +10,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | --- | --- | --- |
 | [0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1) | Design and development handoff | Complete |
 | [0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9) | Game-native menu and desktop launch design amendments | Complete |
-| [0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2) | Desktop foundation | Active; implementation authorized |
+| [0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2) | Desktop foundation | Complete |
 | [0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3) | Starframe in-game runtime | Planned |
 | [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Planned |
 | [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Planned |
@@ -42,7 +42,7 @@ Complete. Retained the logo and first-version desktop layout, replaced the in-ga
 
 ### 0.1.0: Desktop foundation
 
-Active. Issue #6 delivered the minimal shell and language CI. Issues #7–#10 are authorized, subject to their prerequisites. Version synchronization (#7), navigation/live state (#8) and local storage (#9) are implemented locally. [Desktop verification](docs/verification/desktop-state.md) and [storage verification](docs/verification/storage.md) record the checks and their limits. Read-only game discovery (#10) remains. Exit: restart persistence, slow-work interaction and Windows build checks pass. Local implementation does not mark the GitHub issues merged or closed.
+Complete. Issues #6–#10 deliver the shell, synchronized versions, responsive live state, local Turso persistence and read-only game discovery. Restart persistence, slow-work interaction and Windows build checks pass. [Desktop verification](docs/verification/desktop-state.md), [storage verification](docs/verification/storage.md) and [game discovery/milestone exit](docs/verification/game-discovery.md) record evidence and remaining limits. Required GitHub checks must pass before the completion change merges. No loader, mod download, game launch or installer is included.
 
 - [#6: Create the desktop projects with lint, build and test checks](https://github.com/Mastervoliumpl/Starframe/issues/6)
 - [#7: Keep desktop and build versions synchronized](https://github.com/Mastervoliumpl/Starframe/issues/7)

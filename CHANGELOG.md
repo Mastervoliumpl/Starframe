@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-Development version `0.1.0-dev.1`; milestone 0.1.0 is in progress.
+No pending changes.
+
+## 0.1.0 — 2026-09-06
+
+Desktop foundation; internal build with no published installer or app release.
 
 - Added the minimal Tauri desktop shell with plain Svelte, TypeScript and Vite.
 - Added locked dependencies, frontend and Rust check commands, and configuration/rendering fixture tests.
@@ -20,7 +24,11 @@ Development version `0.1.0-dev.1`; milestone 0.1.0 is in progress.
 - Added migration backups, restore into a new directory, and Windows tests for rollback, forced termination, busy handling and corrupt/newer data retention (#9).
 - Added nonblocking storage startup and visible saved-data status; native tests now use isolated temporary data directories (#9).
 
-Mod management and game discovery remain planned. No app release or installer is published.
+- Added Steam discovery, native folder selection, executable/layout/build validation and one saved game installation (#10).
+- Added live process observation, unknown-state handling and periodic selected-build validation without repeated Steam library scans (#10).
+- Verified native picker cancellation/errors, external process start/exit, restart persistence, changing builds and read-only inspection of the installed playtest (#10).
+
+Mod management, game launch and runtime integration remain planned. Database schema 3 preserves earlier records through backed-up migrations.
 
 ## 0.0.2 — 2026-09-06
 

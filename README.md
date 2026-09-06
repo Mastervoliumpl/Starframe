@@ -1,7 +1,7 @@
 # Starframe
 Starframe is a mod manager for Sanctuary: Shattered Sun
 
-The desktop foundation is in development at `0.1.0-dev.1`: a Tauri window with Svelte navigation, typed live state and local Turso storage. Library and collection records have recoverable migrations; editing them through the interface remains later work. Help & logs includes a diagnostic workload for checking progress, cancellation and responsiveness. Mod management and game integration are not available in this build. Milestone 0.1.0 is active; read-only game discovery is next. See [development setup](DEVELOPMENT.md#desktop-development) for prerequisites and commands, and [version preparation](DEVELOPMENT.md#versions-and-change-history) for build metadata checks.
+The desktop foundation is complete at `0.1.0`: a Tauri window with Svelte navigation, typed live state, local Turso storage and read-only game discovery. Settings can locate Sanctuary, save one installation and show its build and running state. Library and collection records have recoverable migrations; editing them through the interface remains later work. Help & logs includes a diagnostic workload for checking progress, cancellation and responsiveness. Mod management, game launch and an installer are not available in this internal build. See [verification and limits](docs/verification/game-discovery.md), [development setup](DEVELOPMENT.md#desktop-development) and [version preparation](DEVELOPMENT.md#versions-and-change-history).
 
 - [Design direction](DESIGN.md): visual style and interaction requirements.
 - [Architecture draft](ARCHITECTURE.md): proposed project structure, diagrams, and module behavior.
