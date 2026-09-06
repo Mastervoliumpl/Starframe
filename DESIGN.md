@@ -1,6 +1,6 @@
 # Starframe: design direction
 
-Status: revision 0.6, 6 September 2026. Product name: Starframe. The user approved the 0.0.1 identity and desktop/in-game specimen for handoff, retaining the accepted visual direction and desktop stack.
+Status: revision 0.7, 6 September 2026. Product name: Starframe. The user retained the logo and accepted the desktop layout for the first version. This revision supersedes the earlier in-game presentation and plans the revised launch action.
 
 This is a design handoff. Implementation is not yet authorized. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
@@ -12,7 +12,7 @@ Local imports are managed mods too. Developers must be able to load and manage t
 
 Starframe owns its in-game mod runtime and settings UI, initially using BepInEx for bootstrap. Keep the desktop manager usable above the game's planned native mod support when that becomes available. Its interface is not yet published; supported controls must follow the active integration's capabilities.
 
-The visual direction is dark navy with orange accents. It should feel modern and related to Sanctuary, with its own identity. Draw from the game's visual character without reproducing its interface or logo. Motion and rounded corners must have a purpose.
+The desktop visual direction is dark navy with orange accents. It should feel modern and related to Sanctuary, with its own identity. The in-game Mods menu follows Sanctuary's existing interface. Game content and artwork are allowed where appropriate; the earlier restriction is withdrawn. Keep Starframe's original logo. Motion and rounded corners must have a purpose.
 
 Responsiveness is the leading interaction requirement. The interface must respond while downloads, file operations, compatibility checks, and other background work take time. Data changes appear live without requiring a refresh. Unavailable actions explain their restriction. Visual effects must yield to input responsiveness, while file safety and accurate status remain required.
 
@@ -37,7 +37,9 @@ Reading this as a desktop mod-management tool for Sanctuary players and mod deve
 
 Use broad, flat regions with aligned edges and readable lists. The contrast between the dark work area and the orange action gives the interface its focal point. Density should support managing many mods without making the app feel like a spreadsheet.
 
-Game influence belongs in collection artwork, a restrained heading face, and the composition of major headers. The game's large engineered structures suggest strong alignment and deliberate divisions. This is a design interpretation of the official visual reference, not a claim that the game uses this palette.
+Game influence belongs in the launch artwork, collection artwork, a restrained heading face, and the composition of major headers. The game's large engineered structures suggest strong alignment and deliberate divisions. This is a design interpretation of the official visual reference, not a claim that the game uses this palette.
+
+The current desktop layout is an accepted first-version baseline. Improve its character through the launch artwork, careful spacing and typography, distinct interaction states, and motion that explains changes. Animation alone does not resolve a generic layout. Keep later visual refinements within these requirements and review them using concrete screens.
 
 Identity treatment: collection detail headers may have one 8-unit cut at the trailing corner of their artwork frame. It separates collection identity from ordinary controls. Keep inputs, rows, and action buttons rectangular with the radii below. Validate this motif in the first visual review; it is not a logo decision.
 
@@ -142,7 +144,7 @@ Design first at 1280 × 800. Also review 1024 × 720 and 1600 × 1000. Resizing,
 │ Downloads        │                                  │ when opened   │
 │                  │                                  │               │
 │ Settings         ├──────────────────────────────────┴───────────────┤
-│ Help & logs      │ Active collection · readiness           Play      │
+│ Help & logs      │ Active collection · readiness         Launch      │
 └──────────────────┴───────────────────────────────────────────────────┘
 ```
 
@@ -160,7 +162,7 @@ Landing view: My mods. The visible active collection selector explains which set
 
 Use a list by default. A row contains a selection checkbox, mod name and author, version, origin, compatibility text, and an enabled switch. Selection chooses rows for bulk actions; the switch changes whether a mod is included in the active setup. These are separate controls with separate accessible labels.
 
-Show `Catalog release` or `Local import` as plain provenance text. Catalog compatibility uses labels such as `Compatible with [game version]`, `Not checked for this version`, or `Made for a previous game version`. Show the declared and installed game versions in details. An older-version warning must not disable Enable or Play or repeatedly demand confirmation. Missing required dependencies and a missing runtime are separate issues. Local imports skip catalog compatibility-version checks. Approval and compatibility are separate labels. Never display `Malware-free` or imply that curation guarantees safety.
+Show `Catalog release` or `Local import` as plain provenance text. Catalog compatibility uses labels such as `Compatible with [game version]`, `Not checked for this version`, or `Made for a previous game version`. Show the declared and installed game versions in details. An older-version warning must not disable Enable or launch or repeatedly demand confirmation. Missing required dependencies and a missing runtime are separate issues. Local imports skip catalog compatibility-version checks. Approval and compatibility are separate labels. Never display `Malware-free` or imply that curation guarantees safety.
 
 Keep frequent actions visible when relevant. Put uninstall and infrequent actions in a named row menu. Clicking the mod name opens its detail view. Hover changes only the row fill; selection uses the selected surface, a checked selector, and readable text. Do not make information appear only on hover.
 
@@ -194,15 +196,27 @@ Use the same list, details, switches, load order, and collection controls as cat
 
 ### Launch and setup
 
-The persistent launch area shows the active collection and a short readiness message. Typical labels are `Play`, `Preparing mods`, `Game running`, or `Finish setup`. The primary action changes only when the next useful action changes.
+The persistent launch area shows the active collection and a short readiness message. Its ready action reads **Launch Sanctuary Shattered Sun**. Use the full visible label and accessible name; do not shorten it to Play. During preparation, show `Preparing mods` beside the unavailable launch action; when the game runs, show `Game running`. Use `Finish setup` when setup is the next useful action.
 
-Problems have a nearby `View issues` action and a count only when the count is real. Downloading and applying changes must not appear complete until they succeed. While the game runs, collection edits remain available and show that application is waiting for exit. Play waits for the latest valid active collection to finish preparation. A game-version warning alone leaves Play available.
+Place Sanctuary artwork behind the launch action, fading roughly halfway into the navy surface with a restrained orange tint. This static fade is intentional. Keep the composition within the launch area, clear of mod rows. Start with a 320–400 px wide, at least 64 px high action where space permits. Let the label wrap to two lines and the launch area grow at narrow widths or large text sizes; never truncate the game name. The existing specimen demonstrates the revised label only; artwork selection and its final composition still need review.
+
+Use real game artwork with recorded provenance and terms suitable for its intended use. Confirm those terms before bundling assets. Keep the action usable with a solid background if artwork is missing. Treat the image as decorative: no text baked into it, no duplicate accessible name, and no layout shift while it loads. Check text contrast over the actual crop in every state, with at least 4.5:1 for normal text. Use a sufficiently opaque backing behind the label where needed; palette measurements alone do not verify an image-backed control.
+
+Use a short opacity transition for hover/focus emphasis and immediate pressed feedback. Keep the dissolved edge static, with no particle loop, moving mask or idle glow. Reduced motion retains the static artwork and all state feedback. Native CSS/Svelte behavior comes first; this treatment does not require an animation library.
+
+Problems have a nearby `View issues` action and a count only when the count is real. Downloading and applying changes must not appear complete until they succeed. While the game runs, collection edits remain available and show that application is waiting for exit. Launch waits for the latest valid active collection to finish preparation. A game-version warning alone leaves launch available.
 
 First-run setup uses one focused sequence: locate game, explain the loader requirement, review the planned setup, show progress, then show the resulting state. Reuse native file pickers. Do not make users navigate multiple settings pages for the initial setup.
 
 ### In-game mod settings
 
-Provide a Starframe-owned mod list and settings view inside the game. Use its navy-and-orange identity where it remains legible over game content. Review the actual in-game screen separately; desktop window dimensions and controls do not transfer unchanged to a game overlay. Keep keyboard focus, mouse input, close/back behavior and text scaling explicit.
+Add a **Mods** entry to Sanctuary's main menu using the game's existing menu structure and controls. Open an installed-mod list from that entry, show which mods are enabled and which actually loaded, and let players select a mod to change its settings. Match the game's typography, spacing, panels, selection states, scrolling, transitions, input navigation and back/close behavior. Reuse the game's UI components where its integration permits. Starframe owns the implementation and settings behavior; the desktop navy-and-orange skin does not carry into this menu.
+
+Use the [monochrome Starframe mark](docs/design/starframe-mark-mono.svg) for the Mods entry. Keep the approved frame-and-sun geometry, but render both parts in the same tint as the other menu icons. Match their size, optical weight and hover/selected/disabled treatment. Retain the visible `Mods` label. Do not bake orange or white into the game icon.
+
+The desktop prepares a metadata-only inventory for the game-side list, alongside the enabled activation entries. Disabled entries must not load DLLs to obtain display information. Distinguish disabled, loaded and failed states. A disabled mod without available settings should explain that its settings become available after enabling it and restarting. The list reflects the prepared setup for this game session; pending desktop changes do not pretend to be loaded.
+
+The former browser in-game screen is superseded. Its replacement in the review artifact is a direction note, not a game preview. Inspect the actual game menus before implementation, then verify the Mods entry, focus/input capture, back behavior and UI scaling in-game. Do not claim game-native visual fidelity from a browser mockup.
 
 Show each mod's named settings using suitable controls for its supported types, with descriptions and defaults where supplied. Save changes to that mod's configuration. Settings stay the same when a collection changes. A setting applies live only when the mod supports it; otherwise display `Takes effect after restart`. The desktop does not maintain a second copy to merge. Loading and collection membership changes still wait for a game restart rather than promising live DLL unloading.
 
@@ -229,7 +243,7 @@ All desktop checking runs within the app's lifetime. Closing the app exits it an
 
 Use the official app repository's published releases. Compare release versions with the installed app version. The initial recommendation is stable releases only; a preview channel requires a separate product decision. Keep the repository address configurable by the maintainer, not an arbitrary imported collection.
 
-When a newer eligible version exists, show a persistent, quiet `Update available` notice near Settings or Help. Opening it shows the installed version, available version, release notes, and `Update`, `View release` and `Later` actions. Keep the notice separate from the main Play action and do not interrupt a game launch with a modal. Dismissing the notice must not cause repeated prompts for the same release; the update remains accessible in Settings.
+When a newer eligible version exists, show a persistent, quiet `Update available` notice near Settings or Help. Opening it shows the installed version, available version, release notes, and `Update`, `View release` and `Later` actions. Keep the notice separate from the main launch action and do not interrupt a game launch with a modal. Dismissing the notice must not cause repeated prompts for the same release; the update remains accessible in Settings.
 
 The user chooses when to install or restart. Background checking does not authorize automatic installation. An app update must wait for active file changes to reach a safe stopping point and, initially, for the game to close because the release can include a new in-game runtime. Explain that reason beside the action. Failure to reach GitHub leaves mod management usable and shows a nonblocking check status. Do not label a failed check as `Up to date`.
 
@@ -293,7 +307,7 @@ Validate accessible mod lists, live state updates, safe file operations, install
 
 ## 11. Review and handoff
 
-The [0.0.1 design specimen](docs/design/review.html) shows My mods, details, collections, download states, setup/update dialogs, and the in-game settings screen. It includes normal, selected, busy, error and empty states, plus reduced motion and compact reflow. It uses fictional data and does not connect to game files or download mods. See [review evidence](docs/design/REVIEW.md) for the checked interactions and verification limits.
+The [design specimen](docs/design/review.html), amended for 0.0.2, shows My mods, details, collections, download states and setup/update dialogs. Its in-game tab now records the game-native direction; it does not preview a replacement game menu. It includes normal, selected, busy, error and empty states, plus reduced motion and compact reflow. It uses fictional data and does not connect to game files or download mods. See [review evidence](docs/design/REVIEW.md) for the checked interactions and verification limits.
 
 The selected identity uses an open structural frame around an orange sun, with a Bahnschrift wordmark. The [dark-surface mark](docs/design/starframe-mark.svg) and [light-surface mark](docs/design/starframe-mark-light.svg) use original geometry. The specimen shows small sizes and both surfaces. The user approved the identity and screens on 6 September 2026: "Approve this design for the handoff".
 
@@ -302,7 +316,7 @@ Handoff decisions and implementation checks:
 - Original frame-and-sun mark and Bahnschrift wordmark selected.
 - Fonts, neutral shades, navigation, screen structure and interaction direction approved through the specimen; verify their actual native rendering during implementation.
 - Representative visual screens, motion direction and reduced-motion alternative approved.
-- In-game settings presentation and accessible load-order controls approved; verify actual Unity input behavior during implementation.
+- Accessible load-order controls remain approved. The in-game presentation now follows the game-native Mods menu described above; verify its visuals and Unity input behavior during implementation.
 - The initial Windows target is defined in the [implementation handoff](docs/HANDOFF.md): Windows 11 x64, starting with 25H2. Verify supported releases and actual Windows integration during implementation.
 - Validation of the chosen Windows installation and update flow remains an implementation requirement, not a claim made by visual review.
 
@@ -325,6 +339,8 @@ Handoff acceptance criteria:
 - In-game settings have clear persistence and restart behavior, and remain usable after the desktop app closes.
 - UI and runtime verification are recorded separately from design review.
 
-Design verification: supplied colors recorded; contrast pairs measured; reference pages inspected; UI structure and motion purposes documented. Revision 0.6 records the user's approval of the original identity and interactive desktop/in-game specimen. Browser checks covered the interactions and reflow listed in docs/design/REVIEW.md. No installed app or runtime was built, so native accessibility, measured performance, updates and game behavior remain unverified. The handoff is complete; beginning milestone 0.1.0 requires the user's next implementation instruction.
+Design verification: supplied colors recorded; contrast pairs measured; reference pages inspected; UI structure and motion purposes documented. Revision 0.6 recorded the original specimen approval. Revision 0.7 retains the logo and first-version desktop layout, replaces the in-game direction, and specifies the artwork-backed launch action. Earlier browser checks are recorded in docs/design/REVIEW.md. Game-native rendering and the final artwork crop remain unverified. No installed app or runtime was built; beginning milestone 0.1.0 requires the user's next implementation instruction.
 
 Required working guidance: [Ponytail](https://github.com/dietrichgebert/ponytail), [Anti-slop](https://github.com/miqdadbadjuber/anti-slop), and [Avoid AI Writing](https://github.com/conorbronsdon/avoid-ai-writing). These are installed globally in Codex. Read the applicable skill instructions when beginning the corresponding work.
+
+Use UI Skills' [fixing-accessibility](https://github.com/ibelick/ui-skills/tree/83b757b8bba91b7268b8e8d370f9a8052a7943c5/skills/fixing-accessibility) for desktop controls and [fixing-motion-performance](https://github.com/ibelick/ui-skills/tree/83b757b8bba91b7268b8e8d370f9a8052a7943c5/skills/fixing-motion-performance) for animation decisions. Apply them within Svelte and the accepted design. The installed `improve-ui` skill is for explicitly requested audits and produces a plan; it is not the workflow for ordinary UI implementation. These skills do not require React, Tailwind or a new animation dependency. Game-side controls follow equivalent input and readability goals through the game's UI system, rather than HTML/ARIA rules.

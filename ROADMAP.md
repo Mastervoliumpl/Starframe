@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-Completed handoff: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)**. Current product version: **0.0.1**, a design/documentation handoff with no app release. No implementation milestone is active; **0.1.0** is next when the user starts development.
+Completed handoff: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)** with **[0.0.2 design amendments](https://github.com/Mastervoliumpl/Starframe/milestone/9)**. Current product version: **0.0.2**, documentation with no app release. No implementation milestone is active; **0.1.0** is next when the user starts development.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not override the planning-only phase or required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -9,6 +9,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | Version | Outcome | Status |
 | --- | --- | --- |
 | [0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1) | Design and development handoff | Complete |
+| [0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9) | Game-native menu and desktop launch design amendments | Complete |
 | [0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2) | Desktop foundation | Planned |
 | [0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3) | Starframe in-game runtime | Planned |
 | [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Planned |
@@ -32,6 +33,12 @@ Complete. The user approved the identity and visual specimen on 6 September 2026
 - [#3: Design the Starframe wordmark and application icon](https://github.com/Mastervoliumpl/Starframe/issues/3)
 - [#4: Review desktop screens, load-order controls and in-game settings design](https://github.com/Mastervoliumpl/Starframe/issues/4)
 - [#5: Finalize implementation contracts and the 0.0.1 handoff](https://github.com/Mastervoliumpl/Starframe/issues/5)
+
+### 0.0.2: Design amendments
+
+Complete. Retained the logo and first-version desktop layout, replaced the in-game direction with a Sanctuary-native Mods menu, specified the artwork-backed launch action, and added scoped UI skill guidance. This does not start app implementation.
+
+- [#34: Amend the in-game menu and desktop launch design](https://github.com/Mastervoliumpl/Starframe/issues/34)
 
 ### 0.1.0: Desktop foundation
 

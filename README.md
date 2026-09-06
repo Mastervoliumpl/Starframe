@@ -1,7 +1,7 @@
 # Starframe
 Starframe is a mod manager for Sanctuary: Shattered Sun
 
-The 0.0.1 design handoff is complete. Application implementation has not started. The desktop stack is Tauri, Svelte, TypeScript, and Rust, with Windows first. A Starframe-owned C# runtime will provide in-game loading and settings, initially using BepInEx for bootstrap.
+The design handoff and 0.0.2 menu/launch amendments are complete. Application implementation has not started. The desktop stack is Tauri, Svelte, TypeScript, and Rust, with Windows first. A Starframe-owned C# runtime will provide in-game loading and settings, initially using BepInEx for bootstrap.
 
 - [Design direction](DESIGN.md): visual style and interaction requirements.
 - [Architecture draft](ARCHITECTURE.md): proposed project structure, diagrams, and module behavior.
@@ -11,5 +11,5 @@ The 0.0.1 design handoff is complete. Application implementation has not started
 - [Terminology](CONTEXT.md): shared definitions for the project.
 - [Development and checks](DEVELOPMENT.md): continuous tests, CI, versioning and contribution rules.
 - [Version roadmap](ROADMAP.md): the active milestone and scoped GitHub issues.
-- [Changelog](CHANGELOG.md): completed changes; [VERSION](VERSION) identifies the `0.0.1` design handoff.
+- [Changelog](CHANGELOG.md): completed changes; [VERSION](VERSION) identifies the `0.0.2` design handoff amendments.
 - [License](LICENSE): GNU Affero General Public License v3.0.
