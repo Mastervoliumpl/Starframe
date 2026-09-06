@@ -1,0 +1,57 @@
+:root {
+  font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  color: #cbd5e1;
+  background: #0f172a;
+  color-scheme: dark;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+main {
+  padding: 32px;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+header img {
+  flex-shrink: 0;
+}
+h1,
+h2,
+p {
+  margin: 0;
+}
+h1 {
+  font:
+    600 28px/1.2 Bahnschrift,
+    'Segoe UI',
+    sans-serif;
+  color: #f8fafc;
+}
+h2 {
+  font-size: 18px;
+  color: #f8fafc;
+  margin-bottom: 8px;
+}
+section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #334155;
+}
+
+@media (max-width: 480px) {
+  main {
+    padding: 24px;
+  }
+  header {
+    gap: 16px;
+  }
+}
