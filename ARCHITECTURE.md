@@ -1,6 +1,6 @@
 # Starframe architecture
 
-Status: draft 0.3, revised after user review on 6 September 2026. Accepted behavior is identified below; unimplemented structures remain proposals. Milestone 0.1.0 is authorized. Its implemented state layer is described below; later modules remain subject to their milestone and prerequisites.
+Status: draft 0.4, revised on 6 September 2026. Accepted behavior is identified below; unimplemented structures remain proposals. Milestone 0.1.0 is complete. Milestone 0.1.1 is complete. Its binary uses bundled SQLite with retained-source conversion; see [implementation and recovery](docs/verification/sqlite.md). Its implemented state layer is described below; later modules remain subject to their milestone and prerequisites.
 
 Read [DESIGN.md](DESIGN.md) for the accepted user experience and [CONTEXT.md](CONTEXT.md) for terminology. [DEVELOPMENT.md](DEVELOPMENT.md) defines continuous checks and versioning; [ROADMAP.md](ROADMAP.md) assigns the work to version milestones and issues. The [README](README.md) introduces the project, and [LICENSE](LICENSE) contains its licensing terms. Diagrams below are part of this proposal.
 
@@ -18,7 +18,7 @@ Starframe has an installed desktop manager and a game-side runtime that we own. 
 
 The user has selected Tauri, Svelte, TypeScript, and Rust for the desktop app; Windows first; curated individual releases; managed local imports; ordered collections; game launching; and GitHub distribution. Starframe must own its in-game loader/settings experience, support load order, automatically apply edits when the game is closed, and allow users to try mods after a game update with a warning. Collections contain mod references and order, without mod settings. The catalog updates independently of the app.
 
-The user reports that the game developers plan native mod loading/hosting. Design an explicit game-integration seam for that transition; do not assume an unpublished native interface exists. Embedded Turso is the preferred database following evaluation. Tauri's NSIS installer, uninstaller, and updater cover the desktop distribution requirements. These tooling recommendations still need implementation validation.
+The user reports that the game developers plan native mod loading/hosting. Design an explicit game-integration seam for that transition; do not assume an unpublished native interface exists. Bundled SQLite is selected for 0.1.1; see the [transition decision](docs/planning/sqlite-transition.md). Tauri's NSIS installer, uninstaller, and updater cover the desktop distribution requirements. These tooling recommendations still need implementation validation.
 
 | Proposed choice | Reason |
 | --- | --- |
@@ -26,7 +26,7 @@ The user reports that the game developers plan native mod loading/hosting. Desig
 | Plain Svelte with Vite | The app needs bundled screens; it does not need server rendering. |
 | Rust owns saved state and file changes | All views use the same confirmed state and the same validation rules. |
 | A local library outside game loader folders | Disabled mods can remain installed without being visible to a loader. |
-| Embedded Turso for records; ordinary files for artifacts | Uses the Rust database locally; archives and extracted content remain ordinary files. |
+| Bundled SQLite for records; ordinary files for artifacts | Keeps local records in one embedded engine; archives and extracted content remain files. The 0.1.1 build uses bundled SQLite. |
 | Downloads can overlap; game-file changes have one writer | Users can keep working without competing operations changing the same installation. |
 | A portable collection file | Sharing can work without user accounts, cloud storage, or a Starframe server. |
 
@@ -51,7 +51,7 @@ flowchart TB
         Core -->|Confirmed state and progress| IPC
         IPC --> UI
     end
-    Library --> DB[(Local Turso records)]
+    Library --> DB[(Local SQLite records)]
     Catalog --> Files[Local artifacts and staging]
     Catalog --> Authors[Approved author downloads]
     Catalog --> Index[Starframe catalog on GitHub]
@@ -106,7 +106,7 @@ Starframe/
 │   │   ├── ordering.rs          Dependency constraints and stable load order
 │   │   ├── game.rs              Discovery, build identity, launch and observation
 │   │   ├── integration.rs       Capability contract and current runtime adapter
-│   │   ├── storage.rs           Embedded Turso queries and schema migrations
+│   │   ├── storage.rs           Local SQL queries and schema migrations
 │   │   └── updates.rs           In-app release checks and update handoff
 │   ├── migrations/             Ordered database migrations
 │   ├── capabilities/           Tauri permissions for the app window
@@ -139,7 +139,7 @@ Keep feature-specific Svelte components next to their feature. Move a control to
 | Game | Inspect installation, inspect runtime, launch | Executable/build identity, Steam discovery and running-game detection. |
 | Integration | Inspect capabilities, plan activation, inspect activation result | Translation from Starframe's ordered setup to the current runtime or future native game facilities. |
 | In-game runtime | Activate prepared setup, show and save mod settings | Game-side mod lifecycle, supported content overlays, actual activation order, and a Starframe-owned UI. |
-| Storage | Load records, commit a named change | Turso access, record constraints, migrations and consistent persistence. Other modules do not issue ad hoc SQL. |
+| Storage | Load records, commit a named change | Embedded database access, record constraints, migrations and consistent persistence. Other modules do not issue ad hoc SQL. |
 | Updates | Check release, begin user-requested update | Official app releases, notices, due times and the maintained updater integration. |
 
 The useful test seams are package preparation and deployment: callers supply an approved plan and receive a result. Tests can use a temporary game directory, fixture downloads, and injected process/clock observations. Keep those substitutions narrow; do not mirror the entire production system with mocks.
@@ -195,27 +195,27 @@ An accepted command is not a completed operation. Persisted changes become confi
 
 For rapid toggles, the frontend shows the latest intent immediately and sends at most one edit per collection at a time, coalescing later edits. Each edit includes the collection revision it was based on. Rust rejects a stale edit with the current revision. The UI preserves the user's draft and reconciles it; it does not silently overwrite a newer edit from an import or another action.
 
-Use async I/O for transfers and the embedded database interface, with bounded blocking workers for extraction, hashing, or remaining synchronous calls. Never hold a shared-state lock through network or file work. Simply marking a function async does not make expensive synchronous work nonblocking. Cancellation of blocking work must be cooperative; aborting its async handle cannot stop a blocking task that has already started. [Tokio blocking-task behavior](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
+Use async I/O for transfers and bounded background workers for SQLite, extraction, hashing and other synchronous work. Keep the existing single database owner and request queue. Never hold a shared-state lock through network or file work. Simply marking a function async does not make expensive synchronous work nonblocking. Cancellation of blocking work must be cooperative; aborting its async handle cannot stop a blocking task that has already started. [Tokio blocking-task behavior](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
 
 ## 5. Saved data and file ownership
 
-Prefer the embedded Turso Database engine through the Rust `turso` crate. Its local builder opens a database file inside the application; cloud synchronization is optional and is not part of Starframe. This is the Rust SQLite rewrite, not the older libSQL client or a hosted Turso database. No Turso account, token, server, or system service is required. [Turso Rust quickstart](https://docs.turso.tech/sdk/rust/quickstart)
+The 0.1.1 build uses bundled SQLite through pinned rusqlite 0.40.2 with default features disabled and bundled plus backup. One desktop worker owns the connection; synchronous SQL must not run on the UI thread. No database account, service, replication or cloud synchronization is required. See the [decision, dependency evidence and conversion plan](docs/planning/sqlite-transition.md).
 
-Issue #9 implements this choice with `turso = 0.7.2`, pinned exactly with default features disabled. The required Windows checks passed, so the SQLite fallback was not selected. All SQL and the ordered schema migrations live in `src-tauri/src/storage.rs`. Schema 1 stores library entries, collections, ordered references and a database revision; schema 2 adds the active collection. Collection references identify exact content independently of local availability. The schema does not require referenced artifacts to be downloaded. Artifact paths derive from validated lowercase SHA-256 values under `artifacts/`; no binary content is stored in SQL. Catalog metadata, game records and deployment records will arrive with their features.
+The historical 0.1.0 implementation from issue #9 used pinned Turso 0.7.2 with defaults disabled. Its required Windows checks passed. The SQLite decision is based on the accepted workload and dependency reduction, not a failed Turso gate. SQL and ordered migrations live in src-tauri/src/storage.rs. Schema 1 stores library entries, collections, ordered references and a database revision; schema 2 adds active selection; schema 3 adds the selected game installation. References retain exact content independently of local availability. Artifact paths derive from validated lowercase SHA-256 values; binaries remain outside SQL.
 
-The storage module owns one connection and an OS file lock for the data directory. Short immediate transactions validate expected revisions before writing; failed edits roll back. The native app opens storage in a blocking worker after creating the shell and publishes ready/error status through the existing channel. Database revisions cross that channel as decimal strings. Library and collection editing commands are not exposed by this issue.
+The storage module owns one connection and an OS file lock. Short immediate transactions validate expected revisions; failed edits roll back. The app opens storage after creating the shell and publishes ready/error status through the existing channel. Database revisions cross that channel as decimal strings. Library and collection editing commands remain later work.
 
-Before upgrading an existing schema, the module checkpoints the WAL, copies the database and any remaining WAL into a new backup directory, syncs the files and marks the backup complete. Migration steps commit their schema version with their changes. Startup rejects invalid headers, newer versions, unknown database ownership and invalid records without replacing them with an empty library. Restore validates a completed backup in a new directory and leaves the source and damaged data intact. This uses Turso's tested file/checkpoint behavior; it does not reopen files with another database engine. See [storage verification and recovery](docs/verification/storage.md).
+SQLite uses WAL, foreign keys, synchronous=FULL, immediate transactions and a 250 ms busy timeout. Backups use SQLite's backup API, sync the completed database and write a completion marker. Schema changes and version updates commit together. Startup validates ownership, engine, version, integrity and logical records. Invalid data produces a visible error without resetting the library.
 
-The current upstream README reports production use and Windows support. It also distinguishes experimental features, including multi-process WAL coordination. Starframe only needs ordinary local queries, short transactions, constraints and migrations; keep database access in the desktop Rust process and avoid experimental features or a second database writer inside the game. There is no measured reason to claim Turso makes Starframe faster. [Turso status](https://github.com/tursodatabase/turso/blob/main/README.md)
+The first 0.1.1 startup copies legacy state.db and its WAL into a unique staging directory under the locked app-data root. SQLite reads only that copy. The converter rebuilds schema 4 with engine='sqlite', preserving all logical records and revisions. After validation, close/reopen equality checks and file flushes, it marks the candidate complete and renames its directory to sqlite/. Original Turso files, legacy backups and artifact files remain in place. Startup uses an existing sqlite/ directory exclusively; incomplete or invalid contents cause an error rather than a fallback to stale legacy records. Interrupted staging directories are retained, and retry uses a new directory. See [recovery and verification](docs/verification/sqlite.md).
 
-Before release, test the pinned Turso version on Windows for the exact SQL features used, rollback, forced-termination recovery, migration/backup restoration, busy handling and offline operation. SQLite compatibility is not evidence that every extension, pragma or file operation is interchangeable. Keep SQL inside `storage.rs`, use ordered migrations and no ORM. If required durability or compatibility checks fail, use SQLite with `rusqlite` as the fallback through that module; do not ship two engines or assume an existing Turso file can simply be reopened by another engine. [Turso Rust reference](https://docs.turso.tech/sdk/rust/reference)
+The workload through 0.7.0 needs ordinary local queries, constraints and short transactions. The game runtime reads prepared manifests without opening the database. Catalog refresh and collection sharing do not require database sync. The [transition decision](docs/planning/sqlite-transition.md) records the choice; original [Turso checks](docs/verification/storage.md) remain historical evidence.
 
 Use the operating system's per-user app-data directory resolved through Tauri. The installation root selected by the user is separate. Do not hardcode the developer's Steam path or put user data beside the Starframe executable.
 
 ```text
 Starframe app data/
-├── state.db                    Embedded Turso records
+├── state.db                    Local records (SQLite after 0.1.1)
 ├── artifacts/<sha256>/         Verified archives and extracted immutable content
 ├── staging/<operation-id>/     Incomplete downloads and validation work
 └── logs/                      Bounded diagnostic logs
@@ -464,7 +464,7 @@ The repository has no application dependencies yet. The following are candidates
 | Desktop integration | Tauri commands/channels; maintained dialog, opener, single-instance and updater plugins only where needed. |
 | Serialization and shared data types | Serde/serde_json; evaluate ts-rs to generate TypeScript data types from Rust. |
 | Work scheduling | Tauri's existing async runtime and bounded Tokio blocking tasks. |
-| HTTP and local records | reqwest and the embedded `turso` crate; no cloud sync feature. |
+| HTTP and local records | planned reqwest and implemented bundled SQLite through rusqlite; no cloud sync feature. |
 | Archives, content identity and version checks | Maintained ZIP, SHA-256 and semantic-version libraries; select narrow features and compatible versions. |
 | File observation | notify, plus bounded reconciliation scans. |
 | In-game bootstrap and settings persistence | BepInEx; C# runtime built for the verified Unity/Mono environment. Reuse its config types behind Starframe's own settings UI. |
@@ -494,7 +494,7 @@ No runtime claims are verified by this document. Add tests alongside features an
 | Shared collection with unavailable release | Import review identifies the gap and never substitutes a release silently. |
 | Sleep, offline mode, repeated checks and close | One due check, useful cached state, server backoff, and no checker after exit. |
 | Database migration and interrupted update | Existing data survives or a clear recovery path is provided. |
-| Turso transaction, process termination and migration | The pinned Windows build preserves committed records; recovery and backup/restore work with the features actually used. |
+| SQLite transaction, process termination and legacy conversion | The pinned Windows build preserves committed records; recovery and backup/restore work with the features actually used. |
 | Dependency order, manual priority and cycles | The result is deterministic; mandatory dependencies precede dependents; cycles identify the involved mods. The actual runtime follows the supported order. |
 | Older game compatibility declaration | The UI warns and still allows enable/launch; genuine structural failures remain separate. Local imports make no catalog version-check requests. |
 | Catalog changes while the app version stays fixed | A valid newer catalog appears live; invalid or failed responses leave the last valid catalog usable. Installed mods are not silently upgraded. |
@@ -513,7 +513,7 @@ ROADMAP.md gives these slices their release targets. Work only within the active
 
 | Area | Current direction | Remaining work |
 | --- | --- | --- |
-| Local persistence | Embedded Turso 0.7.2 passed the issue #9 Windows gate. | Keep testing new SQL and migrations as features arrive; verify installer/update lifecycle and broader fault conditions before release. |
+| Local persistence | Bundled SQLite with retained-source legacy conversion is implemented. | Retain migration/recovery tests as record schemas grow. |
 | Collections and application | Name plus ordered references; reuse exact content; automatically apply when the game is closed. User confirmed. | Validate import recovery, dependency adjustments and pending-state UI. |
 | Load order | Resolve dependencies automatically; allow manual priority within valid orders. | Review the UI; verify actual activation and define supported content-overlay precedence. |
 | Local builds | Normal mod controls without catalog version checks; watched managed copies. | Test incomplete builds, missed notifications and exit-time application. |

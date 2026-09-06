@@ -77,7 +77,7 @@ impl GameService {
 }
 
 fn saved_status(storage: &Storage) -> Result<SavedData, String> {
-    let records = tauri::async_runtime::block_on(storage.load()).map_err(|e| e.to_string())?;
+    let records = storage.load().map_err(|e| e.to_string())?;
     Ok(SavedData::Ready {
         active_collection_name: records
             .collections
@@ -142,8 +142,7 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
     tauri::async_runtime::spawn_blocking(move || {
         let mut view = GameView::default();
         let result = crate::data_directory(&app).and_then(|root| {
-            tauri::async_runtime::block_on(Storage::open(&root))
-                .map_err(|e| format!("{e} Data folder: {}", root.display()))
+            Storage::open(&root).map_err(|e| format!("{e} Data folder: {}", root.display()))
         });
         let mut storage = match result {
             Ok(storage) => {
@@ -162,7 +161,7 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
         };
         let mut selected = None;
         if let Some(storage) = &storage {
-            match tauri::async_runtime::block_on(storage.selected_game()) {
+            match storage.selected_game() {
                 Ok(value) => selected = value,
                 Err(e) => view.error = e.to_string(),
             }
@@ -229,7 +228,8 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                                 .to_owned()
                         })
                         .and_then(|store| {
-                            tauri::async_runtime::block_on(store.select_game(&item.id, &item.path))
+                            store
+                                .select_game(&item.id, &item.path)
                                 .map_err(|e| e.to_string())
                         });
                     match save {

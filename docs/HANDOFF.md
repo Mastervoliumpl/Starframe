@@ -146,9 +146,9 @@ The runtime is the only settings writer during play. Validate values before savi
 
 ## Storage proof and dependency choices
 
-Use the embedded `turso` engine with local files, existing Tauri async execution and one desktop database owner. The local Rust builder and optional cloud-sync feature are documented upstream; Starframe does not need sync, an account or a service. [Turso Rust quickstart](https://docs.turso.tech/sdk/rust/quickstart)
+The 0.1.1 decision selects bundled SQLite through rusqlite, with one desktop database owner on the existing background worker. It supersedes the original Turso preference. The 0.1.1 implementation uses bundled SQLite and retains original Turso files during conversion. See [current recovery instructions](verification/sqlite.md). See the [decision and conversion plan](planning/sqlite-transition.md).
 
-Issue #9 must prove the selected engine version on Windows before relying on it: required transactions/constraints, restart persistence, termination during a write, backup and restore, migrations in both success and failure cases, unsupported future schema, and offline operation. Preserve the database and evidence on failure. A test failure can justify the documented `rusqlite` fallback; it does not justify silent data reset or shipping two engines. No durability claim is established during this planning milestone.
+Issue #9 proved the original Turso implementation on Windows; retain that evidence. SQLite must pass required transactions/constraints, restart persistence, forced termination, backup/restore, successful/failed migrations, unsupported future schema and offline checks. Add retained-source conversion fixtures for schemas 1 through 3, WAL-bearing data and completed backups. Failure must retain data and expose recovery, never reset the library or silently ship both engines.
 
 Reuse choices for implementation:
 

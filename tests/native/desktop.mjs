@@ -1,22 +1,18 @@
 import { chromium, expect } from '@playwright/test';
+import { waitForDesktopPage } from './page.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, writeFile, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolve } from 'node:path';
-import { createServer } from 'node:net';
+import { waitForDebugPortRelease } from './port.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const executable = resolve('src-tauri/target/debug/starframe.exe');
 const output = resolve('test-results/native');
 const dataDirectory = await mkdtemp(join(tmpdir(), 'starframe-native-'));
 await mkdir(output, { recursive: true });
-const probe = createServer();
-await new Promise((accept, reject) => {
-  probe.once('error', reject);
-  probe.listen(9223, '127.0.0.1', accept);
-});
-await new Promise((accept) => probe.close(accept));
+await waitForDebugPortRelease(9223);
 const child = spawn(executable, [], {
   windowsHide: true,
   stdio: ['ignore', 'inherit', 'inherit'],
@@ -44,7 +40,7 @@ try {
   }
   if (!browser)
     throw new Error('The native webview did not expose its test connection.');
-  const page = browser.contexts()[0].pages()[0];
+  const page = await waitForDesktopPage(browser);
   await expect(
     page.getByRole('status').filter({ hasText: 'Desktop connected' }),
   ).toBeVisible();

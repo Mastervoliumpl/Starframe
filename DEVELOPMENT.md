@@ -1,12 +1,12 @@
 # Starframe development and checks
 
-Status: development policy adopted on 6 September 2026. Milestone 0.1.0 is complete; later milestones remain planned.
+Status: development policy adopted on 6 September 2026. Milestones 0.1.0 and 0.1.1 are complete. Later milestones remain planned.
 
 Read [DESIGN.md](DESIGN.md) for behavior and presentation, [ARCHITECTURE.md](ARCHITECTURE.md) for structure and recovery rules, and [ROADMAP.md](ROADMAP.md) for the current milestone. GitHub issues hold task scope, dependencies, acceptance criteria and verification evidence.
 
 ## Work one milestone at a time
 
-The design handoff and desktop foundation **0.1.0** are complete. No later milestone is active. Start further implementation only after user authorization. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
+The design handoff and desktop foundation **0.1.0** are complete. The SQLite corrective milestone **0.1.1** is complete. Start 0.2.0 only after user authorization. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
 
 Work on an issue only when its milestone is active and its prerequisites are complete. Keep issue dependencies in a `Depends on` section with issue links. Each issue must state its scope, observable completion criteria and checks. Split an issue when it contains independently reviewable outcomes; avoid splitting one small change into tasks that cannot be tested separately.
 
@@ -18,7 +18,9 @@ Close an issue only after its acceptance criteria and relevant checks pass. Clos
 
 Use the installed GitHub CLI (`gh`) for repository inspection, issues, milestones, pull requests, workflow runs and releases. Use `git` for local branches, commits, fetching and pushing. Inspect existing objects before creating new ones. Use `--body-file` or an API JSON input file for multiline text; do not construct shell commands from issue text.
 
-Make small, coherent commits as work reaches a checked state. Reference the issue in the commit or pull request. Use an issue branch for implementation and a focused pull request into `main`. Preserve unrelated changes. Stage explicit paths. Machine-local AGENTS.md instructions stay out of commits and out of .gitignore.
+Keep `main` current with completed, verified work. Use one branch per active milestone or corrective version, named `codex/<version>-<purpose>`, and one draft pull request while that milestone is in development. Make small, coherent commits for its issues on that branch. Merge only after all milestone acceptance criteria and exit checks pass. An unfinished milestone stays on its branch. Completed independent documentation or design work can use a separate pull request.
+
+Reference issues in commits or the pull request. Preserve unrelated changes and stage explicit paths. After merging, delete the local and remote milestone branches. Remove superseded branches only after verifying that their changes are retained. Machine-local AGENTS.md instructions stay out of commits and out of .gitignore.
 
 Pull requests identify the issue, target milestone, behavior changed, verification performed, and any data-migration or release impact. Tests and fixes belong in the same change. Use the CLI to inspect CI failures; do not merge a known failing change. Require the stable `Required checks` status on `main`, without imposing a second-reviewer requirement on a sole maintainer. The maintainer retains administrative recovery access; routine work must pass checks.
 
@@ -57,7 +59,7 @@ Continuous delivery first creates reviewable artifacts and draft releases. Publi
 
 ## Versions and change history
 
-[VERSION](VERSION) is the source of the product version. The current value is `0.1.0`, the completed internal desktop foundation, not a shipped installer. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
+[VERSION](VERSION) is the source of the product version. The current value is `0.1.1`, the completed internal SQLite build, not a shipped installer. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
 
 Use three-part versions: `0.MINOR.PATCH` during initial development. A capability milestone advances the minor version; a corrective release advances the patch version. The planning handoff uses `0.0.1`. Published content is immutable; never replace a release with different bytes under the same version. The `0.x` series makes no stable public API promise, but format migrations and compatibility changes still need explicit notes. [Semantic Versioning](https://semver.org/)
 
@@ -94,11 +96,15 @@ npm run tauri -- build --no-bundle -- --locked
 
 Use `npm run tauri dev` for the native development window, or `npm run dev` for the browser frontend at `http://127.0.0.1:1420`. Use `npm run format` to format frontend/configuration files and `cargo fmt --manifest-path src-tauri/Cargo.toml` for Rust. Vitest watch mode is `npm run test:watch`. Stop the development command when finished.
 
-The shell has six destinations and five focused native commands for live state, diagnostics, fixed external pages and game discovery. Rust opens local Turso storage in Tauri's per-user local app-data directory. The frontend has no SQL or game access. Help & logs provides an explicitly labelled 1,000-row fixture and a diagnostic workload. The launch action remains unavailable until game setup and launch are implemented.
+The shell has six destinations and five focused native commands for live state, diagnostics, fixed external pages and game discovery. The 0.1.1 build opens bundled SQLite at sqlite/state.db under Tauri's per-user local app-data directory. It converts supported Turso data on retained copies before promotion. See [SQLite verification and recovery](docs/verification/sqlite.md). The frontend has no SQL or game access. Help & logs provides an explicitly labelled 1,000-row fixture and a diagnostic workload. The launch action remains unavailable until game setup and launch are implemented.
 
 Vitest checks stale revisions, retired subscriptions, lost acknowledgements, duplicate actions and cancellation state. Rust tests operation transitions, command validation and the generated contract. To regenerate types after editing `model.rs`, set `UPDATE_BINDINGS=1` for a Cargo test run, then unset it. Normal tests compare the checked-in types without writing them.
 
 Run `npx playwright install chromium` once, then `npm run test:browser` for navigation, reconnect, keyboard, text resizing and diagnostic checks. Browser fixtures require the development URL `/?fixture`; production builds omit the fixture transport. These tests do not establish native behavior. On Windows, build with `npm run tauri -- build --debug --no-bundle -- --locked`, then run `npm run test:native`. These checks open and close their own debug app, temporarily enable WebView test connections on ports 9223 and 9224, and test real IPC, permissions, single-instance behavior, cancellation, reconnect, process exit, saved-data failures, game selection, the native folder picker and live process/build changes. They use new temporary data directories through `STARFRAME_TEST_DATA_DIR` and temporary Steam metadata through `STARFRAME_TEST_STEAM_ROOT`; release builds ignore both. The native picker test uses Windows UI Automation and messages scoped to its own app process. The ports must be free and no other Starframe instance may be running. Screenshots and timing data go under ignored `test-results/native`. No test connection is configured in the shipped app. CI builds the release executable and a separate debug executable for these isolated native tests. See [desktop results](docs/verification/desktop-state.md), [storage results and recovery](docs/verification/storage.md) and [game discovery/milestone exit](docs/verification/game-discovery.md).
+
+The 0.1.1 exit checks retain storage/native coverage and add populated legacy conversion and interruption cases. The shipped Cargo graph excludes Turso. [Windows results](docs/verification/sqlite.md) separate dependency resolution, clean/warm compilation, test execution and CI. Keep the existing caching and required checks; do not weaken them to obtain a faster result.
+
+Conversion regression tests run with `cargo test --manifest-path src-tauri/Cargo.toml --locked --lib storage::sqlite_proof`. They use [retained pinned Turso fixtures](src-tauri/tests/fixtures/turso-0.7.2/README.md), so Turso is absent from both current production and test graphs. Three ignored Rust test entries are subprocess workers invoked by parent interruption tests. The historical [proof](docs/verification/sqlite-conversion.md) records #39; [current verification](docs/verification/sqlite.md) records production behavior. The debug-only native startup gate requires STARFRAME_TEST_DATA_DIR and a hold-storage-startup file in that temporary directory. Release builds omit the gate.
 
 Storage tests run as part of `npm run check:rust`. The process-interruption test starts the ignored `storage::tests::crash_worker` test in child processes, waits for a committed fixture and flushed unfinished work, then forcibly terminates each child. The ignored test is a worker entry point, not a skipped recovery check. Run `cargo test --manifest-path src-tauri/Cargo.toml --offline --locked --lib` to repeat the storage gate without registry access. Tests use temporary databases and never use the user's app-data or game directory.
 

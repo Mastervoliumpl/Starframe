@@ -301,7 +301,7 @@ The user selected Tauri + Svelte + TypeScript, with Rust handling local operatio
 - Svelte and TypeScript define the interface, interaction states, and live presentation of data.
 - Rust handles local file operations and game launching. Long-running work must leave the interface responsive and report progress and results back to it.
 
-The in-game component uses C# for the verified Unity/Mono environment, with BepInEx providing bootstrap and reusable configuration support. Starframe owns its activation logic and settings presentation. The proposed local database is embedded Turso; details and validation requirements belong in ARCHITECTURE.md.
+The in-game component uses C# for the verified Unity/Mono environment, with BepInEx providing bootstrap and reusable configuration support. Starframe owns its activation logic and settings presentation. The 0.1.1 build uses bundled SQLite with retained-source conversion of legacy Turso data. This changes no accepted interface behavior. Details and validation requirements belong in ARCHITECTURE.md.
 
 Validate accessible mod lists, live state updates, safe file operations, installer/update behavior, and purposeful motion against this design. Verify responsiveness under representative background load. Framework versions and additional dependencies will be chosen during implementation planning. Ponytail is required for all coding and dependency decisions: reuse established code, standard libraries, and platform features before custom solutions. Do not add a UI library solely to obtain one transition.
 
