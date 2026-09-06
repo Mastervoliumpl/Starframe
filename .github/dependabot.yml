@@ -13,6 +13,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
+    ignore:
+      # Revisit when svelte-check and typescript-eslint support TypeScript 7.
+      - dependency-name: typescript
+        versions: ['7.x']
     groups:
       desktop-tooling:
         patterns: ['*']
