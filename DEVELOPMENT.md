@@ -18,7 +18,9 @@ Close an issue only after its acceptance criteria and relevant checks pass. Clos
 
 Use the installed GitHub CLI (`gh`) for repository inspection, issues, milestones, pull requests, workflow runs and releases. Use `git` for local branches, commits, fetching and pushing. Inspect existing objects before creating new ones. Use `--body-file` or an API JSON input file for multiline text; do not construct shell commands from issue text.
 
-Make small, coherent commits as work reaches a checked state. Reference the issue in the commit or pull request. Use an issue branch for implementation and a focused pull request into `main`. Preserve unrelated changes. Stage explicit paths. Machine-local AGENTS.md instructions stay out of commits and out of .gitignore.
+Keep `main` current with completed, verified work. Use one branch per active milestone or corrective version, named `codex/<version>-<purpose>`, and one draft pull request while that milestone is in development. Make small, coherent commits for its issues on that branch. Merge only after all milestone acceptance criteria and exit checks pass. An unfinished milestone stays on its branch. Completed independent documentation or design work can use a separate pull request.
+
+Reference issues in commits or the pull request. Preserve unrelated changes and stage explicit paths. After merging, delete the local and remote milestone branches. Remove superseded branches only after verifying that their changes are retained. Machine-local AGENTS.md instructions stay out of commits and out of .gitignore.
 
 Pull requests identify the issue, target milestone, behavior changed, verification performed, and any data-migration or release impact. Tests and fixes belong in the same change. Use the CLI to inspect CI failures; do not merge a known failing change. Require the stable `Required checks` status on `main`, without imposing a second-reviewer requirement on a sole maintainer. The maintainer retains administrative recovery access; routine work must pass checks.
 
