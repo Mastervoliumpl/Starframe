@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="930" viewBox="0 0 1280 930" role="img" aria-labelledby="title desc">
   <title id="title">Starframe architecture overview</title>
-  <desc id="desc">Svelte sends requests through Tauri to Rust and receives live state. Rust coordinates library records, catalog downloads, deployment, and update checks. Local files, the game, and GitHub are outside the app. Starframe does no work after it closes.</desc>
+  <desc id="desc">Svelte sends requests through Tauri to Rust and receives live state. Rust manages Turso records, ordered collections, downloads, deployment, and update checks. BepInEx starts Starframe's in-game runtime, which owns activation and settings. A replaceable integration interface allows future native game support. Desktop checks stop when the app closes; the runtime ends with the game.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#FB923C"/></marker>
     <style>
@@ -15,7 +15,7 @@
   </defs>
   <rect width="1280" height="930" fill="#0F172A"/>
   <text x="48" y="61" class="title">Starframe architecture</text>
-  <text x="48" y="93">First draft · Svelte handles interaction; Rust owns confirmed state and local operations.</text>
+  <text x="48" y="93">Draft 0.2 · Svelte handles interaction; Rust owns confirmed state and local operations.</text>
   <text x="1232" y="58" text-anchor="end" class="label">06 September 2026</text>
 
   <rect x="32" y="128" width="1216" height="494" rx="8" fill="none" stroke="#334155" stroke-width="2"/>
@@ -52,7 +52,7 @@
 
   <rect x="56" y="398" width="262" height="128" rx="6" class="box"/>
   <text x="76" y="434" class="heading">Library + collections</text>
-  <text x="76" y="464">Saved versions and setups</text>
+  <text x="76" y="464">Names, mod references, order</text>
   <text x="76" y="491" class="muted">Desired state stays separate</text>
   <text x="76" y="512" class="muted">from files deployed to the game</text>
 
@@ -60,13 +60,13 @@
   <text x="368" y="434" class="heading">Catalog + packages</text>
   <text x="368" y="464">Approved releases and imports</text>
   <text x="368" y="491" class="muted">Download → verify → prepare</text>
-  <text x="368" y="512" class="muted">No mod binaries hosted by us</text>
+  <text x="368" y="512" class="muted">Catalog refreshes independently</text>
 
   <rect x="640" y="398" width="262" height="128" rx="6" class="box"/>
   <text x="660" y="434" class="heading">Deployment + game</text>
   <text x="660" y="464">Plan, apply, recover, launch</text>
-  <text x="660" y="491" class="muted">One writer for game files</text>
-  <text x="660" y="512" class="muted">Apply only when game is closed</text>
+  <text x="660" y="491" class="muted">Ordered activation</text>
+  <text x="660" y="512" class="muted">Replaceable game integration</text>
 
   <rect x="932" y="398" width="290" height="128" rx="6" class="box"/>
   <text x="952" y="434" class="heading">App updates</text>
@@ -75,7 +75,7 @@
   <text x="952" y="512" class="muted">The user chooses when to install</text>
 
   <text x="56" y="570">Slow work leaves navigation and unrelated controls usable.</text>
-  <text x="56" y="599" class="muted">No game-file writes while the game runs. No background checker after Starframe closes.</text>
+  <text x="56" y="599" class="muted">Desktop deployment waits for game exit. Desktop checks stop when Starframe closes.</text>
 
   <path d="M186 622 V708" class="line"/>
   <path d="M478 622 V708" class="line"/>
@@ -84,7 +84,7 @@
 
   <rect x="56" y="708" width="262" height="98" rx="6" class="box"/>
   <text x="76" y="743" class="heading">Local app data</text>
-  <text x="76" y="773">SQLite records + artifact files</text>
+  <text x="76" y="773">Turso records + artifact files</text>
 
   <rect x="348" y="708" width="262" height="98" rx="6" class="box"/>
   <text x="368" y="743" class="heading">Catalog and authors</text>
@@ -92,12 +92,12 @@
 
   <rect x="640" y="708" width="262" height="98" rx="6" class="box"/>
   <text x="660" y="743" class="heading">Sanctuary installation</text>
-  <text x="660" y="773">Game files, loaders, process</text>
+  <text x="660" y="773">Starframe runtime + BepInEx</text>
 
   <rect x="932" y="708" width="290" height="98" rx="6" class="box"/>
   <text x="952" y="743" class="heading">Starframe releases</text>
   <text x="952" y="773">Official GitHub repository</text>
 
-  <text x="48" y="864">This is a simplified map. ARCHITECTURE.md contains the full flows, ownership rules, and open decisions.</text>
-  <text x="48" y="893" class="muted">Proposed module layout and storage · accepted stack and app-lifetime requirements · no application code built</text>
+  <text x="48" y="864">The C# runtime owns loading and settings. Future native mod support replaces the current integration.</text>
+  <text x="48" y="893" class="muted">ARCHITECTURE.md contains detailed flows and verification requirements · planning only; no application code built</text>
 </svg>
