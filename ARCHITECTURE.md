@@ -1,6 +1,6 @@
 # Starframe architecture
 
-Status: draft 0.3, revised after user review on 6 September 2026. Accepted behavior is identified below; implementation details remain a proposal. The user has authorized only issue #6, which introduces the desktop shell and language tooling. This document does not authorize the other proposed modules.
+Status: draft 0.3, revised after user review on 6 September 2026. Accepted behavior is identified below; unimplemented structures remain proposals. Milestone 0.1.0 is authorized. Its implemented state layer is described below; later modules remain subject to their milestone and prerequisites.
 
 Read [DESIGN.md](DESIGN.md) for the accepted user experience and [CONTEXT.md](CONTEXT.md) for terminology. [DEVELOPMENT.md](DEVELOPMENT.md) defines continuous checks and versioning; [ROADMAP.md](ROADMAP.md) assigns the work to version milestones and issues. The [README](README.md) introduces the project, and [LICENSE](LICENSE) contains its licensing terms. Diagrams below are part of this proposal.
 
@@ -9,6 +9,10 @@ Read [DESIGN.md](DESIGN.md) for the accepted user experience and [CONTEXT.md](CO
 The [0.0.1 implementation handoff](docs/HANDOFF.md) narrows the initial Windows target, performance checks, activation/report formats, capabilities and settings registration. It records what can be implemented next and what still requires runtime evidence.
 
 ## 1. Starting point
+
+The desktop foundation currently uses `src-tauri/src/app.rs` for in-memory diagnostic operations, `commands.rs` for four focused commands, and `model.rs` for serializable state and errors. A contract test generates the TypeScript types in `src/lib/generated/model.ts`. One replaceable Tauri channel sends the initial snapshot under the state lock, then revisions and a two-second heartbeat. Session IDs identify the native process; revision strings preserve the full Rust integer range. The frontend rejects older revisions and retired subscriptions. A silent connection is replaced after six seconds without an accepted snapshot. Search, selection, page scroll and draft notes stay in Svelte.
+
+Diagnostics run bounded memory hashing outside the state lock in a blocking worker. Three simulated transfers report progress at most ten times per second. Request UUIDs prevent duplicate starts; cancellation becomes final only when the worker reaches its next boundary. This code has no storage or game operations. The single-instance plugin focuses the existing window before a second state owner can start. Closing the visible window ends the process. The local main-window capability grants only state subscription, diagnostic start/cancel and fixed external-page commands. External pages open through Rust's opener plugin; the frontend has no general opener permission. See [verification and limits](docs/verification/desktop-state.md).
 
 Starframe has an installed desktop manager and a game-side runtime that we own. Svelte presents the user's setup; Rust owns saved manager state, downloads, and deployment. A C# runtime inside the game handles ordered mod activation and the in-game settings UI, with BepInEx providing the initial bootstrap. The game runs independently of the desktop manager.
 

@@ -12,7 +12,11 @@ Development version `0.1.0-dev.1`; milestone 0.1.0 is in progress.
 - Added version checks and preparation for npm, Cargo, Tauri and root lockfile entries, with tests for malformed input, drift and failed writes (#7).
 - Added CI version enforcement and Windows executable artifacts named with the product version and commit SHA (#7).
 
-Mod management, live state, storage and game discovery remain planned. No app release or installer is published.
+- Added six desktop destinations, the full reserved launch label, keyboard navigation and text resizing (#8).
+- Added revisioned native state, reconnect handling, generated TypeScript contracts and bounded diagnostics with progress, cancellation and failure states (#8).
+- Added a single-instance guard, restricted native capabilities, browser interaction tests and a Windows integration check (#8).
+
+Mod management, storage and game discovery remain planned. No app release or installer is published.
 
 ## 0.0.2 — 2026-09-06
 

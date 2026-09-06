@@ -2,7 +2,7 @@
 
 Status: revision 0.7, 6 September 2026. Product name: Starframe. The user retained the logo and accepted the desktop layout for the first version. This revision supersedes the earlier in-game presentation and plans the revised launch action.
 
-This is a design handoff. The user has authorized only issue #6, the minimal desktop shell and language tooling. The full interface remains planned. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
+This is the accepted design handoff. The user authorized milestone 0.1.0 on 6 September 2026, including desktop navigation and live state in issue #8. Later feature screens remain planned. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
 ## 1. Confirmed direction
 
@@ -339,7 +339,7 @@ Handoff acceptance criteria:
 - In-game settings have clear persistence and restart behavior, and remain usable after the desktop app closes.
 - UI and runtime verification are recorded separately from design review.
 
-Design verification: supplied colors recorded; contrast pairs measured; reference pages inspected; UI structure and motion purposes documented. Revision 0.6 recorded the original specimen approval. Revision 0.7 retains the logo and first-version desktop layout, replaces the in-game direction, and specifies the artwork-backed launch action. Earlier browser checks are recorded in docs/design/REVIEW.md. Game-native rendering and the final artwork crop remain unverified. Those design reviews did not build an installed app or runtime. The user has since authorized only issue #6 for the minimal shell and tooling; full interface implementation remains planned.
+Design verification: supplied colors recorded; contrast pairs measured; reference pages inspected; UI structure and motion purposes documented. Revision 0.6 recorded the original specimen approval. Revision 0.7 retains the logo and first-version desktop layout, replaces the in-game direction, and specifies the artwork-backed launch action. Earlier browser checks are recorded in docs/design/REVIEW.md. Game-native rendering and the final artwork crop remain unverified. Those design reviews did not build an installed app or runtime. Milestone 0.1.0 is now authorized; [issue #8 verification](docs/verification/desktop-state.md) records implementation checks separately from design approval.
 
 Required working guidance: [Ponytail](https://github.com/dietrichgebert/ponytail), [Anti-slop](https://github.com/miqdadbadjuber/anti-slop), and [Avoid AI Writing](https://github.com/conorbronsdon/avoid-ai-writing). These are installed globally in Codex. Read the applicable skill instructions when beginning the corresponding work.
 
