@@ -1,6 +1,6 @@
 # SQLite transition plan
 
-Decision: select bundled SQLite through rusqlite for milestone 0.1.1, before 0.2.0. The user delegated this choice on 6 September 2026. This replaces the Turso preference on workload and dependency grounds; it does not invalidate the successful Turso checks in issue #9. The application still uses Turso 0.7.2 until the migration issues are implemented and verified. Product VERSION stays 0.1.0 during planning.
+Decision: select bundled SQLite through rusqlite for milestone 0.1.1, before 0.2.0. The user delegated this choice on 6 September 2026. This replaces the Turso preference on workload and dependency grounds; it does not invalidate the successful Turso checks in issue #9. The application still uses Turso 0.7.2 until the migration issues are implemented and verified. Planning is complete. The user authorized implementation on 6 September 2026; VERSION is 0.1.1-dev.1. See the [issue #39 proof](../verification/sqlite-conversion.md).
 
 ## Why switch
 
@@ -33,9 +33,9 @@ The current internal build writes schemas 1 through 3, with application_id 0x535
 
 Before replacing the engine, prepare populated fixtures using pinned Turso 0.7.2, including WAL-bearing data and completed backups. Verify conversion on isolated copies; never assume SQLite compatibility makes it safe to open the user's original database with another engine.
 
-The first issue establishes a deterministic conversion path. Prefer checked copy-and-convert only if the actual pinned fixtures prove compatibility. If they do not, use a separately invoked legacy export/import utility with the pinned reader, excluded from the normal application dependency graph. Do not ship two runtime engines. Preserve originals, WAL/sidecars, backup markers and artifact directories.
+Issue #39 proves that bundled SQLite can read isolated copies of pinned Turso 0.7.2 schemas 1–3 and their committed WAL. The chosen path copies under the existing source lock, validates the copy, and inserts its records into a fresh canonical SQLite schema. It does not retain the legacy SQL schema or require a shipping Turso reader. Production integration remains #40. Do not ship two runtime engines. Preserve originals, WAL/sidecars, backup markers and artifact directories.
 
-Conversion must preserve library rows, exact origins/hashes/release IDs, collection IDs/names/order/revisions, active collection, database revision and selected game ID/path. Validate ownership, supported schema, constraints, integrity and every logical record before promotion. Use a new SQLite engine marker and an explicit ordered schema transition rather than silently relabelling an old file.
+Conversion must preserve library rows, exact origins/hashes/release IDs, collection IDs/names/order/revisions, active collection, database revision and selected game ID/path. Validate ownership, supported schema, constraints, integrity and every logical record before promotion. Use engine='sqlite' and schema 4 in the fresh validated destination. The proof builds schemas 1–3 with their existing constraints, imports all records, and sets the new marker/schema within the same transaction.
 
 Stage the destination separately, retain the source, and define restart behavior for interruption before and after promotion. Repeated startup/conversion must not duplicate records, reset revisions or overwrite an existing destination. Unknown/newer/corrupt data fails with a recovery message while the original bytes remain available. Old Turso backups need a tested conversion path or a documented legacy restore-then-convert path.
 

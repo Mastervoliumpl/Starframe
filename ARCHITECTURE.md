@@ -1,6 +1,6 @@
 # Starframe architecture
 
-Status: draft 0.4, revised on 6 September 2026. Accepted behavior is identified below; unimplemented structures remain proposals. Milestone 0.1.0 is complete. SQLite is selected for the planned 0.1.1 transition; the current binary still uses Turso. Its implemented state layer is described below; later modules remain subject to their milestone and prerequisites.
+Status: draft 0.4, revised on 6 September 2026. Accepted behavior is identified below; unimplemented structures remain proposals. Milestone 0.1.0 is complete. Milestone 0.1.1 is active. Its development binary still uses Turso; issue #39's [test-only conversion proof](docs/verification/sqlite-conversion.md) precedes engine replacement in #40. Its implemented state layer is described below; later modules remain subject to their milestone and prerequisites.
 
 Read [DESIGN.md](DESIGN.md) for the accepted user experience and [CONTEXT.md](CONTEXT.md) for terminology. [DEVELOPMENT.md](DEVELOPMENT.md) defines continuous checks and versioning; [ROADMAP.md](ROADMAP.md) assigns the work to version milestones and issues. The [README](README.md) introduces the project, and [LICENSE](LICENSE) contains its licensing terms. Diagrams below are part of this proposal.
 

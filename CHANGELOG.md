@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- Selected bundled SQLite for the planned 0.1.1 transition, with preserved Turso data, updated prerequisites and Windows build/recovery verification. The current application still uses Turso; this planning change implements no migration.
+- Selected bundled SQLite for the planned 0.1.1 transition, with preserved Turso data, updated prerequisites and Windows build/recovery verification. The current application still uses Turso; the application engine changes in issue #40.
+- Added a test-only Turso-to-SQLite conversion proof for schemas 1–3, committed WAL and completed backups, with logical-record equality, retained-source byte checks, invalid-data rejection and forced termination at conversion boundaries (#39).
+- Started milestone 0.1.1 at development version 0.1.1-dev.1.
 
 ## 0.1.0 — 2026-09-06
 

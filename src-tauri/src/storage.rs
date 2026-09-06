@@ -895,3 +895,6 @@ mod tests {
         });
     }
 }
+
+#[cfg(test)]
+mod sqlite_proof;
