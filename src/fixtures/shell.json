@@ -4,5 +4,5 @@
     "<h1>Starframe</h1>",
     "aria-labelledby=\"build-status\""
   ],
-  "status": "Intentional CI fixture failure for issue #6."
+  "status": "Mod management is not available in this build."
 }
