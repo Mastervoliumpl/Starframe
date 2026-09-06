@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-Completed milestones: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)**, **[0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9)** and **[0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2)**. Current product version: **0.1.0**, an internal desktop foundation build. No app release or installer has been published. The next planned milestone is **0.1.1**, the SQLite transition. Documentation and issue planning are authorized; migration implementation has not started.
+Completed milestones: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)**, **[0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9)** and **[0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2)**. Current product version: **0.1.0**, an internal desktop foundation build. No app release or installer has been published. The next planned milestone is **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)**, the SQLite transition. Documentation and issue planning are authorized; migration implementation has not started.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -11,7 +11,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | [0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1) | Design and development handoff | Complete |
 | [0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9) | Game-native menu and desktop launch design amendments | Complete |
 | [0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2) | Desktop foundation | Complete |
-| 0.1.1 | Replace Turso with bundled SQLite and preserve existing data | Planned |
+| [0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10) | Replace Turso with bundled SQLite and preserve existing data | Planned |
 | [0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3) | Starframe in-game runtime | Planned |
 | [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Planned |
 | [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Planned |
@@ -55,11 +55,13 @@ Complete. Issues #6–#10 deliver the shell, synchronized versions, responsive l
 
 Planned before 0.2.0. [Decision and scope](docs/planning/sqlite-transition.md): prove recoverable conversion of existing Turso records/backups, replace the local engine with bundled SQLite, and verify recovery plus Windows build costs. Keep the current binary/version unchanged during planning. Exit requires preserved records/artifacts, passing affected checks and no Turso in the shipped app. No release publication or game-file changes are included.
 
-Issue sequence: legacy conversion proof, engine replacement, then Windows verification and milestone exit. GitHub links will be added after updating existing issues and creating the milestone.
+- [#39: Prove recoverable conversion from Turso to SQLite](https://github.com/Mastervoliumpl/Starframe/issues/39)
+- [#40: Replace Turso persistence with bundled SQLite](https://github.com/Mastervoliumpl/Starframe/issues/40)
+- [#41: Verify SQLite recovery and Windows build costs; close 0.1.1](https://github.com/Mastervoliumpl/Starframe/issues/41)
 
 ### 0.2.0: Starframe in-game runtime
 
-Planned; starts after 0.1.1 closes. Deliver reversible bootstrap deployment, a Starframe-owned C# runtime and settings UI, and a verified launch path. Exit: a fixture mod loads through BepInEx, settings persist, and cleanup/recovery are demonstrated.
+Planned; starts after 0.1.1 closes. Issue #11 explicitly depends on the SQLite exit issue [#41](https://github.com/Mastervoliumpl/Starframe/issues/41). Deliver reversible bootstrap deployment, a Starframe-owned C# runtime and settings UI, and a verified launch path. Exit: a fixture mod loads through BepInEx, settings persist, and cleanup/recovery are demonstrated.
 
 - [#11: Add the C# runtime project and shared activation contracts](https://github.com/Mastervoliumpl/Starframe/issues/11)
 - [#12: Deploy and remove the Starframe bootstrap with recovery](https://github.com/Mastervoliumpl/Starframe/issues/12)

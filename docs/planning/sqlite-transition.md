@@ -43,11 +43,11 @@ Use SQLite's backup API through rusqlite's backup feature, retaining completed-b
 
 ## Milestone 0.1.1
 
-Create these issues after updating the existing issue plan:
+Created [milestone 0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10) after updating the existing issue plan:
 
-1. Prove recoverable Turso-to-SQLite conversion. Depends on completed #9 and #10. Own legacy fixtures, conversion evidence and restart/rollback rules.
-2. Replace Turso persistence with bundled SQLite. Depends on the conversion issue. Own storage.rs, worker call sites, migrations/backup/restore, dependencies and affected tests. Preserve the native state contract.
-3. Verify SQLite recovery and Windows build costs; close 0.1.1. Depends on the replacement issue. Own native/recovery evidence, comparable dependency/build measurements, notices and version preparation.
+1. [#39: Prove recoverable Turso-to-SQLite conversion](https://github.com/Mastervoliumpl/Starframe/issues/39). Depends on completed #9 and #10. Own legacy fixtures, conversion evidence and restart/rollback rules.
+2. [#40: Replace Turso persistence with bundled SQLite](https://github.com/Mastervoliumpl/Starframe/issues/40). Depends on the conversion issue. Own storage.rs, worker call sites, migrations/backup/restore, dependencies and affected tests. Preserve the native state contract.
+3. [#41: Verify SQLite recovery and Windows build costs; close 0.1.1](https://github.com/Mastervoliumpl/Starframe/issues/41). Depends on the replacement issue. Own native/recovery evidence, comparable dependency/build measurements, notices and version preparation.
 
 Exit requires preserved populated legacy data and backups, passing storage/game/native checks with SQLite, no Turso in the shipped dependency graph, and recorded build measurements. Prepare 0.1.1 with the existing version tool during implementation/exit; schema and app versions stay separate. No release publication, game-file changes or later features belong to this plan.
 
