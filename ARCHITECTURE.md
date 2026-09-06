@@ -1,6 +1,6 @@
 # Starframe architecture
 
-Status: draft 0.3, revised after user review on 6 September 2026. Accepted behavior is identified below; implementation details remain a proposal. This document does not authorize application implementation. The repository contains documentation and a license, with no application code or installed project dependencies.
+Status: draft 0.3, revised after user review on 6 September 2026. Accepted behavior is identified below; implementation details remain a proposal. The user has authorized only issue #6, which introduces the desktop shell and language tooling. This document does not authorize the other proposed modules.
 
 Read [DESIGN.md](DESIGN.md) for the accepted user experience and [CONTEXT.md](CONTEXT.md) for terminology. [DEVELOPMENT.md](DEVELOPMENT.md) defines continuous checks and versioning; [ROADMAP.md](ROADMAP.md) assigns the work to version milestones and issues. The [README](README.md) introduces the project, and [LICENSE](LICENSE) contains its licensing terms. Diagrams below are part of this proposal.
 

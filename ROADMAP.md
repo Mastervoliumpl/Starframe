@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-Completed handoff: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)** with **[0.0.2 design amendments](https://github.com/Mastervoliumpl/Starframe/milestone/9)**. Current product version: **0.0.2**, documentation with no app release. No implementation milestone is active; **0.1.0** is next when the user starts development.
+Completed handoff: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)** with **[0.0.2 design amendments](https://github.com/Mastervoliumpl/Starframe/milestone/9)**. Current development version: **0.1.0-dev.1**. Milestone **0.1.0** is active; the user has authorized **only issue #6**. Complete that issue and stop before starting any other issue. No app release has been published.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not override the planning-only phase or required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -10,7 +10,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | --- | --- | --- |
 | [0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1) | Design and development handoff | Complete |
 | [0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9) | Game-native menu and desktop launch design amendments | Complete |
-| [0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2) | Desktop foundation | Planned |
+| [0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2) | Desktop foundation | Active; only #6 authorized |
 | [0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3) | Starframe in-game runtime | Planned |
 | [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Planned |
 | [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Planned |
@@ -42,7 +42,7 @@ Complete. Retained the logo and first-version desktop layout, replaced the in-ga
 
 ### 0.1.0: Desktop foundation
 
-Planned; starts after 0.0.1 closes and implementation is authorized. Deliver a responsive Tauri/Svelte shell, typed Rust state, verified local Turso storage, read-only game discovery, and language CI. Exit: restart persistence, slow-work interaction and Windows build checks pass.
+Active. Issue #6 introduces the minimal shell and language CI. Issues #7–#10 remain planned and require a further user instruction. The full milestone will deliver typed Rust state, verified local Turso storage and read-only game discovery. Exit: restart persistence, slow-work interaction and Windows build checks pass.
 
 - [#6: Create the desktop projects with lint, build and test checks](https://github.com/Mastervoliumpl/Starframe/issues/6)
 - [#7: Keep desktop and build versions synchronized](https://github.com/Mastervoliumpl/Starframe/issues/7)

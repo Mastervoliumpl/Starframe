@@ -28,14 +28,58 @@ jobs:
       - run: python -m unittest discover -s scripts -p 'test_*.py'
       - run: python scripts/check_repository.py
 
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@94196ee1d15439c1b6651cd87ef14e88ec435966
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+
+  windows:
+    name: Rust checks and Windows build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@94196ee1d15439c1b6651cd87ef14e88ec435966
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: 1.98.1
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: npm run build
+      - run: npm run check:rust
+      - run: npm run tauri -- build --no-bundle -- --locked
+
   required:
     name: Required checks
     if: ${{ always() }}
-    needs: [repository]
+    needs: [repository, frontend, windows]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
       - name: Require successful applicable checks
         env:
           REPOSITORY_RESULT: ${{ needs.repository.result }}
-        run: test "$REPOSITORY_RESULT" = success
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+          WINDOWS_RESULT: ${{ needs.windows.result }}
+        run: |
+          test "$REPOSITORY_RESULT" = success
+          test "$FRONTEND_RESULT" = success
+          test "$WINDOWS_RESULT" = success

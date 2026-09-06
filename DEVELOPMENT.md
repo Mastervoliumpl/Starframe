@@ -1,12 +1,12 @@
 # Starframe development and checks
 
-Status: development policy adopted on 6 September 2026. The 0.0.1 handoff is complete; creating issues and CI does not authorize application implementation.
+Status: development policy adopted on 6 September 2026. Milestone 0.1.0 is active; the user has authorized only issue #6.
 
 Read [DESIGN.md](DESIGN.md) for behavior and presentation, [ARCHITECTURE.md](ARCHITECTURE.md) for structure and recovery rules, and [ROADMAP.md](ROADMAP.md) for the current milestone. GitHub issues hold task scope, dependencies, acceptance criteria and verification evidence.
 
 ## Work one milestone at a time
 
-The **0.0.1** handoff is complete. No implementation milestone is active; **0.1.0** is next when the user starts development. Later milestones are planned work, not permission to begin implementation. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
+The design handoff is complete. **0.1.0** is active, with implementation limited to **issue #6**. Stop after that issue; the other issues need a further user instruction. Later milestones are planned work, not permission to begin implementation. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
 
 Work on an issue only when its milestone is active and its prerequisites are complete. Keep issue dependencies in a `Depends on` section with issue links. Each issue must state its scope, observable completion criteria and checks. Split an issue when it contains independently reviewable outcomes; avoid splitting one small change into tasks that cannot be tested separately.
 
@@ -28,7 +28,7 @@ Add useful tests with implementation, not at the end of the project. Each bug fi
 
 Prefer observable behavior over tests of private function shapes. Use unit tests for deterministic rules such as ordering, version comparison and validation. Use temporary-file integration tests for storage, deployment, archive handling and recovery. Use frontend interaction tests for stale replies, pending states, navigation and accessible controls. Avoid snapshots of entire screens, blanket coverage percentages, and tests that only repeat a constant or a CSS declaration.
 
-The initial repository contains documentation and its CI tooling. Run `python scripts/check_repository.py` and `python -m unittest discover -s scripts -p 'test_*.py'` for the checker regression tests. Add each application's language tooling when its first source project arrives, and make the applicable checks pass before that project's first merge. Do not report absent language tests as passing.
+Run `python scripts/check_repository.py` and `python -m unittest discover -s scripts -p 'test_*.py'` for repository checks and their regression tests. The desktop commands below check Svelte/TypeScript and Rust. C# tooling starts with its first source project. Do not report absent language tests as passing.
 
 | Area | Checks when that area is introduced |
 | --- | --- |
@@ -45,7 +45,7 @@ The C# code must compile without checking proprietary game assemblies into the r
 
 ## GitHub Actions
 
-Use pull-request and `main` push workflows for required checks. The current workflow validates tracked documentation links, fenced blocks, SVG XML, the version format and exclusion of machine-local instructions. It runs without project dependencies or access to game files.
+Use pull-request and `main` push workflows for required checks. The repository job validates tracked documentation links, fenced blocks, SVG XML, the version format and exclusion of machine-local instructions. The frontend job runs a clean npm install, formatting, lint, Svelte/TypeScript checks, fixture tests and a production build on Linux. The Windows job runs Rustfmt, Clippy, Rust tests and a Tauri executable build. All three run on documentation changes too and feed `Required checks`; no path filters can leave it pending. None accesses game files.
 
 Extend CI as source projects arrive. Keep one stable final status, `Required checks`, that fails if any applicable job fails or is canceled. If language jobs use path filtering, a small final job must still report a result for documentation-only changes; skipped workflows must not leave a required check pending forever. Shared contracts, lockfiles and workflow changes trigger all affected jobs.
 
@@ -57,7 +57,7 @@ Continuous delivery first creates reviewable artifacts and draft releases. Publi
 
 ## Versions and change history
 
-[VERSION](VERSION) is the source of the product version. The current value is `0.0.2`, the completed design handoff amendments, not a shipped app. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized.
+[VERSION](VERSION) is the source of the product version. The current value is `0.1.0-dev.1`, the desktop foundation in development, not a shipped app. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. The initial npm, Cargo and Tauri values match manually; automated version synchronization remains issue #7.
 
 Use three-part versions: `0.MINOR.PATCH` during initial development. A capability milestone advances the minor version; a corrective release advances the patch version. The planning handoff uses `0.0.1`. Published content is immutable; never replace a release with different bytes under the same version. The `0.x` series makes no stable public API promise, but format migrations and compatibility changes still need explicit notes. [Semantic Versioning](https://semver.org/)
 
@@ -66,6 +66,29 @@ At the start of an implementation milestone, use its target version with a devel
 When build manifests exist, derive or check package.json, Cargo package metadata, Tauri's app version, and C# informational version against VERSION. Keep installer-specific numeric representations consistent with their platform requirements. A tested release-preparation command should update all required representations; CI rejects drift. Keep database, catalog, collection and runtime-contract versions separate from the app version. Catalog edits advance catalog revision without an app-version bump.
 
 For a release, finalize its changelog entry, validate version agreement, and create an immutable `vX.Y.Z` tag from the checked commit. Use `gh` to create or inspect the draft release and workflow results. Publish after its acceptance checks and maintainer authorization. Do not fabricate changelog entries for work that is only planned.
+
+## Desktop development
+
+Use Node.js **24.19.0** (see [.node-version](.node-version)) with npm, and Rust **1.98.1** with Rustfmt and Clippy (see [rust-toolchain.toml](rust-toolchain.toml)). On Windows, install the MSVC C++ build tools with the Windows SDK and the WebView2 runtime required by [Tauri's prerequisites](https://v2.tauri.app/start/prerequisites/). Target Windows x64. A Node-only machine can check and preview the frontend; Rust compilation needs the native build prerequisites too.
+
+From the repository root:
+
+```sh
+npm ci
+npm run check
+npm run check:rust
+npm run tauri -- build --no-bundle -- --locked
+```
+
+`npm run check` runs Prettier, ESLint, Svelte/TypeScript diagnostics, Vitest and Vite's production build. It builds `dist` before Rust checks, which need those frontend assets. `npm run check:rust` runs Rustfmt, Clippy with warnings denied, and locked Cargo tests. The final command builds the Windows executable without an installer; packaging and updates are later issues. It writes `src-tauri/target/release/starframe.exe`.
+
+Use `npm run tauri dev` for the native development window, or `npm run dev` for the browser frontend at `http://127.0.0.1:1420`. Use `npm run format` to format frontend/configuration files and `cargo fmt --manifest-path src-tauri/Cargo.toml` for Rust. Vitest watch mode is `npm run test:watch`. Stop the development command when finished.
+
+The shell has no game access, native commands or plugin permissions. It uses the accepted logo and a visible build-status message; navigation and live state remain issue #8. The Rust entry point follows the Tauri template, with sample commands, mobile output and unused plugins removed. The frontend uses plain Svelte/Vite as required by #6. No SvelteKit or animation framework is included.
+
+The initial tests are tooling smoke checks, not feature coverage. The frontend fixture checks that the real Svelte component compiles and renders its landmarks and status. Rust checks the actual Tauri configuration and rejects a malformed window fixture. Missing tests cause Vitest to fail. Add behavior tests when each feature arrives; do not count these checks as validation of mod loading, state, storage or native accessibility.
+
+The build icons were generated from [the approved SVG](docs/design/starframe-mark.svg) using Tauri's icon command. Only the PNG and Windows ICO needed for this build are retained. Final installer/taskbar asset review remains part of packaging.
 
 ## Tool references
 
