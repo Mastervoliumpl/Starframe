@@ -3,7 +3,9 @@
 ## 0.2.0-dev.1 — in development
 
 - Added the .NET Standard 2.1 runtime contract library, matching Rust validation, shared fixtures and internal lifecycle interfaces (#11).
-- Added locked C# builds, formatting/analyzers, fixture CI and synchronized informational versions. Game bootstrap, activation, settings and launch remain in progress for 0.2.0.
+- Added locked C# builds, formatting/analyzers, fixture CI and synchronized informational versions.
+- Added pinned BepInEx bootstrap preparation, journaled installation/removal, schema-5 deployment backups, process guards and restart recovery (#12).
+- Explicitly scoped DLL, Lua-only, map-only and mixed packages; deferred AI support pending game facilities. Activation, settings and desktop launch remain in progress for 0.2.0.
 
 ## 0.1.1 — 2026-09-06
 

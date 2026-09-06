@@ -3,6 +3,7 @@ use crate::{
     model::{CommandError, GameAction, SavedData},
 };
 use starframe::{
+    deployment,
     game::{self, GameView, Running},
     storage::Storage,
     windows_game,
@@ -172,6 +173,7 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
         worker_busy.store(false, Ordering::SeqCst);
         let mut validated = Instant::now();
         let mut observed = SystemTime::now();
+        let mut recovery_observation = None;
         loop {
             if core.lock().expect("state lock").stopped {
                 break;
@@ -189,6 +191,24 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
             view.running = view.selected.as_ref().map_or(Running::Unknown, |game| {
                 game::classify(&PathBuf::from(&game.executable), windows_game::processes())
             });
+            let observation = view
+                .selected
+                .as_ref()
+                .map(|game| (game.executable.clone(), view.running.clone()));
+            if observation != recovery_observation
+                && view.running == Running::Stopped
+                && let (Some(store), Some(game)) = (storage.as_mut(), view.selected.as_ref())
+            {
+                match deployment::recover(store, game) {
+                    Ok(true) => {
+                        view.message =
+                            "Previous bootstrap deployment restored after interruption.".into()
+                    }
+                    Ok(false) => {}
+                    Err(message) => view.error = message,
+                }
+            }
+            recovery_observation = observation;
             view.busy = worker_busy.load(Ordering::SeqCst);
             core.lock().expect("state lock").game(view.clone());
             let request = match receiver.recv_timeout(Duration::from_secs(2)) {
@@ -196,6 +216,7 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                 Err(mpsc::RecvTimeoutError::Timeout) => continue,
                 Err(_) => break,
             };
+            recovery_observation = None;
             view.error.clear();
             view.running = Running::Unknown;
             view.busy = true;

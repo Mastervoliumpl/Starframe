@@ -7,9 +7,9 @@ use std::{
 };
 use uuid::Uuid;
 
-const SCHEMA: i64 = 4;
+const SCHEMA: i64 = 5;
 const APPLICATION_ID: i64 = 0x53544652;
-const MIGRATIONS: [&str; 3] = [
+const MIGRATIONS: [&str; 5] = [
     "CREATE TABLE metadata (id INTEGER PRIMARY KEY CHECK(id = 1), engine TEXT NOT NULL CHECK(engine = 'sqlite'), revision INTEGER NOT NULL CHECK(revision >= 0));
      INSERT INTO metadata VALUES (1, 'sqlite', 0);
      CREATE TABLE library (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author) <= 200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(mod_id, hash), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL)));
@@ -17,6 +17,8 @@ const MIGRATIONS: [&str; 3] = [
      CREATE TABLE collection_entries (collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE, position INTEGER NOT NULL CHECK(position >= 0), mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(collection_id, position), UNIQUE(collection_id, mod_id), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL)));",
     "CREATE TABLE preferences (id INTEGER PRIMARY KEY CHECK(id = 1), active_collection TEXT REFERENCES collections(id)); INSERT INTO preferences VALUES (1, NULL);",
     "CREATE TABLE game_selection (singleton INTEGER PRIMARY KEY CHECK(singleton = 1), installation_id TEXT NOT NULL, path TEXT NOT NULL CHECK(length(path) BETWEEN 1 AND 32768));",
+    "SELECT 1;",
+    "CREATE TABLE deployments (root TEXT PRIMARY KEY NOT NULL, record TEXT NOT NULL CHECK(length(record) <= 1048576 AND json_valid(record))); CREATE TABLE deployment_blobs (hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash)=64), bytes BLOB NOT NULL CHECK(length(bytes)<=8388608));",
 ];
 
 #[derive(Debug)]
@@ -158,6 +160,74 @@ fn finish<T>(tx: Transaction<'_>, result: Result<T>) -> Result<T> {
 }
 
 impl Storage {
+    pub(crate) fn deployment_record(&self, root: &str) -> Result<Option<String>> {
+        use rusqlite::OptionalExtension;
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT record FROM deployments WHERE root=?",
+                [root],
+                |row| row.get(0),
+            )
+            .optional()?)
+    }
+
+    pub(crate) fn save_deployment(
+        &mut self,
+        root: &str,
+        record: &str,
+        blobs: &[(String, Vec<u8>)],
+    ) -> Result<()> {
+        use sha2::{Digest, Sha256};
+        if !Path::new(root).is_absolute()
+            || record.len() > 1_048_576
+            || serde_json::from_str::<serde_json::Value>(record).is_err()
+        {
+            return Err(Error::Invalid("Invalid deployment record.".into()));
+        }
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        for (hash, bytes) in blobs {
+            if bytes.len() > 8_388_608 || format!("{:x}", Sha256::digest(bytes)) != *hash {
+                return Err(Error::Invalid("Invalid deployment backup.".into()));
+            }
+            tx.execute(
+                "INSERT OR IGNORE INTO deployment_blobs (hash, bytes) VALUES (?, ?)",
+                rusqlite::params![hash, bytes],
+            )?;
+            let retained: Vec<u8> = tx.query_row(
+                "SELECT bytes FROM deployment_blobs WHERE hash=?",
+                [hash],
+                |row| row.get(0),
+            )?;
+            if retained != *bytes {
+                return Err(Error::Invalid(
+                    "A retained deployment backup is corrupt. No game files were changed.".into(),
+                ));
+            }
+        }
+        tx.execute("INSERT INTO deployments (root, record) VALUES (?, ?) ON CONFLICT(root) DO UPDATE SET record=excluded.record", [root, record])?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub(crate) fn deployment_blob(&self, hash: &str) -> Result<Vec<u8>> {
+        use sha2::{Digest, Sha256};
+        let bytes: Vec<u8> = self.conn.query_row(
+            "SELECT bytes FROM deployment_blobs WHERE hash=?",
+            [hash],
+            |row| row.get(0),
+        )?;
+        if bytes.len() > 8_388_608 || format!("{:x}", Sha256::digest(&bytes)) != hash {
+            return Err(Error::Invalid(
+                "Deployment backup failed its hash check. Retain the database and recovery files."
+                    .into(),
+            ));
+        }
+        Ok(bytes)
+    }
+
     pub fn selected_game(&self) -> Result<Option<(String, String)>> {
         let mut statement = self
             .conn
@@ -678,7 +748,7 @@ mod tests {
         store.put_library_entry(&entry(), 0).unwrap();
         store
             .conn
-            .execute_batch("DROP TABLE game_selection; PRAGMA user_version = 2;")
+            .execute_batch("DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; PRAGMA user_version = 2;")
             .unwrap();
         drop(store);
         let mut store = Storage::open(root.path()).unwrap();
@@ -773,7 +843,7 @@ mod tests {
         store
             .conn
             .execute_batch(
-                "DROP TABLE preferences; DROP TABLE game_selection; PRAGMA user_version = 1;",
+                "DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; PRAGMA user_version = 1;",
             )
             .unwrap();
         let backup = store.backup().unwrap();
@@ -912,7 +982,7 @@ mod tests {
             if mode == "migration" {
                 store
                     .conn
-                    .execute_batch("DROP TABLE preferences; DROP TABLE game_selection; PRAGMA user_version = 1;")
+                    .execute_batch("DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; PRAGMA user_version = 1;")
                     .unwrap();
                 store.backup().unwrap();
                 store.conn.execute("BEGIN IMMEDIATE", []).unwrap();
@@ -1197,7 +1267,7 @@ mod conversion {
             "PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL; PRAGMA journal_mode=DELETE;",
         )?;
         let tx = candidate.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        for migration in MIGRATIONS {
+        for migration in MIGRATIONS.iter().take(3) {
             tx.execute_batch(migration)?;
         }
         for &(_, table, columns, _) in TABLES {

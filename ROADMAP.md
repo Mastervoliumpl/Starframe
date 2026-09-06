@@ -63,9 +63,9 @@ Complete. Bundled SQLite preserves supported legacy records and backups through 
 
 ### 0.2.0: Starframe in-game runtime
 
-Active on `codex/0.2.0-runtime`; 0.1.1 is complete. Issue #11 explicitly depends on the SQLite exit issue [#41](https://github.com/Mastervoliumpl/Starframe/issues/41). Deliver reversible bootstrap deployment, a Starframe-owned C# runtime and settings UI, and a verified launch path. Exit: a fixture mod loads through BepInEx, settings persist, and cleanup/recovery are demonstrated.
+Active on `codex/0.2.0-runtime`; 0.1.1 is complete. Runtime contracts and [bootstrap deployment/recovery](docs/verification/bootstrap.md) are implemented; game activation, settings and launch remain. Issue #11 explicitly depends on the SQLite exit issue [#41](https://github.com/Mastervoliumpl/Starframe/issues/41). Deliver reversible bootstrap deployment, a Starframe-owned C# runtime and settings UI, and a verified launch path. Exit: a fixture mod loads through BepInEx, settings persist, and cleanup/recovery are demonstrated.
 
-The content investigation in #13 explicitly includes map folders and optional supporting plugins. [Map source evidence](docs/planning/map-support.md) distinguishes content-only maps from DLL dependencies and records current-build verification gaps. Review the DLL-required activation format before implementing map support; no wrapper DLL should be required solely for package metadata. AI support remains deferred.
+The package investigation in #13 explicitly includes managed DLLs, conventional BepInEx plugins, Lua-only content, map-only content and mixed packages. [Map source evidence](docs/planning/map-support.md) distinguishes content-only maps from DLL dependencies and records current-build verification gaps. Review the DLL-required activation format before implementing map support; no wrapper DLL should be required solely for package metadata. AI support remains deferred.
 
 - [#11: Add the C# runtime project and shared activation contracts](https://github.com/Mastervoliumpl/Starframe/issues/11)
 - [#12: Deploy and remove the Starframe bootstrap with recovery](https://github.com/Mastervoliumpl/Starframe/issues/12)

@@ -285,7 +285,14 @@ fn decimal(value: &Value) -> Result<()> {
     )
 }
 fn path(value: &Value) -> Result<String> {
-    let value = text(value, 240, false)?;
+    relative_path(text(value, 240, false)?)
+}
+
+pub(crate) fn relative_path(value: &str) -> Result<String> {
+    require(
+        !value.is_empty() && value.len() <= 240,
+        "relative path length",
+    )?;
     for part in value.split('/') {
         require(
             !part.is_empty()

@@ -333,9 +333,9 @@ pub fn observation_expired(previous: std::time::SystemTime, now: std::time::Syst
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
-    fn fixture(root: &Path, engine: &str) {
+    pub(crate) fn fixture(root: &Path, engine: &str) {
         let base = root.join(engine);
         fs::create_dir_all(base.join("Sanctuary_Data/Managed")).unwrap();
         fs::create_dir_all(base.join("MonoBleedingEdge")).unwrap();

@@ -51,6 +51,10 @@ Use the .NET SDK pinned in [runtime/global.json](runtime/global.json). From `run
 
 [Runtime target and licensing](docs/verification/runtime-contracts.md) records inspected game evidence and the limits of these checks. [Contract v1](contracts/README.md) defines the shared files. Run `cargo test --manifest-path src-tauri/Cargo.toml --locked --test runtime_contract` for the matching Rust fixtures. During issue work, run these focused checks; run the affected full suites before pushing a coherent milestone update. Keep the milestone PR in draft until its exit checks pass.
 
+## Bootstrap development
+
+[Bootstrap commands and recovery](docs/verification/bootstrap.md) describe pinned package preparation and the guarded install/remove/recover command. Run `cargo test --manifest-path src-tauri/Cargo.toml --locked --lib deployment::tests` for focused deployment tests. They use temporary installations and exercise forced process exit; never substitute a personal game directory. The package preparation tests use synthetic archives, so required CI does not need a live BepInEx download.
+
 ## GitHub Actions
 
 Use pull-request and `main` push workflows for required checks. The repository job validates tracked documentation links, fenced blocks, SVG XML, product version agreement and exclusion of machine-local instructions. The frontend job runs a clean npm install, formatting, lint, Svelte/TypeScript checks, fixture tests and a production build on Linux. After repository checks pass, the Windows job runs Rustfmt, Clippy, Rust tests and a Tauri executable build. It retains the executable for seven days as `starframe-<VERSION>-windows-x64-<commit SHA>`, using the full SHA of the checked-out revision (the merge revision for pull requests). All four run on documentation changes too and feed `Required checks`; no path filters can leave it pending. None accesses game files.

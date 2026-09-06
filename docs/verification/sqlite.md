@@ -2,6 +2,8 @@
 
 Milestone 0.1.1, issues #40 and #41. The 0.1.1 application uses rusqlite 0.40.2, default features disabled, bundled plus backup. libsqlite3-sys 0.38.2 embeds SQLite 3.53.2. No system SQLite installation, network database or Turso runtime is required. The local checks and build comparison below pass. Required CI is the final merge gate on [PR #42](https://github.com/Mastervoliumpl/Starframe/pull/42).
 
+The active 0.2.0 branch adds schema 5 for [bootstrap journals and backups](bootstrap.md), preserving the schema-4 records verified below. SQLite backups now also contain deployment backup blobs; ordinary library artifact payloads remain separate.
+
 ## Storage and conversion
 
 SQL, constraints, ordered migrations and validation remain in [storage.rs](../../src-tauri/src/storage.rs). Synchronous operations run on the existing blocking owner and one-slot request queue in game_service.rs. The native/frontend contract is unchanged. SQLite uses foreign_keys=ON, synchronous=FULL, WAL and a 250 ms busy timeout. Writes use immediate transactions and preserve stale-edit errors.
