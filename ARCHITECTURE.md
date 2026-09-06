@@ -6,6 +6,8 @@ Read [DESIGN.md](DESIGN.md) for the accepted user experience and [CONTEXT.md](CO
 
 [Open the visual overview](docs/architecture-overview.svg) for a single-page map. The diagrams in each section show the detailed flows.
 
+The [0.0.1 implementation handoff](docs/HANDOFF.md) narrows the initial Windows target, performance checks, activation/report formats, capabilities and settings registration. It records what can be implemented next and what still requires runtime evidence.
+
 ## 1. Starting point
 
 Starframe has an installed desktop manager and a game-side runtime that we own. Svelte presents the user's setup; Rust owns saved manager state, downloads, and deployment. A C# runtime inside the game handles ordered mod activation and the in-game settings UI, with BepInEx providing the initial bootstrap. The game runs independently of the desktop manager.

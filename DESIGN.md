@@ -1,6 +1,6 @@
 # Starframe: design direction
 
-Status: revision 0.5, 6 September 2026. Product name: Starframe. Visual direction and Tauri/Svelte/TypeScript/Rust desktop stack accepted by the user.
+Status: revision 0.6, 6 September 2026. Product name: Starframe. The user approved the 0.0.1 identity and desktop/in-game specimen for handoff, retaining the accepted visual direction and desktop stack.
 
 This is a design handoff. Implementation is not yet authorized. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
@@ -293,16 +293,18 @@ Validate accessible mod lists, live state updates, safe file operations, install
 
 ## 11. Review and handoff
 
-The next design review should show one representative My mods screen, its detail view, and a collection view at standard and compact sizes. Show normal, selected, busy, error, and empty states. Include a small motion demonstration and its reduced-motion alternative. A visual specimen is design work; it must not connect to game files or download mods.
+The [0.0.1 design specimen](docs/design/review.html) shows My mods, details, collections, download states, setup/update dialogs, and the in-game settings screen. It includes normal, selected, busy, error and empty states, plus reduced motion and compact reflow. It uses fictional data and does not connect to game files or download mods. See [review evidence](docs/design/REVIEW.md) for the checked interactions and verification limits.
 
-Before implementation, settle:
+The selected identity uses an open structural frame around an orange sun, with a Bahnschrift wordmark. The [dark-surface mark](docs/design/starframe-mark.svg) and [light-surface mark](docs/design/starframe-mark-light.svg) use original geometry. The specimen shows small sizes and both surfaces. The user approved the identity and screens on 6 September 2026: "Approve this design for the handoff".
 
-- Independent logo/wordmark for Starframe.
-- Visual validation of the accepted fonts, neutral shades, corner motif, navigation, and starting dimensions.
-- Approval of the representative visual screens and motion samples.
-- The in-game settings screen and accessible load-order interactions.
-- Supported Windows versions.
-- Validation of the chosen Windows installation and update flow.
+Handoff decisions and implementation checks:
+
+- Original frame-and-sun mark and Bahnschrift wordmark selected.
+- Fonts, neutral shades, navigation, screen structure and interaction direction approved through the specimen; verify their actual native rendering during implementation.
+- Representative visual screens, motion direction and reduced-motion alternative approved.
+- In-game settings presentation and accessible load-order controls approved; verify actual Unity input behavior during implementation.
+- The initial Windows target is defined in the [implementation handoff](docs/HANDOFF.md): Windows 11 x64, starting with 25H2. Verify supported releases and actual Windows integration during implementation.
+- Validation of the chosen Windows installation and update flow remains an implementation requirement, not a claim made by visual review.
 
 Handoff acceptance criteria:
 
@@ -323,6 +325,6 @@ Handoff acceptance criteria:
 - In-game settings have clear persistence and restart behavior, and remain usable after the desktop app closes.
 - UI and runtime verification are recorded separately from design review.
 
-Design verification: supplied colors recorded; contrast pairs measured; reference pages inspected; UI structure and motion purposes documented. The user accepted the visual direction and desktop stack. Revision 0.5 records ordered collections without mod settings, automatic application after game exit, independent catalog refresh, permissive game-version warnings, and Starframe-owned in-game settings. No app UI or runtime was built, so keyboard, animation, layout, responsiveness, updates, and game behavior are not yet verified. Implementation remains on hold until planning and design are complete.
+Design verification: supplied colors recorded; contrast pairs measured; reference pages inspected; UI structure and motion purposes documented. Revision 0.6 records the user's approval of the original identity and interactive desktop/in-game specimen. Browser checks covered the interactions and reflow listed in docs/design/REVIEW.md. No installed app or runtime was built, so native accessibility, measured performance, updates and game behavior remain unverified. The handoff is complete; beginning milestone 0.1.0 requires the user's next implementation instruction.
 
 Required working guidance: [Ponytail](https://github.com/dietrichgebert/ponytail), [Anti-slop](https://github.com/miqdadbadjuber/anti-slop), and [Avoid AI Writing](https://github.com/conorbronsdon/avoid-ai-writing). These are installed globally in Codex. Read the applicable skill instructions when beginning the corresponding work.

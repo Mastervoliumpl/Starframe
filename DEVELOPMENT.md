@@ -1,12 +1,12 @@
 # Starframe development and checks
 
-Status: development policy adopted on 6 September 2026. Planning remains active; creating issues and CI does not authorize application implementation.
+Status: development policy adopted on 6 September 2026. The 0.0.1 handoff is complete; creating issues and CI does not authorize application implementation.
 
 Read [DESIGN.md](DESIGN.md) for behavior and presentation, [ARCHITECTURE.md](ARCHITECTURE.md) for structure and recovery rules, and [ROADMAP.md](ROADMAP.md) for the current milestone. GitHub issues hold task scope, dependencies, acceptance criteria and verification evidence.
 
 ## Work one milestone at a time
 
-The active milestone is **0.0.1**. Later milestones are planned work, not permission to begin implementation. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
+The **0.0.1** handoff is complete. No implementation milestone is active; **0.1.0** is next when the user starts development. Later milestones are planned work, not permission to begin implementation. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
 
 Work on an issue only when its milestone is active and its prerequisites are complete. Keep issue dependencies in a `Depends on` section with issue links. Each issue must state its scope, observable completion criteria and checks. Split an issue when it contains independently reviewable outcomes; avoid splitting one small change into tasks that cannot be tested separately.
 
@@ -57,7 +57,7 @@ Continuous delivery first creates reviewable artifacts and draft releases. Publi
 
 ## Versions and change history
 
-[VERSION](VERSION) is the source of the product version. The starting value is `0.0.0`, a planning baseline, not a shipped app. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a release is prepared.
+[VERSION](VERSION) is the source of the product version. The current value is `0.0.1`, the completed design handoff, not a shipped app. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized.
 
 Use three-part versions: `0.MINOR.PATCH` during initial development. A capability milestone advances the minor version; a corrective release advances the patch version. The planning handoff uses `0.0.1`. Published content is immutable; never replace a release with different bytes under the same version. The `0.x` series makes no stable public API promise, but format migrations and compatibility changes still need explicit notes. [Semantic Versioning](https://semver.org/)
 

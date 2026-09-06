@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-Active milestone: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)**. Current product version: **0.0.0**, a planning baseline with no app release.
+Completed handoff: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)**. Current product version: **0.0.1**, a design/documentation handoff with no app release. No implementation milestone is active; **0.1.0** is next when the user starts development.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not override the planning-only phase or required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -8,7 +8,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 
 | Version | Outcome | Status |
 | --- | --- | --- |
-| [0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1) | Design and development handoff | Active |
+| [0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1) | Design and development handoff | Complete |
 | [0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2) | Desktop foundation | Planned |
 | [0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3) | Starframe in-game runtime | Planned |
 | [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Planned |
@@ -25,7 +25,7 @@ The issue pages are the source of task status. This index records scope and orde
 
 ### 0.0.1: Design and development handoff
 
-Active. Finish the visual and architecture handoff, publish the scoped issue plan, and establish documentation CI and versioning. Exit: design review recorded, implementation boundaries agreed, planning checks green. No application implementation in this milestone.
+Complete. The user approved the identity and visual specimen on 6 September 2026. The technical handoff, issue plan, versioning and documentation CI are recorded. See [handoff](docs/HANDOFF.md) and [review evidence](docs/design/REVIEW.md). No application implementation was part of this milestone.
 
 - [#1: Record the accepted Starframe product and architecture baseline](https://github.com/Mastervoliumpl/Starframe/issues/1)
 - [#2: Establish continuous checks, versioning and milestone rules](https://github.com/Mastervoliumpl/Starframe/issues/2)
