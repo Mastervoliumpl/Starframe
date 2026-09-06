@@ -71,4 +71,3 @@ This establishes compatibility for the pinned engine and Starframe schemas teste
 No user or game data was opened or changed. The app has no conversion UI/command yet. Production SQLite backup/journal policy, removal of Turso, native startup/recovery integration and comparable build timings remain #40/#41. Preserve the pinned legacy fixture definitions/provenance when #40 changes the application migrations; do not regenerate “legacy” fixtures from the new schema.
 
 The first local build after the repository move found stale Tauri permission paths in cached build output. Refreshing the affected Tauri packages fixed that environment issue. It was not a database compatibility failure.
-
