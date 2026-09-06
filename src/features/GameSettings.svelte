@@ -18,6 +18,18 @@
       ? `\\\\${path.slice(8)}`
       : path.replace(/^\\\\\?\\/, '');
   }
+  let selectedHeading = $state<HTMLHeadingElement>();
+  let selectedFromResult = $state<string | null>(null);
+  $effect(() => {
+    if (
+      selectedFromResult &&
+      game?.selected?.path === selectedFromResult &&
+      !game.busy
+    ) {
+      selectedFromResult = null;
+      if (selectedHeading?.checkVisibility()) selectedHeading.focus();
+    }
+  });
 </script>
 
 <div class="settings-section game-settings">
@@ -44,7 +56,7 @@
   </p>
   {#if game?.error}<p class="error" role="alert">{game.error}</p>{/if}
   {#if game?.selected}
-    <h3>Selected installation</h3>
+    <h3 bind:this={selectedHeading} tabindex="-1">Selected installation</h3>
     <dl>
       <dt>Edition</dt>
       <dd>{game.selected.edition}</dd>
@@ -77,8 +89,10 @@
           <button
             disabled={unavailable || game?.busy}
             aria-label={`Use installation: ${item.edition}, ${displayPath(item.path)}`}
-            onclick={() => onaction({ kind: 'select', id: item.id })}
-            >Use installation</button
+            onclick={() => {
+              selectedFromResult = item.path;
+              onaction({ kind: 'select', id: item.id });
+            }}>Use installation</button
           >
         </li>
       {/each}

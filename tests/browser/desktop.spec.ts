@@ -25,6 +25,9 @@ test('game selection remains readable and keyboard accessible at large text size
   await expect(
     page.getByText('Game not running', { exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Selected installation' }),
+  ).toBeFocused();
   await page.setViewportSize({ width: 1024, height: 720 });
   await page.addStyleTag({ content: 'html { font-size: 175%; }' });
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });

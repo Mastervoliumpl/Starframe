@@ -19,6 +19,13 @@ $taskFilter = [System.Windows.Automation.AndCondition]::new(
 $taskDeadline = [DateTime]::UtcNow.AddSeconds(10)
 do {
     $taskWindow = $taskRoot.FindFirst([System.Windows.Automation.TreeScope]::Children, $taskFilter)
+    if (!$taskWindow) {
+        $taskAppWindows = $taskRoot.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $AppProcessId))
+        foreach ($taskAppWindow in $taskAppWindows) {
+            $taskWindow = $taskAppWindow.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $taskFilter)
+            if ($taskWindow) { break }
+        }
+    }
     if ($taskWindow) { break }
     Start-Sleep -Milliseconds 100
 } while ([DateTime]::UtcNow -lt $taskDeadline)
