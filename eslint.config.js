@@ -6,7 +6,12 @@ import ts from 'typescript-eslint';
 import svelteConfig from './svelte.config.js';
 
 export default defineConfig(
-  globalIgnores(['dist/**', 'src-tauri/**']),
+  globalIgnores([
+    'dist/**',
+    'src-tauri/**',
+    'test-results/**',
+    'playwright-report/**',
+  ]),
   js.configs.recommended,
   ts.configs.recommended,
   svelte.configs.recommended,

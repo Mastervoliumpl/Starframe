@@ -47,6 +47,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ failure() }}
+        with:
+          name: desktop-browser-test-results
+          path: test-results/
+          retention-days: 7
 
   windows:
     name: Rust checks and Windows build
@@ -72,6 +80,14 @@ jobs:
       - run: npm run build
       - run: npm run check:rust
       - run: npm run tauri -- build --no-bundle -- --locked
+      - run: npm run test:native -- src-tauri/target/release/starframe.exe
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() }}
+        with:
+          name: desktop-native-test-results
+          path: test-results/native/
+          if-no-files-found: ignore
+          retention-days: 7
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: starframe-${{ needs.repository.outputs.version }}-windows-x64-${{ github.sha }}

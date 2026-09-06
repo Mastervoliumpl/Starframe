@@ -2,5 +2,7 @@
 /dist/
 /src-tauri/target/
 /src-tauri/gen/
+/playwright-report/
+/test-results/
 __pycache__/
 *.pyc
