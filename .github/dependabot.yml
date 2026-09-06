@@ -8,3 +8,19 @@ updates:
     groups:
       github-actions:
         patterns: ['*']
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      desktop-tooling:
+        patterns: ['*']
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      desktop-rust:
+        patterns: ['*']
