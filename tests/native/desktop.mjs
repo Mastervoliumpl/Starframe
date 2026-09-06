@@ -1,14 +1,15 @@
 import { chromium, expect } from '@playwright/test';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { resolve } from 'node:path';
 import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const executable = resolve(
-  process.argv[2] ?? 'src-tauri/target/debug/starframe.exe',
-);
+const executable = resolve('src-tauri/target/debug/starframe.exe');
 const output = resolve('test-results/native');
+const dataDirectory = await mkdtemp(join(tmpdir(), 'starframe-native-'));
 await mkdir(output, { recursive: true });
 const probe = createServer();
 await new Promise((accept, reject) => {
@@ -21,6 +22,7 @@ const child = spawn(executable, [], {
   stdio: 'ignore',
   env: {
     ...process.env,
+    STARFRAME_TEST_DATA_DIR: dataDirectory,
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9223',
   },
 });
@@ -43,6 +45,11 @@ try {
   await expect(
     page.getByRole('status').filter({ hasText: 'Desktop connected' }),
   ).toBeVisible();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(
+    page.getByText('Saved locally: 0 library entries and 0 collections.'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'My mods', exact: true }).click();
   const rejected = await page.evaluate(async () => {
     const invoke = window.__TAURI_INTERNALS__.invoke;
     const invalidPage = await invoke('open_external', {

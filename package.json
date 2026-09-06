@@ -22,7 +22,7 @@
     "check": "npm run format:check && npm run lint && npm run check:types && npm test && npm run build",
     "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --check && cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml --locked",
     "test:browser": "playwright test",
-    "test:native": "node tests/native/desktop.mjs"
+    "test:native": "node tests/native/desktop.mjs && node tests/native/storage.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

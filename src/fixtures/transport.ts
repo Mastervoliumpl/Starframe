@@ -9,6 +9,13 @@ export function fixtureTransport(): Transport {
     revision: '0',
     appVersion: version,
     operations: [],
+    savedData: {
+      status: 'ready',
+      revision: '0',
+      libraryCount: 0,
+      collectionCount: 0,
+      activeCollectionName: null,
+    },
   };
   let receiver: ((snapshot: Snapshot) => void) | undefined;
   let work: ReturnType<typeof setInterval>;

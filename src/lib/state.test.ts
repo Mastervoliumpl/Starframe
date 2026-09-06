@@ -8,6 +8,13 @@ const snapshot = (revision: string, sessionId = 'session'): Snapshot => ({
   revision,
   appVersion: '0.1.0-dev.1',
   operations: [],
+  savedData: {
+    status: 'ready',
+    revision: '0',
+    libraryCount: 0,
+    collectionCount: 0,
+    activeCollectionName: null,
+  },
 });
 afterEach(() => vi.useRealTimers());
 

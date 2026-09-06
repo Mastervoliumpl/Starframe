@@ -307,6 +307,8 @@ progress {
   background: var(--surface);
 }
 .launch-footer > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
   flex: 1 1 220px;
 }
 .launch-footer p {

@@ -1,4 +1,4 @@
-use crate::model::{CommandError, Operation, OperationStatus, Snapshot};
+use crate::model::{CommandError, Operation, OperationStatus, SavedData, Snapshot};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -23,6 +23,7 @@ impl Default for Core {
                 revision: "0".into(),
                 app_version: env!("CARGO_PKG_VERSION").into(),
                 operations: vec![],
+                saved_data: SavedData::Loading,
             },
             revision: 0,
             subscriber: None,
@@ -33,6 +34,12 @@ impl Default for Core {
 }
 
 impl Core {
+    pub fn saved_data(&mut self, status: SavedData) {
+        if !self.stopped {
+            self.snapshot.saved_data = status;
+            self.changed();
+        }
+    }
     pub fn watch(&mut self, channel: Channel<Snapshot>) -> Result<(), CommandError> {
         channel.send(self.snapshot.clone()).map_err(|_| {
             CommandError::new("connection_failed", "Could not connect to desktop state.")

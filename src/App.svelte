@@ -22,6 +22,11 @@
   let heading: HTMLHeadingElement;
   let fail = $state(false);
   const operations = $derived($desktop.snapshot?.operations ?? []);
+  const activeCollection = $derived(
+    $desktop.snapshot?.savedData.status === 'ready'
+      ? ($desktop.snapshot.savedData.activeCollectionName ?? 'None')
+      : 'Unavailable',
+  );
   const active = $derived(
     operations.some(
       (op) => op.status === 'running' || op.status === 'cancelling',
@@ -119,16 +124,22 @@
       </p>
     </header>
     <main id="workspace" tabindex="-1">
+      {#if $desktop.snapshot?.savedData.status === 'unavailable'}
+        <p class="error" role="alert">
+          Saved data is unavailable. {$desktop.snapshot.savedData.message} No empty
+          library has replaced it. Close Starframe before attempting recovery.
+        </p>
+      {/if}
       {#if $desktop.error}<p class="error" role="alert">
           {$desktop.error}
         </p>{/if}
       <section class="page" hidden={page !== 'mods'} aria-label="My mods">
         <div class="toolbar">
-          <p>Active collection: <strong>None</strong></p>
+          <p>Active collection: <strong>{activeCollection}</strong></p>
           <p class="muted">Library management coming later</p>
         </div>
         <div class="empty-state">
-          <h2>No mods installed</h2>
+          <h2>Saved library</h2>
           <p>Mod management is not available in this build.</p>
           <button onclick={() => navigate('catalog')}>Browse catalog</button>
         </div>
@@ -152,7 +163,7 @@
         aria-label="Collections"
       >
         <div class="empty-state">
-          <h2>No collections yet</h2>
+          <h2>Saved collections</h2>
           <p>
             A collection will hold a name and an ordered list of mods.
             Collection editing is not available in this build.
@@ -215,6 +226,24 @@
         {/if}
       </section>
       <section class="page" hidden={page !== 'settings'} aria-label="Settings">
+        <div class="settings-section">
+          <h2>Saved data</h2>
+          {#if $desktop.snapshot?.savedData.status === 'ready'}
+            <p>
+              Saved locally: {$desktop.snapshot.savedData.libraryCount} library entries
+              and {$desktop.snapshot.savedData.collectionCount} collections.
+            </p>
+          {:else if $desktop.snapshot?.savedData.status === 'unavailable'}
+            <p>
+              Saved data could not be opened. The recovery message identifies
+              the data folder.
+            </p>
+          {:else}<p>
+              {$desktop.connection === 'preview'
+                ? 'Saved data requires the desktop app.'
+                : 'Opening saved data…'}
+            </p>{/if}
+        </div>
         <div class="settings-section">
           <h2>Game location</h2>
           <p>Game discovery and setup are not available in this build.</p>
@@ -282,7 +311,7 @@
     </main>
     <footer class="launch-footer">
       <div>
-        <strong>No active collection</strong>
+        <strong>Active collection: {activeCollection}</strong>
         <p id="launch-reason">
           Game setup and launch are not available in this build.
         </p>
