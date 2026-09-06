@@ -20,7 +20,7 @@ Use the installed GitHub CLI (`gh`) for repository inspection, issues, milestone
 
 Make small, coherent commits as work reaches a checked state. Reference the issue in the commit or pull request. Use an issue branch for implementation and a focused pull request into `main`. Preserve unrelated changes. Stage explicit paths. Machine-local AGENTS.md instructions stay out of commits and out of .gitignore.
 
-Pull requests identify the issue, target milestone, behavior changed, verification performed, and any data-migration or release impact. Tests and fixes belong in the same change. Use the CLI to inspect CI failures; do not merge a known failing change. Required-check branch rules will be configured once the initial workflow has produced a successful check, without requiring an unavailable second reviewer for a sole maintainer.
+Pull requests identify the issue, target milestone, behavior changed, verification performed, and any data-migration or release impact. Tests and fixes belong in the same change. Use the CLI to inspect CI failures; do not merge a known failing change. Require the stable `Required checks` status on `main`, without imposing a second-reviewer requirement on a sole maintainer. The maintainer retains administrative recovery access; routine work must pass checks.
 
 ## Test as features are built
 
@@ -28,7 +28,7 @@ Add useful tests with implementation, not at the end of the project. Each bug fi
 
 Prefer observable behavior over tests of private function shapes. Use unit tests for deterministic rules such as ordering, version comparison and validation. Use temporary-file integration tests for storage, deployment, archive handling and recovery. Use frontend interaction tests for stale replies, pending states, navigation and accessible controls. Avoid snapshots of entire screens, blanket coverage percentages, and tests that only repeat a constant or a CSS declaration.
 
-The initial repository contains documentation only. Its executable check is `python scripts/check_repository.py`. Add each language's tooling when its first source project arrives, and make the applicable checks pass before that project's first merge. Do not report absent language tests as passing.
+The initial repository contains documentation and its CI tooling. Run `python scripts/check_repository.py` and `python -m unittest discover -s scripts -p 'test_*.py'` for the checker regression tests. Add each application's language tooling when its first source project arrives, and make the applicable checks pass before that project's first merge. Do not report absent language tests as passing.
 
 | Area | Checks when that area is introduced |
 | --- | --- |
