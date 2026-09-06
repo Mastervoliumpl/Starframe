@@ -1,6 +1,6 @@
 # Starframe 0.0.1 implementation handoff
 
-Status: prepared on 6 September 2026. Visual review is pending. This document defines the first implementation contract; it does not claim a working game integration or authorize work beyond the active milestone.
+Status: 0.0.1 handoff, 6 September 2026. The user approved the identity and visual specimen. This document defines the first implementation contract; it does not claim a working game integration or start the next implementation milestone.
 
 Read [DESIGN.md](../DESIGN.md), [ARCHITECTURE.md](../ARCHITECTURE.md), [DEVELOPMENT.md](../DEVELOPMENT.md) and the [version roadmap](../ROADMAP.md). The [design specimen](design/review.html) demonstrates the UI with fictional data. [Design review evidence](design/REVIEW.md) distinguishes browser checks from later native verification.
 
@@ -166,10 +166,10 @@ The repository's AGPL license remains unchanged. The public mod API raises a sep
 | --- | --- |
 | Accepted product direction | DESIGN.md, ARCHITECTURE.md and the closed baseline issue #1. |
 | Continuous checks and scope | DEVELOPMENT.md and the closed setup issue #2. |
-| Identity and visual specimen | Original SVG marks and design/review.html; visual approval pending. |
+| Identity and visual specimen | Original SVG marks and design/review.html; user approved the handoff on 6 September 2026. |
 | Browser interaction checks | design/REVIEW.md records the exercised flows and limits. |
 | Windows and responsiveness targets | Defined above; actual app measurement belongs to implementation. |
 | Contract and reuse decisions | Defined above; cross-language fixtures and runtime verification belong to #11–#15. |
 | Next milestone | 0.1.0 remains planned. Finishing this handoff does not start application implementation. |
 
-Close 0.0.1 only after the user's visual review is recorded and required repository checks pass on the merged handoff. Then set VERSION to the finalized 0.0.1 handoff version and record its changelog entry. A documentation milestone does not require a fake installer or public app release.
+VERSION identifies this handoff as 0.0.1, with its completed work recorded in CHANGELOG.md. Close the GitHub milestone after the approved handoff merges and required checks pass. No application implementation has started. A documentation milestone does not require an installer or public app release.

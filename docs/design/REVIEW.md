@@ -1,6 +1,6 @@
 # Starframe design review
 
-Prepared 6 September 2026 for issues #3 and #4. User approval is pending.
+Prepared and approved on 6 September 2026 for issues #3 and #4.
 
 Open [review.html](review.html) directly in a browser. It is self-contained apart from the two adjacent SVG marks; no build, network request, persistent storage or game access is required. A local HTTP preview is optional, not a shipped service.
 
@@ -48,4 +48,4 @@ Not yet verified: native Tauri keyboard/window behavior, actual Windows screen-r
 
 ## Review decision
 
-Pending the user's review of the identity and desktop/in-game screens. Do not describe this proposal as selected until that response is recorded here and in DESIGN.md.
+The user approved the frame-and-sun identity and desktop/in-game screens on 6 September 2026: "Approve this design for the handoff". This selects the shown identity, screen structure and interaction direction for implementation. It does not turn the browser specimen into production code or waive the native verification listed above.
