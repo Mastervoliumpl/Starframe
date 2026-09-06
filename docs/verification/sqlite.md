@@ -67,3 +67,9 @@ Both first warm builds compiled only Starframe; dependencies were cached. A subs
 The planning method resolves a broader metadata graph than the feature-selected cargo tree. Repeating that method gives 385 to 282, one fewer than the planned SQLite 283 after removing the unused direct Tokio test dependency. Neither count represents compiler invocations. Both the normal/build tree and the test tree exclude Turso; only legacy fixture names and the conversion engine marker retain its name.
 
 Test execution is separate: the final local Rust run passed 25 regular tests, with 0.74 seconds reported for the storage/game library tests and less than 0.01 seconds for the other suites. Frontend Vitest passed six tests in 1.81 seconds. Native integration, browser checks and total GitHub CI include additional work and are reported through the PR checks, not folded into clean compilation. The original proof CI Windows job took 12 minutes 5 seconds; that job also compiled both engines and ran tests, so it is not the baseline compile measurement.
+
+## Hosted-runner startup race
+
+The first final CI run passed Rust checks but failed before native database checks: WebView2 exposed its CDP connection before the page existed. Both native entry points now wait for the page event when the context is empty. A browser regression covers delayed page creation and an already-open page. This changes test startup synchronization; it does not relax assertions or add a fixed sleep. Final CI is linked through PR #42 and the completed milestone issues.
+
+Rapid local restarts also exposed a port-probe failure with Windows TIME_WAIT sockets and no live listener. The harness now checks listener availability and waits for teardown instead of exclusively binding a recently used port. A real TCP-listener regression covers release, and the repeated native conversion startups exercise the Windows path. The two reserved test ports and release-build restrictions are unchanged.

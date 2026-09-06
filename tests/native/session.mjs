@@ -1,18 +1,14 @@
 import { chromium, expect } from '@playwright/test';
+import { waitForDesktopPage } from './page.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { createServer } from 'node:net';
+import { waitForDebugPortRelease } from './port.mjs';
 
 const executable = resolve('src-tauri/target/debug/starframe.exe');
 export async function withDesktop(root, check, env = {}) {
-  const probe = createServer();
-  await new Promise((accept, reject) => {
-    probe.once('error', reject);
-    probe.listen(9224, '127.0.0.1', accept);
-  });
-  await new Promise((accept) => probe.close(accept));
+  await waitForDebugPortRelease(9224);
   const child = spawn(executable, [], {
     windowsHide: true,
     stdio: ['ignore', 'inherit', 'inherit'],
@@ -39,7 +35,7 @@ export async function withDesktop(root, check, env = {}) {
       }
     }
     if (!browser) throw new Error('The test desktop did not connect.');
-    await check(browser.contexts()[0].pages()[0], child.pid);
+    await check(await waitForDesktopPage(browser), child.pid);
     execFileSync(
       'powershell.exe',
       [
@@ -53,5 +49,6 @@ export async function withDesktop(root, check, env = {}) {
   } finally {
     await browser?.close();
     if (child.exitCode === null) child.kill();
+    await waitForDebugPortRelease(9224);
   }
 }
