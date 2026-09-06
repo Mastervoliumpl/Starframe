@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-game-action"
+description = "Enables the game_action command without any pre-configured scope."
+commands.allow = ["game_action"]
+
+[[permission]]
+identifier = "deny-game-action"
+description = "Denies the game_action command without any pre-configured scope."
+commands.deny = ["game_action"]

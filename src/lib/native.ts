@@ -19,6 +19,7 @@ const native: Transport = {
   start: (requestId, fail) => invoke('start_diagnostic', { requestId, fail }),
   cancel: (operationId) => invoke('cancel_operation', { operationId }),
   open: (page) => invoke('open_external', { page }),
+  game: (action) => invoke('game_action', { action }),
 };
 
 export async function getTransport(): Promise<Transport | null> {

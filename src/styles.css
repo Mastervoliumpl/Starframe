@@ -384,6 +384,32 @@ progress {
   white-space: nowrap;
   border: 0;
 }
+.game-settings {
+  overflow-wrap: anywhere;
+}
+.game-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.game-settings dl {
+  margin: 16px 0;
+}
+.game-settings dt {
+  color: var(--outline);
+  margin-top: 8px;
+}
+.game-settings dd {
+  margin: 0;
+}
+.game-candidates {
+  list-style: none;
+  padding: 0;
+}
+.game-candidates li {
+  border-top: 1px solid var(--outline);
+  padding: 16px 0;
+}
 @media (hover: hover) {
   button:hover:not(:disabled) {
     border-color: #fb923c;

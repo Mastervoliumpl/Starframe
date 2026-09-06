@@ -6,6 +6,15 @@ use tauri::{State, ipc::Channel};
 use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
+pub fn game_action(
+    app: tauri::AppHandle,
+    service: State<'_, crate::game_service::GameService>,
+    action: crate::model::GameAction,
+) -> Result<(), CommandError> {
+    service.request(app, action)
+}
+
+#[tauri::command]
 pub fn watch_state(
     state: State<'_, Shared>,
     channel: Channel<Snapshot>,

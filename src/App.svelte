@@ -3,6 +3,7 @@
   import mark from '../docs/design/starframe-mark.svg';
   import { version } from '../package.json';
   import DiagnosticList from './features/DiagnosticList.svelte';
+  import GameSettings from './features/GameSettings.svelte';
   import { createDesktop } from './lib/state';
   import { getTransport } from './lib/native';
 
@@ -244,10 +245,12 @@
                 : 'Opening saved data…'}
             </p>{/if}
         </div>
-        <div class="settings-section">
-          <h2>Game location</h2>
-          <p>Game discovery and setup are not available in this build.</p>
-        </div>
+        <GameSettings
+          game={$desktop.snapshot?.game}
+          unavailable={$desktop.connection !== 'connected' ||
+            $desktop.gameRequest}
+          onaction={(action) => desktop.game(action)}
+        />
         <div class="settings-section">
           <h2>Starframe {version}</h2>
           <p>Automatic update checks are not available yet.</p>
@@ -313,7 +316,12 @@
       <div>
         <strong>Active collection: {activeCollection}</strong>
         <p id="launch-reason">
-          Game setup and launch are not available in this build.
+          {$desktop.snapshot?.game.running === 'running'
+            ? 'Game running. '
+            : $desktop.snapshot?.game.selectedPath &&
+                $desktop.snapshot.game.running === 'unknown'
+              ? 'Game state unknown. '
+              : ''}Setup and launch are not available in this build.
         </p>
         {#if active}<button
             class="text-button"

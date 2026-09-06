@@ -1,11 +1,12 @@
 import { writable } from 'svelte/store';
-import type { Snapshot } from './generated/model';
+import type { Snapshot, GameAction } from './generated/model';
 
 export interface Transport {
   watch(receive: (snapshot: Snapshot) => void): Promise<() => void>;
   start(requestId: string, fail: boolean): Promise<string[]>;
   cancel(operationId: string): Promise<void>;
   open(page: 'repository' | 'releases'): Promise<void>;
+  game(action: GameAction): Promise<void>;
 }
 
 export type DesktopView = {
@@ -13,6 +14,7 @@ export type DesktopView = {
   connection: 'connecting' | 'connected' | 'reconnecting' | 'preview';
   error: string;
   starting: boolean;
+  gameRequest: boolean;
   cancelling: string[];
 };
 
@@ -55,6 +57,7 @@ export function createDesktop(transport: Transport | null) {
     connection: transport ? 'connecting' : 'preview',
     error: '',
     starting: false,
+    gameRequest: false,
     cancelling: [],
   };
   const store = writable(view);
@@ -131,6 +134,23 @@ export function createDesktop(transport: Transport | null) {
       };
     },
     reconnect: connect,
+    async game(action: GameAction) {
+      if (
+        !transport ||
+        view.connection !== 'connected' ||
+        view.gameRequest ||
+        view.snapshot?.game.busy
+      )
+        return;
+      update({ gameRequest: true, error: '' });
+      try {
+        await confirmed(transport.game(action));
+      } catch (error) {
+        if (!stopped) update({ error: errorMessage(error) });
+      } finally {
+        if (!stopped) update({ gameRequest: false });
+      }
+    },
     async start(fail = false) {
       if (!transport || view.starting || view.connection !== 'connected')
         return;

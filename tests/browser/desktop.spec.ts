@@ -7,6 +7,43 @@ test.beforeEach(async ({ page }) => {
   ).toBeVisible();
 });
 
+test('game selection remains readable and keyboard accessible at large text sizes', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const find = page.getByRole('button', { name: 'Find in Steam' });
+  await find.focus();
+  await page.keyboard.press('Enter');
+  await expect(find).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'My mods', exact: true }),
+  ).toBeEnabled();
+  const select = page.getByRole('button', { name: /^Use installation:/ });
+  await expect(select).toBeEnabled();
+  await select.focus();
+  await page.keyboard.press('Enter');
+  await expect(
+    page.getByText('Game not running', { exact: true }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 1024, height: 720 });
+  await page.addStyleTag({ content: 'html { font-size: 175%; }' });
+  await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
+  const folder = page.getByText('C:\\Fixture library\\Sanctuary', {
+    exact: true,
+  });
+  await expect(folder).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.getByRole('button', { name: 'Choose game folder' }).click();
+  await expect(page.getByRole('alert')).toContainText(
+    'requires the desktop app',
+  );
+  await expect(folder).toBeVisible();
+});
+
 test('navigation and reconnect preserve local search, selection, scroll and notes under load', async ({
   page,
 }) => {

@@ -24,6 +24,7 @@ impl Default for Core {
                 app_version: env!("CARGO_PKG_VERSION").into(),
                 operations: vec![],
                 saved_data: SavedData::Loading,
+                game: Default::default(),
             },
             revision: 0,
             subscriber: None,
@@ -34,6 +35,24 @@ impl Default for Core {
 }
 
 impl Core {
+    pub fn game(&mut self, view: starframe::game::GameView) {
+        if !self.stopped && self.snapshot.game != view {
+            self.snapshot.game = view;
+            self.changed();
+        }
+    }
+    pub fn begin_game_request(&mut self) -> Result<(), CommandError> {
+        if self.stopped || self.snapshot.game.busy {
+            return Err(CommandError::new(
+                "game_busy",
+                "A game location check is already in progress.",
+            ));
+        }
+        self.snapshot.game.busy = true;
+        self.snapshot.game.error.clear();
+        self.changed();
+        Ok(())
+    }
     pub fn saved_data(&mut self, status: SavedData) {
         if !self.stopped {
             self.snapshot.saved_data = status;

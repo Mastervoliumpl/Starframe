@@ -9,6 +9,15 @@ export function fixtureTransport(): Transport {
     revision: '0',
     appVersion: version,
     operations: [],
+    game: {
+      busy: false,
+      candidates: [],
+      selected: null,
+      selectedPath: null,
+      running: 'unknown',
+      message: 'No game found in this fixture.',
+      error: '',
+    },
     savedData: {
       status: 'ready',
       revision: '0',
@@ -83,5 +92,40 @@ export function fixtureTransport(): Transport {
       if (op?.status === 'running') op.status = 'cancelling';
     },
     async open() {},
+    async game(action) {
+      snapshot.game.busy = true;
+      snapshot.revision = String(BigInt(snapshot.revision) + 1n);
+      publish();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      snapshot.game.error = '';
+      if (action.kind === 'discover') {
+        snapshot.game.candidates = [
+          {
+            id: 'fixture-game',
+            path: 'C:\\Fixture library\\Sanctuary',
+            executable: 'C:\\Fixture library\\Sanctuary\\engine\\Sanctuary.exe',
+            edition: 'Playtest fixture',
+            build: 'Steam 123 · Unity fixture',
+          },
+        ];
+        snapshot.game.message = 'Choose an installation to save its location.';
+      } else if (action.kind === 'select') {
+        const selected = snapshot.game.candidates.find(
+          (item) => item.id === action.id,
+        );
+        if (selected) {
+          snapshot.game.selected = selected;
+          snapshot.game.selectedPath = selected.path;
+          snapshot.game.running = 'stopped';
+          snapshot.game.message = 'Fixture location selected.';
+        }
+      } else {
+        snapshot.game.error =
+          'The native folder picker requires the desktop app.';
+      }
+      snapshot.game.busy = false;
+      snapshot.revision = String(BigInt(snapshot.revision) + 1n);
+      publish();
+    },
   };
 }

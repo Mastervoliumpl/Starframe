@@ -2,9 +2,9 @@
 
 mod app;
 mod commands;
+mod game_service;
 mod model;
 
-use starframe::storage::Storage;
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
@@ -31,49 +31,11 @@ fn main() {
             }
         }))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let state: app::Shared = Arc::new(Mutex::new(app::Core::default()));
             app.manage(state.clone());
-            app.manage(Mutex::new(None::<Storage>));
-            let handle = app.handle().clone();
-            let storage_state = state.clone();
-            tauri::async_runtime::spawn_blocking(move || {
-                let result = tauri::async_runtime::block_on(async {
-                    let root = data_directory(&handle)?;
-                    let storage = Storage::open(&root)
-                        .await
-                        .map_err(|error| format!("{error} Data folder: {}", root.display()))?;
-                    let records = storage.load().await.map_err(|error| error.to_string())?;
-                    let status = model::SavedData::Ready {
-                        active_collection_name: records
-                            .collections
-                            .iter()
-                            .find(|collection| {
-                                Some(&collection.id) == records.active_collection.as_ref()
-                            })
-                            .map(|collection| collection.name.clone()),
-                        revision: records.revision.to_string(),
-                        library_count: records
-                            .library
-                            .len()
-                            .try_into()
-                            .map_err(|_| "Too many library records.")?,
-                        collection_count: records
-                            .collections
-                            .len()
-                            .try_into()
-                            .map_err(|_| "Too many collections.")?,
-                    };
-                    *handle
-                        .state::<Mutex<Option<Storage>>>()
-                        .lock()
-                        .expect("storage lock") = Some(storage);
-                    Ok::<_, String>(status)
-                });
-                storage_state.lock().expect("state lock").saved_data(
-                    result.unwrap_or_else(|message| model::SavedData::Unavailable { message }),
-                );
-            });
+            app.manage(game_service::start(app.handle().clone(), state.clone()));
             std::thread::spawn(move || {
                 loop {
                     std::thread::sleep(Duration::from_secs(2));
@@ -99,7 +61,8 @@ fn main() {
             commands::watch_state,
             commands::start_diagnostic,
             commands::cancel_operation,
-            commands::open_external
+            commands::open_external,
+            commands::game_action
         ])
         .run(tauri::generate_context!())
         .expect("Starframe could not start");
