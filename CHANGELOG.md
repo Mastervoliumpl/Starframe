@@ -9,6 +9,8 @@ Development version `0.1.0-dev.1`; milestone 0.1.0 is in progress.
 - Extended required CI with frontend checks and a Windows executable build; added grouped npm/Cargo dependency updates.
 - Deferred TypeScript 7 dependency updates until the Svelte and ESLint checkers support that major version.
 - Kept text file line endings consistent on Windows so clean checkouts pass formatting checks.
+- Added version checks and preparation for npm, Cargo, Tauri and root lockfile entries, with tests for malformed input, drift and failed writes (#7).
+- Added CI version enforcement and Windows executable artifacts named with the product version and commit SHA (#7).
 
 Mod management, live state, storage and game discovery remain planned. No app release or installer is published.
 

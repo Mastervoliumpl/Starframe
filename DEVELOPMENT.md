@@ -45,7 +45,7 @@ The C# code must compile without checking proprietary game assemblies into the r
 
 ## GitHub Actions
 
-Use pull-request and `main` push workflows for required checks. The repository job validates tracked documentation links, fenced blocks, SVG XML, the version format and exclusion of machine-local instructions. The frontend job runs a clean npm install, formatting, lint, Svelte/TypeScript checks, fixture tests and a production build on Linux. The Windows job runs Rustfmt, Clippy, Rust tests and a Tauri executable build. All three run on documentation changes too and feed `Required checks`; no path filters can leave it pending. None accesses game files.
+Use pull-request and `main` push workflows for required checks. The repository job validates tracked documentation links, fenced blocks, SVG XML, product version agreement and exclusion of machine-local instructions. The frontend job runs a clean npm install, formatting, lint, Svelte/TypeScript checks, fixture tests and a production build on Linux. After repository checks pass, the Windows job runs Rustfmt, Clippy, Rust tests and a Tauri executable build. It retains the executable for seven days as `starframe-<VERSION>-windows-x64-<commit SHA>`, using the full SHA of the checked-out revision (the merge revision for pull requests). All three run on documentation changes too and feed `Required checks`; no path filters can leave it pending. None accesses game files.
 
 Extend CI as source projects arrive. Keep one stable final status, `Required checks`, that fails if any applicable job fails or is canceled. If language jobs use path filtering, a small final job must still report a result for documentation-only changes; skipped workflows must not leave a required check pending forever. Shared contracts, lockfiles and workflow changes trigger all affected jobs.
 
@@ -57,13 +57,23 @@ Continuous delivery first creates reviewable artifacts and draft releases. Publi
 
 ## Versions and change history
 
-[VERSION](VERSION) is the source of the product version. The current value is `0.1.0-dev.1`, the desktop foundation in development, not a shipped app. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. The initial npm, Cargo and Tauri values match manually; automated version synchronization remains issue #7.
+[VERSION](VERSION) is the source of the product version. The current value is `0.1.0-dev.1`, the desktop foundation in development, not a shipped app. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
 
 Use three-part versions: `0.MINOR.PATCH` during initial development. A capability milestone advances the minor version; a corrective release advances the patch version. The planning handoff uses `0.0.1`. Published content is immutable; never replace a release with different bytes under the same version. The `0.x` series makes no stable public API promise, but format migrations and compatibility changes still need explicit notes. [Semantic Versioning](https://semver.org/)
 
 At the start of an implementation milestone, use its target version with a development suffix, such as `0.2.0-dev.1`. Increment the suffix for a newly distributed preview build, not every local commit; use the commit SHA to identify ordinary CI artifacts. Release candidates can use `0.2.0-rc.1`. Strip the suffix only when that version's release checks pass. Planned milestone titles are targets, not evidence of releases. Internal milestones need not publish installers.
 
-When build manifests exist, derive or check package.json, Cargo package metadata, Tauri's app version, and C# informational version against VERSION. Keep installer-specific numeric representations consistent with their platform requirements. A tested release-preparation command should update all required representations; CI rejects drift. Keep database, catalog, collection and runtime-contract versions separate from the app version. Catalog edits advance catalog revision without an app-version bump.
+To prepare a version, edit VERSION, then run these commands with Python 3.11 or later:
+
+```sh
+python scripts/versions.py --write
+python scripts/versions.py
+python -m unittest discover -s scripts -p 'test_*.py'
+```
+
+The command checks by default. `--write` copies VERSION into the product fields after parsing every required file. It preserves dependency versions and lockfile format versions. JSON files that need changes use two-space indentation; Cargo files retain their comments and formatting. Each file is replaced atomically. If preparation stops between files, repeat the command to finish synchronization. Inspect the diff and update the changelog and any documented version values before committing. The command does not create commits, tags, installers or releases.
+
+When the C# project arrives, add its `InformationalVersion` to `version_updates` using the standard-library XML parser, with fixtures in [the version tests](scripts/test_versions.py). Reuse `read_version` and the existing preflight/write path. Keep installer-specific numeric representations consistent with their platform requirements when packaging arrives. Database, catalog, collection and runtime-contract versions remain separate from the app version. Catalog edits advance catalog revision without an app-version bump.
 
 For a release, finalize its changelog entry, validate version agreement, and create an immutable `vX.Y.Z` tag from the checked commit. Use `gh` to create or inspect the draft release and workflow results. Publish after its acceptance checks and maintainer authorization. Do not fabricate changelog entries for work that is only planned.
 
