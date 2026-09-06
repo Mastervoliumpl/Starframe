@@ -42,7 +42,7 @@ Complete. Retained the logo and first-version desktop layout, replaced the in-ga
 
 ### 0.1.0: Desktop foundation
 
-Active. Issue #6 delivered the minimal shell and language CI. Issues #7–#10 are authorized, subject to their prerequisites. Version synchronization (#7) and navigation/live state (#8) are implemented locally; [#8 verification](docs/verification/desktop-state.md) records remaining review limits. Storage (#9) and read-only game discovery (#10) remain. Exit: restart persistence, slow-work interaction and Windows build checks pass. Local implementation does not mark the GitHub issues merged or closed.
+Active. Issue #6 delivered the minimal shell and language CI. Issues #7–#10 are authorized, subject to their prerequisites. Version synchronization (#7), navigation/live state (#8) and local storage (#9) are implemented locally. [Desktop verification](docs/verification/desktop-state.md) and [storage verification](docs/verification/storage.md) record the checks and their limits. Read-only game discovery (#10) remains. Exit: restart persistence, slow-work interaction and Windows build checks pass. Local implementation does not mark the GitHub issues merged or closed.
 
 - [#6: Create the desktop projects with lint, build and test checks](https://github.com/Mastervoliumpl/Starframe/issues/6)
 - [#7: Keep desktop and build versions synchronized](https://github.com/Mastervoliumpl/Starframe/issues/7)

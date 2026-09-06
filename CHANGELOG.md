@@ -16,7 +16,11 @@ Development version `0.1.0-dev.1`; milestone 0.1.0 is in progress.
 - Added revisioned native state, reconnect handling, generated TypeScript contracts and bounded diagnostics with progress, cancellation and failure states (#8).
 - Added a single-instance guard, restricted native capabilities, browser interaction tests and a Windows integration check (#8).
 
-Mod management, storage and game discovery remain planned. No app release or installer is published.
+- Added pinned local Turso persistence for library entries, ordered collection references and active selection, with revision checks and record constraints (#9).
+- Added migration backups, restore into a new directory, and Windows tests for rollback, forced termination, busy handling and corrupt/newer data retention (#9).
+- Added nonblocking storage startup and visible saved-data status; native tests now use isolated temporary data directories (#9).
+
+Mod management and game discovery remain planned. No app release or installer is published.
 
 ## 0.0.2 — 2026-09-06
 
