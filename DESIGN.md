@@ -1,6 +1,6 @@
 # Starframe: design direction
 
-Status: revision 0.5, 6 September 2026. Product name: Starframe. Visual direction and Tauri/Svelte/TypeScript/Rust desktop stack accepted by the user.
+Status: revision 0.6, 6 September 2026. Product name: Starframe. Visual direction and Tauri/Svelte/TypeScript/Rust desktop stack accepted by the user. The 0.0.1 visual specimen is prepared for final review.
 
 This is a design handoff. Implementation is not yet authorized. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
@@ -293,7 +293,9 @@ Validate accessible mod lists, live state updates, safe file operations, install
 
 ## 11. Review and handoff
 
-The next design review should show one representative My mods screen, its detail view, and a collection view at standard and compact sizes. Show normal, selected, busy, error, and empty states. Include a small motion demonstration and its reduced-motion alternative. A visual specimen is design work; it must not connect to game files or download mods.
+The [0.0.1 design specimen](docs/design/review.html) shows My mods, details, collections, download states, setup/update dialogs, and the in-game settings screen. It includes normal, selected, busy, error and empty states, plus reduced motion and compact reflow. It uses fictional data and does not connect to game files or download mods. See [review evidence](docs/design/REVIEW.md) for the checked interactions and verification limits.
+
+The identity proposal uses an open structural frame around an orange sun, with a Bahnschrift wordmark. The [dark-surface mark](docs/design/starframe-mark.svg) and [light-surface mark](docs/design/starframe-mark-light.svg) use original geometry. The specimen shows small sizes and both surfaces. This proposal still awaits the user's final visual review; it does not replace the accepted product name or palette.
 
 Before implementation, settle:
 
@@ -301,8 +303,8 @@ Before implementation, settle:
 - Visual validation of the accepted fonts, neutral shades, corner motif, navigation, and starting dimensions.
 - Approval of the representative visual screens and motion samples.
 - The in-game settings screen and accessible load-order interactions.
-- Supported Windows versions.
-- Validation of the chosen Windows installation and update flow.
+- The initial Windows target is defined in the [implementation handoff](docs/HANDOFF.md): Windows 11 x64, starting with 25H2. Verify supported releases and actual Windows integration during implementation.
+- Validation of the chosen Windows installation and update flow remains an implementation requirement, not a claim made by visual review.
 
 Handoff acceptance criteria:
 
