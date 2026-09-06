@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-Development version `0.1.0-dev.1`; issue #6 only.
+Development version `0.1.0-dev.1`; milestone 0.1.0 is in progress.
 
 - Added the minimal Tauri desktop shell with plain Svelte, TypeScript and Vite.
 - Added locked dependencies, frontend and Rust check commands, and configuration/rendering fixture tests.
