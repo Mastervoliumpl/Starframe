@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "runtimeContractVersion": 1,
+  "integrationId": "starframe.bepinex",
+  "deploymentRevision": "12",
+  "installedMods": [
+    {
+      "modId": "example.core",
+      "name": "Example Core",
+      "version": "1.0.0"
+    },
+    {
+      "modId": "example.disabled",
+      "name": "Disabled <b>text</b>",
+      "version": "1.0.0"
+    }
+  ],
+  "mods": [
+    {
+      "modId": "example.core",
+      "source": {
+        "kind": "catalog",
+        "releaseId": "example.core.1"
+      },
+      "root": "example.core/1",
+      "entryAssembly": "Example.Core.dll",
+      "entryType": "Example.Core.Entry",
+      "requires": [],
+      "files": [
+        {
+          "path": "Example.Core.dll",
+          "sha256": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        {
+          "path": "data/rules.txt",
+          "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ]
+    }
+  ]
+}

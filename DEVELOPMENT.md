@@ -1,12 +1,12 @@
 # Starframe development and checks
 
-Status: development policy adopted on 6 September 2026. Milestones 0.1.0 and 0.1.1 are complete. Later milestones remain planned.
+Status: development policy adopted on 6 September 2026. Milestones 0.1.0 and 0.1.1 are complete. Milestone 0.2.0 is active; later milestones remain planned.
 
 Read [DESIGN.md](DESIGN.md) for behavior and presentation, [ARCHITECTURE.md](ARCHITECTURE.md) for structure and recovery rules, and [ROADMAP.md](ROADMAP.md) for the current milestone. GitHub issues hold task scope, dependencies, acceptance criteria and verification evidence.
 
 ## Work one milestone at a time
 
-The design handoff and desktop foundation **0.1.0** are complete. The SQLite corrective milestone **0.1.1** is complete. Start 0.2.0 only after user authorization. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
+The design handoff and desktop foundation **0.1.0** are complete. The SQLite corrective milestone **0.1.1** is complete. The user authorized milestone 0.2.0; begin with issue #11. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
 
 Work on an issue only when its milestone is active and its prerequisites are complete. Keep issue dependencies in a `Depends on` section with issue links. Each issue must state its scope, observable completion criteria and checks. Split an issue when it contains independently reviewable outcomes; avoid splitting one small change into tasks that cannot be tested separately.
 
@@ -30,7 +30,7 @@ Add useful tests with implementation, not at the end of the project. Each bug fi
 
 Prefer observable behavior over tests of private function shapes. Use unit tests for deterministic rules such as ordering, version comparison and validation. Use temporary-file integration tests for storage, deployment, archive handling and recovery. Use frontend interaction tests for stale replies, pending states, navigation and accessible controls. Avoid snapshots of entire screens, blanket coverage percentages, and tests that only repeat a constant or a CSS declaration.
 
-Run `python scripts/check_repository.py` and `python -m unittest discover -s scripts -p 'test_*.py'` for repository checks and their regression tests. The desktop commands below check Svelte/TypeScript and Rust. C# tooling starts with its first source project. Do not report absent language tests as passing.
+Run `python scripts/check_repository.py` and `python -m unittest discover -s scripts -p 'test_*.py'` for repository checks and their regression tests. The desktop commands below check Svelte/TypeScript and Rust. C# checks are listed below. Do not report absent language tests as passing.
 
 | Area | Checks when that area is introduced |
 | --- | --- |
@@ -45,11 +45,17 @@ Run `python scripts/check_repository.py` and `python -m unittest discover -s scr
 
 The C# code must compile without checking proprietary game assemblies into the repository. Keep testable runtime logic independent of those references. Resolve a lawful, repeatable reference acquisition path before enabling a required game-runtime build. Do not disguise a skipped runtime build as a successful one.
 
+## C# runtime development
+
+Use the .NET SDK pinned in [runtime/global.json](runtime/global.json). From `runtime/`, run `dotnet restore Starframe.Runtime.slnx --locked-mode`, `dotnet format Starframe.Runtime.slnx --verify-no-changes --no-restore`, `dotnet build Starframe.Runtime.slnx --no-restore -c Release`, then `dotnet test Starframe.Runtime.slnx --no-build -c Release`. The runtime targets .NET Standard 2.1; only the fixture test host targets .NET 10. NuGet dependencies are locked. No game installation or proprietary reference is needed for these checks.
+
+[Runtime target and licensing](docs/verification/runtime-contracts.md) records inspected game evidence and the limits of these checks. [Contract v1](contracts/README.md) defines the shared files. Run `cargo test --manifest-path src-tauri/Cargo.toml --locked --test runtime_contract` for the matching Rust fixtures. During issue work, run these focused checks; run the affected full suites before pushing a coherent milestone update. Keep the milestone PR in draft until its exit checks pass.
+
 ## GitHub Actions
 
-Use pull-request and `main` push workflows for required checks. The repository job validates tracked documentation links, fenced blocks, SVG XML, product version agreement and exclusion of machine-local instructions. The frontend job runs a clean npm install, formatting, lint, Svelte/TypeScript checks, fixture tests and a production build on Linux. After repository checks pass, the Windows job runs Rustfmt, Clippy, Rust tests and a Tauri executable build. It retains the executable for seven days as `starframe-<VERSION>-windows-x64-<commit SHA>`, using the full SHA of the checked-out revision (the merge revision for pull requests). All three run on documentation changes too and feed `Required checks`; no path filters can leave it pending. None accesses game files.
+Use pull-request and `main` push workflows for required checks. The repository job validates tracked documentation links, fenced blocks, SVG XML, product version agreement and exclusion of machine-local instructions. The frontend job runs a clean npm install, formatting, lint, Svelte/TypeScript checks, fixture tests and a production build on Linux. After repository checks pass, the Windows job runs Rustfmt, Clippy, Rust tests and a Tauri executable build. It retains the executable for seven days as `starframe-<VERSION>-windows-x64-<commit SHA>`, using the full SHA of the checked-out revision (the merge revision for pull requests). All four run on documentation changes too and feed `Required checks`; no path filters can leave it pending. None accesses game files.
 
-Extend CI as source projects arrive. Keep one stable final status, `Required checks`, that fails if any applicable job fails or is canceled. If language jobs use path filtering, a small final job must still report a result for documentation-only changes; skipped workflows must not leave a required check pending forever. Shared contracts, lockfiles and workflow changes trigger all affected jobs.
+A fourth job builds the C# runtime target and runs shared fixture tests on a .NET test host. It does not claim game loading. Extend CI as source projects arrive. Keep one stable final status, `Required checks`, that fails if any applicable job fails or is canceled. If language jobs use path filtering, a small final job must still report a result for documentation-only changes; skipped workflows must not leave a required check pending forever. Shared contracts, lockfiles and workflow changes trigger all affected jobs.
 
 Run fast independent checks concurrently. Cancel superseded PR runs, use finite timeouts and cache dependencies using lockfile keys. Start with one supported Windows target and a Linux runner for portable checks; expand the matrix only for a supported platform or a demonstrated failure. Upload useful failure logs and test results, omitting secrets and personal paths. Avoid requiring live external downloads for deterministic tests; use fixtures and separate scheduled/explicit source-availability checks.
 
@@ -75,7 +81,7 @@ python -m unittest discover -s scripts -p 'test_*.py'
 
 The command checks by default. `--write` copies VERSION into the product fields after parsing every required file. It preserves dependency versions and lockfile format versions. JSON files that need changes use two-space indentation; Cargo files retain their comments and formatting. Each file is replaced atomically. If preparation stops between files, repeat the command to finish synchronization. Inspect the diff and update the changelog and any documented version values before committing. The command does not create commits, tags, installers or releases.
 
-When the C# project arrives, add its `InformationalVersion` to `version_updates` using the standard-library XML parser, with fixtures in [the version tests](scripts/test_versions.py). Reuse `read_version` and the existing preflight/write path. Keep installer-specific numeric representations consistent with their platform requirements when packaging arrives. Database, catalog, collection and runtime-contract versions remain separate from the app version. Catalog edits advance catalog revision without an app-version bump.
+The C# `InformationalVersion` in `runtime/Directory.Build.props` is synchronized through the standard-library XML parser, with fixtures in [the version tests](scripts/test_versions.py). This reuses `read_version` and the existing preflight/write path. Keep installer-specific numeric representations consistent with their platform requirements when packaging arrives. Database, catalog, collection and runtime-contract versions remain separate from the app version. Catalog edits advance catalog revision without an app-version bump.
 
 For a release, finalize its changelog entry, validate version agreement, and create an immutable `vX.Y.Z` tag from the checked commit. Use `gh` to create or inspect the draft release and workflow results. Publish after its acceptance checks and maintainer authorization. Do not fabricate changelog entries for work that is only planned.
 

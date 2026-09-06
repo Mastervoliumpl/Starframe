@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "runtimeContractVersion": 2,
+  "integrationId": "starframe.bepinex",
+  "capabilities": {
+    "managedLifecycle": {
+      "supported": false,
+      "reason": "Not implemented"
+    },
+    "manualPriority": {
+      "supported": false,
+      "reason": "Not implemented"
+    },
+    "contentOverlays": {
+      "supported": false,
+      "reason": "Not implemented"
+    },
+    "settingsUi": {
+      "supported": false,
+      "reason": "Not implemented"
+    },
+    "activationReport": {
+      "supported": false,
+      "reason": "Not implemented"
+    }
+  }
+}

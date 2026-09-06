@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0-dev.1 — in development
+
+- Added the .NET Standard 2.1 runtime contract library, matching Rust validation, shared fixtures and internal lifecycle interfaces (#11).
+- Added locked C# builds, formatting/analyzers, fixture CI and synchronized informational versions. Game bootstrap, activation, settings and launch remain in progress for 0.2.0.
+
 ## 0.1.1 — 2026-09-06
 
 SQLite corrective milestone; internal build with no published installer or app release.

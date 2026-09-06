@@ -8,7 +8,7 @@ import tomllib
 import unittest
 from unittest.mock import patch
 
-from versions import JSON_FIELDS, read_version, synchronize
+from versions import JSON_FIELDS, RUNTIME_PROPS, read_version, synchronize
 
 
 class VersionChecks(unittest.TestCase):
@@ -17,7 +17,7 @@ class VersionChecks(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
         self.source = Path(__file__).resolve().parents[1]
-        self.names = ["VERSION", *JSON_FIELDS, "src-tauri/Cargo.toml", "src-tauri/Cargo.lock"]
+        self.names = [RUNTIME_PROPS, "VERSION", *JSON_FIELDS, "src-tauri/Cargo.toml", "src-tauri/Cargo.lock"]
         for name in self.names + ["scripts/versions.py"]:
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -157,6 +157,21 @@ class VersionChecks(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("tauri.conf.json", result.stderr)
                 self.assertEqual(self.contents(), before)
+
+    def test_runtime_version_and_invalid_xml(self):
+        path = self.root / RUNTIME_PROPS
+        original = path.read_text(encoding="utf-8")
+        path.write_text(original.replace(read_version(self.root), "9.9.9"), encoding="utf-8")
+        self.assertTrue(any(RUNTIME_PROPS in error for error in synchronize(self.root)))
+        synchronize(self.root, write=True)
+        self.assertEqual(synchronize(self.root), [])
+        (self.root / "VERSION").write_text("0.2.0-dev.9\n", encoding="utf-8")
+        for text in ("<Project>", "<Project />", original.replace("</InformationalVersion>", "</InformationalVersion><InformationalVersion>1.0.0</InformationalVersion>")):
+            path.write_text(text, encoding="utf-8")
+            before = self.contents()
+            with self.assertRaises(ValueError):
+                synchronize(self.root, write=True)
+            self.assertEqual(self.contents(), before)
 
     def test_cargo_comments_and_same_named_registry_package_survive(self):
         path = self.root / "src-tauri/Cargo.lock"

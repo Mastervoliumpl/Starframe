@@ -1,0 +1,1316 @@
+{
+  "schemaVersion": 1,
+  "runtimeContractVersion": 1,
+  "integrationId": "starframe.bepinex",
+  "deploymentRevision": "12",
+  "installedMods": [
+    {
+      "modId": "mod0",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod1",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod2",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod3",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod4",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod5",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod6",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod7",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod8",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod9",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod10",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod11",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod12",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod13",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod14",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod15",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod16",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod17",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod18",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod19",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod20",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod21",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod22",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod23",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod24",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod25",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod26",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod27",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod28",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod29",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod30",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod31",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod32",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod33",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod34",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod35",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod36",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod37",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod38",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod39",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod40",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod41",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod42",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod43",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod44",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod45",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod46",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod47",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod48",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod49",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod50",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod51",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod52",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod53",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod54",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod55",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod56",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod57",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod58",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod59",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod60",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod61",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod62",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod63",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod64",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod65",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod66",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod67",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod68",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod69",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod70",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod71",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod72",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod73",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod74",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod75",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod76",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod77",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod78",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod79",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod80",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod81",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod82",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod83",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod84",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod85",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod86",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod87",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod88",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod89",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod90",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod91",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod92",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod93",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod94",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod95",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod96",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod97",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod98",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod99",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod100",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod101",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod102",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod103",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod104",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod105",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod106",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod107",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod108",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod109",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod110",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod111",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod112",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod113",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod114",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod115",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod116",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod117",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod118",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod119",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod120",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod121",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod122",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod123",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod124",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod125",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod126",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod127",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod128",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod129",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod130",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod131",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod132",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod133",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod134",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod135",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod136",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod137",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod138",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod139",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod140",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod141",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod142",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod143",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod144",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod145",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod146",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod147",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod148",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod149",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod150",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod151",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod152",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod153",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod154",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod155",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod156",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod157",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod158",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod159",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod160",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod161",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod162",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod163",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod164",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod165",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod166",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod167",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod168",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod169",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod170",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod171",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod172",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod173",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod174",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod175",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod176",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod177",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod178",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod179",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod180",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod181",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod182",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod183",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod184",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod185",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod186",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod187",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod188",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod189",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod190",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod191",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod192",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod193",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod194",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod195",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod196",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod197",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod198",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod199",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod200",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod201",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod202",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod203",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod204",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod205",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod206",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod207",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod208",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod209",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod210",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod211",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod212",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod213",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod214",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod215",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod216",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod217",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod218",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod219",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod220",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod221",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod222",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod223",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod224",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod225",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod226",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod227",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod228",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod229",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod230",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod231",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod232",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod233",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod234",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod235",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod236",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod237",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod238",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod239",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod240",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod241",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod242",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod243",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod244",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod245",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod246",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod247",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod248",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod249",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod250",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod251",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod252",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod253",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod254",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod255",
+      "name": "M",
+      "version": "1"
+    },
+    {
+      "modId": "mod256",
+      "name": "M",
+      "version": "1"
+    }
+  ],
+  "mods": [
+    {
+      "modId": "example.core",
+      "source": {
+        "kind": "catalog",
+        "releaseId": "example.core.1"
+      },
+      "root": "example.core/1",
+      "entryAssembly": "Example.Core.dll",
+      "entryType": "Example.Core.Entry",
+      "requires": [],
+      "files": [
+        {
+          "path": "Example.Core.dll",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "path": "data/rules.txt",
+          "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ]
+    }
+  ]
+}

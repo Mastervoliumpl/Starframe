@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-Completed milestones: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)**, **[0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9)**, **[0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2)** and **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)**. Current product version: **0.1.1**, an internal desktop foundation build. No app release or installer has been published. Milestone **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)** is complete; [SQLite recovery and build evidence](docs/verification/sqlite.md) records its exit checks. No later milestone is active.
+Completed milestones: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)**, **[0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9)**, **[0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2)** and **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)**. Current product version: **0.2.0-dev.1**, an internal desktop foundation build. No app release or installer has been published. Milestone **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)** is complete; [SQLite recovery and build evidence](docs/verification/sqlite.md) records its exit checks. Milestone **[0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3)** is active, beginning with runtime contracts in #11.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -12,7 +12,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | [0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9) | Game-native menu and desktop launch design amendments | Complete |
 | [0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2) | Desktop foundation | Complete |
 | [0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10) | Replace Turso with bundled SQLite and preserve existing data | Complete |
-| [0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3) | Starframe in-game runtime | Planned |
+| [0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3) | Starframe in-game runtime | In progress |
 | [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Planned |
 | [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Planned |
 | [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Planned |
@@ -61,7 +61,7 @@ Complete. Bundled SQLite preserves supported legacy records and backups through 
 
 ### 0.2.0: Starframe in-game runtime
 
-Planned; starts after 0.1.1 closes. Issue #11 explicitly depends on the SQLite exit issue [#41](https://github.com/Mastervoliumpl/Starframe/issues/41). Deliver reversible bootstrap deployment, a Starframe-owned C# runtime and settings UI, and a verified launch path. Exit: a fixture mod loads through BepInEx, settings persist, and cleanup/recovery are demonstrated.
+Active on `codex/0.2.0-runtime`; 0.1.1 is complete. Issue #11 explicitly depends on the SQLite exit issue [#41](https://github.com/Mastervoliumpl/Starframe/issues/41). Deliver reversible bootstrap deployment, a Starframe-owned C# runtime and settings UI, and a verified launch path. Exit: a fixture mod loads through BepInEx, settings persist, and cleanup/recovery are demonstrated.
 
 - [#11: Add the C# runtime project and shared activation contracts](https://github.com/Mastervoliumpl/Starframe/issues/11)
 - [#12: Deploy and remove the Starframe bootstrap with recovery](https://github.com/Mastervoliumpl/Starframe/issues/12)

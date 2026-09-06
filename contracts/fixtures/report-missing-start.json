@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "runtimeContractVersion": 1,
+  "integrationId": "starframe.bepinex",
+  "deploymentRevision": "12",
+  "gameSessionId": "be730e50-de98-4e02-b435-2237f775402a",
+  "processId": 456,
+  "mods": [
+    {
+      "modId": "example.core",
+      "outcome": "loaded",
+      "errorCode": "",
+      "message": ""
+    }
+  ]
+}

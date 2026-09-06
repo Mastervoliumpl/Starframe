@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Starframe.Runtime.Tests/Starframe.Runtime.Tests.csproj" />
+  <Project Path="Starframe.Runtime/Starframe.Runtime.csproj" />
+</Solution>
