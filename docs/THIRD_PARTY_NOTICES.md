@@ -4,6 +4,10 @@ The 0.1.1 application links rusqlite 0.40.2 and libsqlite3-sys 0.38.2 under the 
 
 This storage notice supplements the repository license. A complete distribution notice inventory remains part of installer packaging; no installer has been published.
 
+## Sanctuary artwork
+
+The launch image is copyright Enhearten Media and/or its respective artist, with separate use conditions. It is not licensed under Starframe’s AGPL code license. See the [source and permission record](notices/Sanctuary-artwork.md).
+
 ## rusqlite and libsqlite3-sys
 
 Copyright (c) 2014 The rusqlite developers

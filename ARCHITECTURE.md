@@ -420,6 +420,8 @@ When native support ships, verify it, map native mod IDs to stable Starframe ide
 
 ### Discovery and launch
 
+Issue #15 connects the existing desktop game worker to journaled runtime preparation, revision-checked executable launch and process-bound report observation. [Implementation and limits](docs/verification/game-launch.md) distinguish empty-collection support, missing build resources, external launches and the game shutdown smoke-check limitation.
+
 Game discovery reads Steam library/install metadata, validates the executable and layout, and falls back to a native folder picker. Keep app IDs and release/playtest differences in game metadata. Earlier local inspection found a Unity/Mono x64 playtest installation, app 4511930, build 25135612; this is dated evidence, not a universal path or a runtime compatibility claim. Reverify supported game layouts before implementation.
 
 Issue #10 implements read-only discovery in `game.rs` with Windows registry/process calls in `windows_game.rs`. The installed playtest layout was reverified on 6 September 2026. `game_service.rs` owns the storage connection and a bounded request queue, publishes game state, observes processes every two seconds and revalidates only the selected installation every 30 seconds. Steam library discovery runs at startup or on request. Long observation gaps invalidate running-state evidence before a fresh check. Schema 3 persists one selected installation ID/path. Native selection is confirmed only after validation and the database commit; failed/cancelled selections retain the previous record. See [verification and limits](docs/verification/game-discovery.md).

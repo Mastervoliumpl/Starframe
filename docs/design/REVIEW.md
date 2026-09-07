@@ -56,3 +56,8 @@ The user approved the frame-and-sun identity and desktop/in-game screens on 6 Se
 The desktop specimen now uses `Launch Sanctuary Shattered Sun`. The in-game tab contains the replacement direction and a monochrome asset study; the original settings mockup is removed. The game artwork treatment is specified in DESIGN.md and has not been rendered with a selected game asset.
 
 Local Edge/Playwright checks passed for all three views at 1280, 853 and 640 CSS pixels without document overflow. Checks covered the complete launch label, simulated launch and running-state restriction, issue-dialog dismissal and focus return, inherited monochrome tint, removal of the old settings controls, and reduced-motion/high-contrast reflow. No page errors occurred. The amended desktop and in-game direction views were visually inspected. These checks do not verify real game menus, artwork contrast or native accessibility.
+
+
+## Issue #15 launch control
+
+The implemented launch action uses the official Dyson-sphere image, static navy fade and orange tint. The owner supplied FoneE’s permission conditions on 7 September 2026; [the artwork notice](../notices/Sanctuary-artwork.md) records the source and conditions separately from the AGPL code license. [Launch verification](../verification/game-launch.md) records state captures, full-label reflow, rendered contrast, missing-image fallback and remaining Windows scaling checks.

@@ -8,7 +8,8 @@
 - Added the BepInEx entry plugin, ordered managed activation, failure propagation and process-bound reports (#13). Activation schema 2 represents content-only packages without executable metadata; their activation adapters remain unsupported.
 - Verified fixture activation inside the current playtest. The core runtime targets .NET Standard 2.0 with explicit Mono dependencies; its Unity entry plugin targets 2.1.
 - Added internal typed settings registration, per-mod BepInEx persistence with atomic replacement, and the game-native Mods/settings page (#14). Runtime tests, game-side save/restart checks and the focused Windows keyboard smoke check pass. The full Windows display-scaling matrix remains final milestone validation.
-- Explicitly scoped DLL, Lua-only, map-only and mixed packages; deferred AI support pending game facilities. Desktop launch and final milestone validation remain for 0.2.0.
+- Added desktop runtime setup/removal, revision-checked executable launch, process-bound runtime results and the credited Sanctuary artwork launch control (#15). Non-empty collection preparation remains later work.
+- Scoped DLL, Lua-only, map-only and mixed packages; deferred AI support pending game facilities. Final milestone validation remains for 0.2.0.
 
 ## 0.1.1 — 2026-09-06
 
