@@ -21,6 +21,8 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 
 AI-package support is deferred until the game provides suitable AI extension/selection facilities. Automated replacement of the shipped AI is outside the current scope. Assign that work to a future milestone after those facilities can be verified; it is not a promised 0.7.0 feature.
 
+[Security scope](SECURITY.md) keeps 0.3.0 focused on the internal mod lifecycle, accurate status messages, disk/write recovery checks and separate dependency auditing. Catalog signing/advisory delivery must precede public catalog access; Windows signing and hosted release approval remain in 0.6.0 unless distribution moves earlier. Broader fuzzing and detailed compatibility reporting are follow-up work. Publishing an empty development catalog is not approval to open a live catalog to general users.
+
 Versions describe bounded outcomes, not dates. The native integration target may move when the official API becomes available; it must not block corrective releases to existing features. Add a patch milestone such as `0.6.1` when a released version needs fixes. Finish or explicitly pause the active milestone before changing focus.
 
 ## Issue index
@@ -100,6 +102,8 @@ Planned; starts after 0.4.0 closes. Deliver local DLL/folder imports, normal man
 - [#26: Verify the local developer workflow and document its limits](https://github.com/Mastervoliumpl/Starframe/issues/26)
 
 ### 0.6.0: Windows alpha distribution
+
+Pre-publication follow-ups: [#46: Catalog authentication and security advisory delivery](https://github.com/Mastervoliumpl/Starframe/issues/46) and [#47: Broader archive/path fuzzing](https://github.com/Mastervoliumpl/Starframe/issues/47). Move the relevant gate forward if public distribution starts earlier; neither blocks internal 0.3.0 implementation.
 
 Planned; starts after 0.5.0 closes. Deliver signed user-initiated updates, NSIS install/uninstall, release checks and user documentation. Exit: whole-app Windows verification passes and a draft installer release is reviewable. Publishing remains a maintainer action.
 

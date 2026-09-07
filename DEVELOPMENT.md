@@ -73,6 +73,8 @@ Use read-only permissions by default, immutable action commit pins, and isolated
 
 Continuous delivery first creates reviewable artifacts and draft releases. Publishing a release remains a maintainer action. Build and sign only from trusted repository revisions after required checks pass. Add the release workflow with the installer/updater milestone; no placeholder workflow should claim to publish a working app now.
 
+Dependency auditing moves forward to 0.3.0 as a separate CI workflow for dependency changes, scheduled checks and manual release checks. It does not run from ordinary local build commands. Keep scanner failures visible, triage findings and record expiring exceptions. Signing and wider security work follow [SECURITY.md](SECURITY.md); internal 0.3.0 does not open the catalog to general users.
+
 ## Versions and change history
 
 [VERSION](VERSION) is the source of the product version. This branch uses `0.3.0-dev.1`; main retains the completed internal `0.2.0` build. No installer has been published. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.

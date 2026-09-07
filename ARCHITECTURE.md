@@ -275,7 +275,7 @@ A newly approved mod release appears live, but never silently replaces versions 
 
 ### Game-version warnings
 
-When a detected game build changes, recalculate the displayed compatibility evidence for each catalog mod. If the last supported build is older, show `Made for a previous game version` with that build and the current build in details. If no useful evidence exists, show `Not checked for this game version`. A lack of testing is not proof that a mod is broken.
+When a detected game build changes, recalculate the displayed compatibility evidence for each catalog mod. Show `Not tested with this version` unless evidence establishes a specific incompatibility, and show tested/current builds in details. An unmaintained mod stays usable with a maintenance label. Maintenance, compatibility, download availability and security findings are separate facts; [security scope](SECURITY.md) defines their behavior and implementation phases. A failed request does not establish withdrawal, and ordinary withdrawal does not block activation of a verified installed copy.
 
 These warnings do not disable a mod, remove it from the collection, or prevent trying a launch. The launch area can summarize warnings with a route to details while keeping launch available. Missing executable files, an unusable loader, missing required dependencies, invalid activation contracts, or an incomplete deployment are separate actionable failures. Do not disguise a game-version mismatch as a hard dependency failure to bypass the warning policy.
 
@@ -464,7 +464,7 @@ An explicitly requested installer may run to replace the app after its process e
 
 ## 10. Dependencies and security scope
 
-The repository has no application dependencies yet. The following are candidates to validate when implementing the relevant behavior, not an instruction to install everything now.
+The repository now uses the desktop, runtime, HTTP, archive and SQLite dependencies recorded in its lockfiles. The following table also includes candidates for later work; it is not an instruction to install everything now. [Security scope](SECURITY.md) distinguishes implemented checks, lightweight 0.3.0 work and pre-distribution signing/advisory requirements. Internal development continues without signing; public catalog and installer access require the corresponding checks first.
 
 | Need | Proposed reuse |
 | --- | --- |
