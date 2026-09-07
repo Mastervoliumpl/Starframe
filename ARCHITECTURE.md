@@ -389,7 +389,7 @@ Use a versioned JSON activation document as the initial desktop/runtime handoff.
 
 ### Mod settings have one owner
 
-The 0.2.0 implementation registers typed settings through `IModContext.Settings` in the reference-free core. The bootstrap adapts them to per-mod BepInEx files and the game-native menu. [Settings verification](docs/verification/runtime-settings.md) records supported types, atomic save behavior, effective versus saved values, and the remaining input/scaling checks.
+The 0.2.0 implementation registers typed settings through `IModContext.Settings` in the reference-free core. The bootstrap adapts them to per-mod BepInEx files and the game-native menu. [Settings verification](docs/verification/runtime-settings.md) records supported types, atomic save behavior, effective versus saved values, the completed keyboard smoke check, and the final milestone display-scaling matrix.
 
 Mod settings are values such as key bindings, UI scale, or feature options. They are not collection membership, load order, or copies of the whole game configuration.
 

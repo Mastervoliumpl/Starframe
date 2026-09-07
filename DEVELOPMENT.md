@@ -131,4 +131,4 @@ The build icons were generated from [the approved SVG](docs/design/starframe-mar
 - [.NET formatting checks](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-format)
 - [GitHub CLI issue creation](https://cli.github.com/manual/gh_issue_create)
 
-The #14 runtime settings contract and game-native menu have [a verification record and remaining acceptance steps](docs/verification/runtime-settings.md). The Unity menu still requires a local game-reference build and in-game checks; reference-free CI covers the settings model, not the game controls.
+The #14 runtime settings contract and game-native menu have [a verification record and final milestone display checks](docs/verification/runtime-settings.md). The Unity menu still requires a local game-reference build and in-game checks; reference-free CI covers the settings model, not the game controls.

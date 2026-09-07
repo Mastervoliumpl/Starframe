@@ -1,6 +1,6 @@
 # Runtime settings verification
 
-Issue #14 is implemented on the 0.2.0 branch. It remains open for physical keyboard input and Windows display-scale acceptance checks. The desktop launch issue #15 has not started.
+Issue #14 is complete on the 0.2.0 branch. Its focused keyboard smoke check passed on 7 September 2026. By owner decision, the full Windows display-scale matrix belongs to final milestone validation. The desktop launch issue #15 has not started.
 
 ## Implemented behavior
 
@@ -27,13 +27,22 @@ The local build and game checks used the installation recorded in [activation ve
 - Captures were inspected at 2560 × 1440 and 1280 × 720. A synthetic 200% text enlargement exposed clipped native row labels; after the fix, labels and controls remained visible and the lower settings could be reached by focus scrolling. This is text-layout evidence, not a Windows DPI test.
 - Development captures, logs, probe source and prepared packages remain under ignored `test-results/ui-probe` and `test-results/ui-menu-*`. The probe is excluded from the product build and must not ship in a runtime package. Guarded removal cleaned up the recorded test integration afterward; original engine-root hashes matched the saved baseline, and generated settings remained.
 
-## Remaining acceptance checks
+## Focused keyboard smoke check
 
-Use the [guarded fixture preparation commands](runtime-activation.md#local-build-and-smoke-commands), with only product DLLs in the bootstrap output. Close the desktop before testing the game.
+After the owner narrowed the acceptance scope, a temporary probe used Windows `SendInput` against the game process started for this test. It checked that the ordinary input desktop was available and verified the foreground process before sending keys. The test set initial focus to the Mods entry, then sent Windows keyboard input rather than invoking Unity control callbacks.
 
-1. Reach Mods with the keyboard. Use Tab and Shift+Tab through settings, Enter/Space for controls and Escape/Back to return. Verify visible focus, input capture and focus restoration. Check that input cannot activate the menu behind the page.
-2. Enter and correct invalid numeric text. Verify the error is visible and the last saved value remains intact. Test reset and the distinction between saved and effective restart-only values.
-3. Check Windows display scaling at 100%, 150% and 200%, including narrow/windowed sizes, enlarged text and long mod names/descriptions. Verify wrapping, scrolling, selection and unfinished text edits.
-4. Repeat after closing the desktop, then restart the game and verify the settings. Check the native appearance against the adjacent game menus.
+Enter opened Mods and selected the fixture. Tab moved forward, Shift+Tab restored the previous focus, and Ctrl+A followed by typing replaced the numeric value with `27`. Enter saved it through the runtime. Escape returned to the mod list, a second Escape restored the main menu, and focus returned to Mods. The sequence passed on the first run without a product-code change. The game log and assertions are retained in ignored `test-results/ui-probe/menu-keyboard1.log`, `keyboard-result.txt` and `Probe.cs`; `keyboard-settings.png` captures the edited setting.
 
-The available desktop-control tool was not exposed in this session. Unity event dispatch and screenshot probes do not substitute for physical keyboard, OS display scaling, controller or screen-reader checks. No accessibility compliance claim is made. Keep #14 open until its remaining checks pass; main stays on the completed 0.1.1 milestone.
+The desktop-control plugin remained unavailable, but this Windows-input fallback completed the issue-level smoke check. Initial focus was established by the probe; this was not an audit of keyboard access across Sanctuary's entire main menu. The broader controller and screen-reader behavior is not claimed. All GitHub checks passed for implementation commit `46bb36c`; the subsequent issue-completion change updates documentation only.
+
+Guarded removal cleaned up the test-owned integration afterward. Original engine-root hashes matched the saved baseline; generated settings were retained. The probe DLL was removed from the local product output so later fixture preparation cannot include it accidentally.
+
+## Final milestone display checks
+
+The following matrix remains part of the 0.2.0 exit checks, rather than a blocker for #14:
+
+- Windows display scaling at 100%, 150% and 200%.
+- Narrow/windowed sizes, long mod names and descriptions, and enlarged text.
+- Wrapping, scrolling, visible selection and preservation of unfinished edits.
+
+Use the [guarded fixture preparation commands](runtime-activation.md#local-build-and-smoke-commands), with only product DLLs in the bootstrap output. Close the desktop before testing the game. Compare the added controls with the adjacent native menus; no full retest of Sanctuary's UI framework is required. The already completed normal/enlarged-text and Windows keyboard smoke checks are #14's acceptance evidence. Main remains on completed 0.1.1 until the rest of 0.2.0 passes its exit checks.
