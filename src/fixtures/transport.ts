@@ -10,6 +10,11 @@ export function fixtureTransport(): Transport {
     appVersion: version,
     operations: [],
     game: {
+      launch: {
+        phase: 'setup_required',
+        message: 'Choose a game installation to finish setup.',
+        details: [],
+      },
       busy: false,
       candidates: [],
       selected: null,
@@ -119,6 +124,25 @@ export function fixtureTransport(): Transport {
           snapshot.game.running = 'stopped';
           snapshot.game.message = 'Fixture location selected.';
         }
+      } else if (action.kind === 'setup') {
+        snapshot.game.launch = {
+          phase: 'ready',
+          message: 'Fixture runtime prepared.',
+          details: [],
+        };
+      } else if (action.kind === 'launch') {
+        snapshot.game.launch = {
+          phase: 'launch_requested',
+          message:
+            'Windows accepted the launch request. Waiting for the game process…',
+          details: [],
+        };
+      } else if (action.kind === 'remove_runtime') {
+        snapshot.game.launch = {
+          phase: 'setup_required',
+          message: 'Fixture runtime removed.',
+          details: [],
+        };
       } else {
         snapshot.game.error =
           'The native folder picker requires the desktop app.';

@@ -10,6 +10,15 @@
     unavailable: boolean;
     onaction: (action: GameAction) => void;
   } = $props();
+  const operationPending = $derived(
+    game?.busy || game?.launch.phase === 'launch_requested',
+  );
+  const canWrite = $derived(
+    !unavailable &&
+      !operationPending &&
+      game?.selected &&
+      game.running === 'stopped',
+  );
   const candidates = $derived(
     game?.candidates.filter((item) => item.path !== game.selected?.path) ?? [],
   );
@@ -34,24 +43,21 @@
 
 <div class="settings-section game-settings">
   <h2>Game location</h2>
-  <p>
-    Locate Sanctuary to see its build and running state. Setup and launch are
-    not available in this build.
-  </p>
+  <p>Choose the Sanctuary installation you want Starframe to manage.</p>
   <div class="game-actions">
     <button
-      disabled={unavailable || game?.busy}
+      disabled={unavailable || operationPending}
       onclick={() => onaction({ kind: 'discover' })}>Find in Steam</button
     >
     <button
-      disabled={unavailable || game?.busy}
+      disabled={unavailable || operationPending}
       onclick={() => onaction({ kind: 'choose_folder' })}
       >Choose game folder</button
     >
   </div>
   <p role="status">
     {game?.busy
-      ? 'Checking game location…'
+      ? 'Working on the game setup…'
       : (game?.message ?? 'Game discovery requires the desktop app.')}
   </p>
   {#if game?.error}<p class="error" role="alert">{game.error}</p>{/if}
@@ -87,7 +93,7 @@
           <p>{item.build}</p>
           <p>{displayPath(item.path)}</p>
           <button
-            disabled={unavailable || game?.busy}
+            disabled={unavailable || operationPending}
             aria-label={`Use installation: ${item.edition}, ${displayPath(item.path)}`}
             onclick={() => {
               selectedFromResult = item.path;
@@ -98,4 +104,35 @@
       {/each}
     </ul>
   {/if}
+</div>
+
+<div class="settings-section game-settings">
+  <h2>Game runtime</h2>
+  <p>
+    Install the Starframe runtime to add the in-game Mods menu. This build can
+    launch with an empty collection; mod imports and collection editing come
+    later.
+  </p>
+  <p>{game?.launch.message ?? 'Runtime setup requires the desktop app.'}</p>
+  {#if game?.launch.details.length}
+    <ul>
+      {#each game.launch.details as detail (detail)}<li>{detail}</li>{/each}
+    </ul>
+  {/if}
+  <div class="game-actions">
+    <button disabled={!canWrite} onclick={() => onaction({ kind: 'setup' })}
+      >{game?.launch.phase === 'ready'
+        ? 'Check setup'
+        : 'Install or retry setup'}</button
+    >
+    <button
+      disabled={!canWrite}
+      onclick={() => onaction({ kind: 'remove_runtime' })}
+      >Remove Starframe runtime</button
+    >
+  </div>
+  <p class="muted">
+    Removal retains mod settings and files Starframe does not own. Close the
+    game before changing its runtime.
+  </p>
 </div>

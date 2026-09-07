@@ -497,7 +497,7 @@ fn payload(path: &Path) -> Result<Vec<(String, Vec<u8>)>> {
     ));
     Ok(files)
 }
-fn guard_game(game: &game::Installation) -> Result<()> {
+pub(crate) fn guard_game(game: &game::Installation) -> Result<()> {
     let current = game::inspect(Path::new(&game.path))?;
     if current.executable != game.executable || current.build != game.build {
         return Err("Game installation changed; prepare again.".into());
@@ -616,6 +616,73 @@ pub fn install_runtime(
     let mut guard = || guard_game(game);
     let mut engine = Engine::open(&engine_root(game)?, &mut guard)?;
     apply(store, &mut engine, files, &mut guard, &mut |_| Ok(()))
+}
+
+/// Prepare the desktop's current activation through the existing ownership journal.
+pub fn prepare_desktop(
+    store: &mut Storage,
+    game: &game::Installation,
+    resources: &Path,
+    activation: &serde_json::Value,
+    cancelled: &impl Fn() -> bool,
+) -> Result<usize> {
+    crate::runtime_contract::read(
+        &serde_json::to_vec(activation).map_err(|e| e.to_string())?,
+        "activation",
+    )?;
+    let mut files = runtime_payload(&resources.join("runtime"))?;
+    let template = files
+        .iter()
+        .find(|(p, _)| p == "Starframe/activation.json")
+        .unwrap();
+    let template = crate::runtime_contract::read(&template.1, "activation")?;
+    if !template["mods"].as_array().unwrap().is_empty()
+        || !activation["mods"].as_array().unwrap().is_empty()
+    {
+        return Err("This build cannot prepare a collection with mods yet. The existing deployment was retained.".into());
+    }
+    files.retain(|(p, _)| p != "Starframe/activation.json");
+    files.push((
+        "Starframe/activation.json".into(),
+        serde_json::to_vec(activation).map_err(|e| e.to_string())?,
+    ));
+    files.extend(payload(&resources.join("bootstrap"))?);
+    let mut guard = || {
+        if cancelled() {
+            return Err("Starframe is closing. Preparation stopped at a safe boundary.".into());
+        }
+        guard_game(game)
+    };
+    let mut engine = Engine::open(&engine_root(game)?, &mut guard)?;
+    apply(store, &mut engine, files, &mut guard, &mut |_| Ok(()))
+}
+
+/// Read confirmed ownership without creating directories, locks or game files.
+pub fn prepared_activation(
+    store: &Storage,
+    game: &game::Installation,
+) -> Result<Option<serde_json::Value>> {
+    let root = engine_root(game)?;
+    let record = load(store, &root)?;
+    if record.pending.is_some() {
+        return Err("Repair required: a deployment remains interrupted. Wait for the game to close, then retry setup.".into());
+    }
+    let Some(expected) = record.owned.get("Starframe/activation.json") else {
+        return Ok(None);
+    };
+    for (path, digest) in &record.owned {
+        if read(&root.join(path))?.as_ref().map(|v| hash(v)).as_ref() != Some(digest) {
+            return Err(format!(
+                "Repair required: {path} changed or is missing. Files were retained."
+            ));
+        }
+    }
+    let bytes =
+        read(&root.join("Starframe/activation.json"))?.ok_or("Activation file is missing.")?;
+    if hash(&bytes) != *expected {
+        return Err("Activation changed while checking setup.".into());
+    }
+    crate::runtime_contract::read(&bytes, "activation").map(Some)
 }
 
 fn runtime_payload(prepared: &Path) -> Result<Vec<(String, Vec<u8>)>> {

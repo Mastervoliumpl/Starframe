@@ -9,6 +9,11 @@ const snapshot = (revision: string, sessionId = 'session'): Snapshot => ({
   appVersion: '0.1.0-dev.1',
   operations: [],
   game: {
+    launch: {
+      phase: 'setup_required',
+      message: 'Choose a game installation to finish setup.',
+      details: [],
+    },
     busy: false,
     candidates: [],
     selected: null,

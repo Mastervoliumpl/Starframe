@@ -35,6 +35,13 @@ impl Default for Core {
 }
 
 impl Core {
+    pub fn closing_game_operation(&mut self) {
+        self.snapshot.game.launch.message =
+            "Closing Starframe after the current file operation reaches a safe stopping point…"
+                .into();
+        self.changed();
+    }
+
     pub fn game(&mut self, view: starframe::game::GameView) {
         if !self.stopped && self.snapshot.game != view {
             self.snapshot.game = view;
@@ -42,10 +49,13 @@ impl Core {
         }
     }
     pub fn begin_game_request(&mut self) -> Result<(), CommandError> {
-        if self.stopped || self.snapshot.game.busy {
+        if self.stopped
+            || self.snapshot.game.busy
+            || self.snapshot.game.launch.phase == starframe::launch::Phase::LaunchRequested
+        {
             return Err(CommandError::new(
                 "game_busy",
-                "A game location check is already in progress.",
+                "A game operation is already in progress.",
             ));
         }
         self.snapshot.game.busy = true;

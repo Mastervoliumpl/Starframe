@@ -5,6 +5,7 @@ use crate::{
 use starframe::{
     deployment,
     game::{self, GameView, Running},
+    launch::{self, LaunchView, Phase},
     storage::Storage,
     windows_game,
 };
@@ -22,19 +23,27 @@ use tauri_plugin_dialog::DialogExt;
 
 enum Request {
     Discover,
+    Setup,
+    Launch,
+    RemoveRuntime,
     Select(String),
     Picked(Result<Option<PathBuf>, String>),
 }
 pub struct GameService {
     sender: SyncSender<Request>,
     busy: Arc<AtomicBool>,
+    writing: Arc<AtomicBool>,
 }
 impl GameService {
+    pub fn writing(&self) -> bool {
+        self.writing.load(Ordering::SeqCst)
+    }
+
     pub fn request(&self, app: tauri::AppHandle, action: GameAction) -> Result<(), CommandError> {
         if self.busy.swap(true, Ordering::SeqCst) {
             return Err(CommandError::new(
                 "game_busy",
-                "A game location check is already in progress.",
+                "A game operation is already in progress.",
             ));
         }
         if let Err(error) = app
@@ -47,6 +56,18 @@ impl GameService {
             return Err(error);
         }
         let request = match action {
+            GameAction::Setup => {
+                self.writing.store(true, Ordering::SeqCst);
+                Request::Setup
+            }
+            GameAction::Launch => {
+                self.writing.store(true, Ordering::SeqCst);
+                Request::Launch
+            }
+            GameAction::RemoveRuntime => {
+                self.writing.store(true, Ordering::SeqCst);
+                Request::RemoveRuntime
+            }
             GameAction::Discover => Request::Discover,
             GameAction::Select { id } => Request::Select(id),
             GameAction::ChooseFolder => {
@@ -69,6 +90,7 @@ impl GameService {
         };
         self.sender.try_send(request).map_err(|_| {
             self.busy.store(false, Ordering::SeqCst);
+            self.writing.store(false, Ordering::SeqCst);
             CommandError::new(
                 "game_unavailable",
                 "Game discovery is unavailable. Restart Starframe.",
@@ -136,10 +158,59 @@ fn revalidate(view: &mut GameView, selected: &Option<(String, String)>) {
     }
 }
 
+fn resources(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    #[cfg(debug_assertions)]
+    if let Some(root) = std::env::var_os("STARFRAME_INTEGRATION_DIR") {
+        return Ok(root.into());
+    }
+    app.path()
+        .resource_dir()
+        .map(|p| p.join("integration"))
+        .map_err(|e| e.to_string())
+}
+
+fn prepare(
+    app: &tauri::AppHandle,
+    core: &Shared,
+    store: &mut Storage,
+    game: &game::Installation,
+    dispatch: bool,
+) -> Result<serde_json::Value, String> {
+    let resources = resources(app)?;
+    if !resources.join("runtime/runtime-package.json").is_file() {
+        return Err("This Starframe build does not include the game runtime. Use a build with runtime support to finish setup.".into());
+    }
+    let store = std::cell::RefCell::new(store);
+    launch::prepare_latest(
+        || launch::requested(&store.borrow().load().map_err(|e| e.to_string())?),
+        |activation| {
+            deployment::prepare_desktop(
+                &mut store.borrow_mut(),
+                game,
+                &resources,
+                activation,
+                &|| core.lock().expect("state lock").stopped,
+            )
+            .map(|_| ())
+        },
+        || {
+            if core.lock().expect("state lock").stopped {
+                return Err("Starframe closed before launch was requested.".into());
+            }
+            if dispatch {
+                windows_game::launch(game)?;
+            }
+            Ok(())
+        },
+    )
+}
+
 pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
     let (sender, receiver) = mpsc::sync_channel(1);
     let busy = Arc::new(AtomicBool::new(true));
     let worker_busy = busy.clone();
+    let writing = Arc::new(AtomicBool::new(false));
+    let worker_writing = writing.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let mut view = GameView::default();
         let result = crate::data_directory(&app).and_then(|root| {
@@ -174,8 +245,15 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
         let mut validated = Instant::now();
         let mut observed = SystemTime::now();
         let mut recovery_observation = None;
+        let mut prepared = None;
+        let mut launch_requested: Option<Instant> = None;
+        let mut process_seen = false;
+        let mut process_wait: Option<Instant> = None;
         loop {
             if core.lock().expect("state lock").stopped {
+                if worker_writing.load(Ordering::SeqCst) {
+                    app.exit(0);
+                }
                 break;
             }
             let now = SystemTime::now();
@@ -188,13 +266,35 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                 validated = Instant::now();
             }
             observed = now;
+            let processes = windows_game::observe();
             view.running = view.selected.as_ref().map_or(Running::Unknown, |game| {
-                game::classify(&PathBuf::from(&game.executable), windows_game::processes())
+                game::classify(
+                    &PathBuf::from(&game.executable),
+                    processes
+                        .as_ref()
+                        .map(|v| {
+                            v.iter()
+                                .map(|p| p.as_ref().map(|p| p.path.clone()))
+                                .collect()
+                        })
+                        .map_err(Clone::clone),
+                )
             });
-            let observation = view
-                .selected
-                .as_ref()
-                .map(|game| (game.executable.clone(), view.running.clone()));
+            let process = processes.as_ref().ok().and_then(|v| {
+                v.iter().flatten().find(|p| {
+                    view.selected
+                        .as_ref()
+                        .is_some_and(|g| std::path::Path::new(&g.executable) == p.path)
+                })
+            });
+            let observation = view.selected.as_ref().map(|game| {
+                (
+                    game.executable.clone(),
+                    game.build.clone(),
+                    view.running.clone(),
+                    process.map(|p| (p.pid, p.start.clone())),
+                )
+            });
             if observation != recovery_observation
                 && view.running == Running::Stopped
                 && let (Some(store), Some(game)) = (storage.as_mut(), view.selected.as_ref())
@@ -206,6 +306,91 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                     }
                     Ok(false) => {}
                     Err(message) => view.error = message,
+                }
+            }
+            if observation != recovery_observation {
+                process_wait = None;
+                prepared = match (storage.as_ref(), view.selected.as_ref()) {
+                    (Some(store), Some(game)) => match deployment::prepared_activation(store, game)
+                    {
+                        Ok(value) => value,
+                        Err(error) => {
+                            view.launch = LaunchView::new(Phase::Failed, &error);
+                            None
+                        }
+                    },
+                    _ => None,
+                };
+                if view.running == Running::Stopped
+                    && launch_requested.is_none()
+                    && view.launch.phase != Phase::Failed
+                {
+                    view.launch = if prepared.is_some() {
+                        LaunchView::new(
+                            Phase::Ready,
+                            "Runtime installed. The latest setup will be checked before launch.",
+                        )
+                    } else {
+                        LaunchView::new(
+                            Phase::SetupRequired,
+                            "Install the Starframe runtime to finish setup.",
+                        )
+                    };
+                }
+            }
+            if let Some(process) = process {
+                process_seen = true;
+                let waited = process_wait.get_or_insert_with(Instant::now).elapsed();
+                view.launch = if let (Some(activation), Some(game)) = (&prepared, &view.selected) {
+                    let report = launch::read_report(
+                        &PathBuf::from(&game.executable)
+                            .parent()
+                            .unwrap()
+                            .join("Starframe/report.json"),
+                    );
+                    match report {
+                        Ok(report) => launch::runtime_view(
+                            activation,
+                            report.as_ref(),
+                            process.pid,
+                            &process.start,
+                        ),
+                        Err(error) => LaunchView::new(Phase::ProcessObserved, &error),
+                    }
+                } else {
+                    LaunchView::new(
+                        Phase::ProcessObserved,
+                        "Game running. Starframe runtime activation is unverified.",
+                    )
+                };
+                if waited >= Duration::from_secs(60) && view.launch.phase == Phase::ProcessObserved
+                {
+                    view.launch.details = vec!["No matching runtime result was confirmed within 60 seconds. Check the game's BepInEx log after it closes.".into()];
+                }
+            } else if view.running == Running::Stopped {
+                process_wait = None;
+                if process_seen {
+                    process_seen = false;
+                    launch_requested = None;
+                    view.launch = if prepared.is_some() {
+                        LaunchView::new(
+                            Phase::Ready,
+                            "Game closed. Ready to prepare the next launch.",
+                        )
+                    } else {
+                        LaunchView::new(
+                            Phase::SetupRequired,
+                            "Game closed. Finish setup to enable the runtime.",
+                        )
+                    };
+                } else if launch_requested
+                    .is_some_and(|time| time.elapsed() >= Duration::from_secs(30))
+                {
+                    launch_requested = None;
+                    view.launch = LaunchView::new(
+                        Phase::Failed,
+                        "Windows accepted the launch request, but no game process was observed within 30 seconds. Retry setup before launching again.",
+                    );
                 }
             }
             recovery_observation = observation;
@@ -221,7 +406,70 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
             view.running = Running::Unknown;
             view.busy = true;
             core.lock().expect("state lock").game(view.clone());
+            if matches!(
+                request,
+                Request::Setup | Request::Launch | Request::RemoveRuntime
+            ) {
+                view.launch = LaunchView::new(
+                    Phase::Preparing,
+                    if matches!(request, Request::RemoveRuntime) {
+                        "Removing the Starframe runtime…"
+                    } else {
+                        "Preparing mods…"
+                    },
+                );
+                core.lock().expect("state lock").game(view.clone());
+                let result = (|| {
+                    if core.lock().expect("state lock").stopped {
+                        return Err("Starframe closed before setup started.".into());
+                    }
+                    let game = view
+                        .selected
+                        .as_ref()
+                        .ok_or("Choose an available game installation first.")?;
+                    let store = storage
+                        .as_mut()
+                        .ok_or("Saved data is unavailable. Setup was not changed.")?;
+                    if launch_requested.is_some() {
+                        return Err(
+                            "A launch request is still waiting for its game process.".into()
+                        );
+                    }
+                    if matches!(request, Request::RemoveRuntime) {
+                        deployment::remove(store, game)?;
+                        prepared = None;
+                        return Ok(LaunchView::new(
+                            Phase::SetupRequired,
+                            "Starframe runtime removed. Mod settings and unowned files were retained.",
+                        ));
+                    }
+                    let dispatch = matches!(request, Request::Launch);
+                    prepared = Some(prepare(&app, &core, store, game, dispatch)?);
+                    if dispatch {
+                        launch_requested = Some(Instant::now());
+                        Ok(LaunchView::new(
+                            Phase::LaunchRequested,
+                            "Windows accepted the launch request. Waiting for the game process…",
+                        ))
+                    } else {
+                        Ok(LaunchView::new(
+                            Phase::Ready,
+                            "Runtime installed. Ready to launch Sanctuary Shattered Sun.",
+                        ))
+                    }
+                })();
+                view.launch =
+                    result.unwrap_or_else(|error: String| LaunchView::new(Phase::Failed, &error));
+                worker_writing.store(false, Ordering::SeqCst);
+                worker_busy.store(false, Ordering::SeqCst);
+                if core.lock().expect("state lock").stopped {
+                    app.exit(0);
+                    break;
+                }
+                continue;
+            }
             let chosen = match request {
+                Request::Setup | Request::Launch | Request::RemoveRuntime => unreachable!(),
                 Request::Discover => {
                     discover(&mut view);
                     revalidate(&mut view, &selected);
@@ -258,6 +506,10 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                             selected = Some((item.id.clone(), item.path.clone()));
                             view.selected_path = Some(item.path.clone());
                             view.selected = Some(item);
+                            view.launch = LaunchView::default();
+                            launch_requested = None;
+                            process_seen = false;
+                            process_wait = None;
                             view.message =
                                 "Game location saved. Game files were not changed.".into();
                             if let Some(store) = &storage {
@@ -277,5 +529,9 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
             worker_busy.store(false, Ordering::SeqCst);
         }
     });
-    GameService { sender, busy }
+    GameService {
+        sender,
+        busy,
+        writing,
+    }
 }
