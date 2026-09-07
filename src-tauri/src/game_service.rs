@@ -7,6 +7,7 @@ use starframe::{
     deployment,
     game::{self, GameView, Running},
     launch::{self, LaunchView, Phase},
+    packages::{self, Packages},
     storage::Storage,
     windows_game,
 };
@@ -23,6 +24,10 @@ use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 enum Request {
+    Package(
+        packages::Action,
+        tokio::sync::oneshot::Sender<Result<Vec<packages::Operation>, String>>,
+    ),
     Discover,
     Setup,
     Launch,
@@ -36,6 +41,26 @@ pub struct GameService {
     writing: Arc<AtomicBool>,
 }
 impl GameService {
+    pub async fn package(
+        &self,
+        action: packages::Action,
+    ) -> Result<Vec<packages::Operation>, CommandError> {
+        let (reply, result) = tokio::sync::oneshot::channel();
+        self.sender
+            .try_send(Request::Package(action, reply))
+            .map_err(|_| {
+                CommandError::new("package_busy", "The storage worker is busy. Retry shortly.")
+            })?;
+        result
+            .await
+            .map_err(|_| {
+                CommandError::new(
+                    "package_unavailable",
+                    "Package preparation is unavailable. Restart Starframe.",
+                )
+            })?
+            .map_err(|message| CommandError::new("package_failed", &message))
+    }
     pub fn writing(&self) -> bool {
         self.writing.load(Ordering::SeqCst)
     }
@@ -207,7 +232,7 @@ fn prepare(
 }
 
 pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
-    let (sender, receiver) = mpsc::sync_channel(1);
+    let (sender, receiver) = mpsc::sync_channel(8);
     let busy = Arc::new(AtomicBool::new(true));
     let worker_busy = busy.clone();
     let writing = Arc::new(AtomicBool::new(false));
@@ -233,6 +258,7 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
             }
         };
         let mut selected = None;
+        let mut packages = storage.as_mut().map(Packages::open).transpose();
         let mut catalog = match storage.as_ref().map(Refresh::load).transpose() {
             Ok(value) => value,
             Err(error) => {
@@ -276,6 +302,19 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                 break;
             }
             let now = SystemTime::now();
+            if let (Ok(Some(packages)), Some(storage)) = (&mut packages, &mut storage) {
+                match packages.poll(storage) {
+                    Ok(true) => core.lock().expect("state lock").saved_data(
+                        saved_status(storage)
+                            .unwrap_or_else(|message| SavedData::Unavailable { message }),
+                    ),
+                    Ok(false) => (),
+                    Err(message) => core
+                        .lock()
+                        .expect("state lock")
+                        .saved_data(SavedData::Unavailable { message }),
+                }
+            }
             if let (Some(catalog), Some(storage)) = (&mut catalog, &mut storage) {
                 let (ready, stopped) = {
                     let core = core.lock().expect("state lock");
@@ -448,6 +487,34 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                 Err(mpsc::RecvTimeoutError::Timeout) => continue,
                 Err(_) => break,
             };
+            if let Request::Package(action, reply) = request {
+                let result = (|| {
+                    if core.lock().expect("state lock").stopped {
+                        return Err("Starframe is closing.".into());
+                    }
+                    let queue = packages
+                        .as_mut()
+                        .map_err(|e| e.clone())?
+                        .as_mut()
+                        .ok_or("Package storage is unavailable.")?;
+                    let store = storage.as_mut().ok_or("Saved data is unavailable.")?;
+                    match action {
+                        packages::Action::Prepare {
+                            request_id,
+                            release_id,
+                        } => {
+                            queue.start(store, &request_id, &release_id)?;
+                        }
+                        packages::Action::Cancel { operation_id } => {
+                            queue.cancel(store, &operation_id)?
+                        }
+                        packages::Action::List => (),
+                    }
+                    queue.operations(store)
+                })();
+                let _ = reply.send(result);
+                continue;
+            }
             recovery_observation = None;
             view.error.clear();
             view.running = Running::Unknown;
@@ -516,7 +583,10 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                 continue;
             }
             let chosen = match request {
-                Request::Setup | Request::Launch | Request::RemoveRuntime => unreachable!(),
+                Request::Setup
+                | Request::Launch
+                | Request::RemoveRuntime
+                | Request::Package(..) => unreachable!(),
                 Request::Discover => {
                     discover(&mut view);
                     revalidate(&mut view, &selected);

@@ -283,6 +283,8 @@ Local imports skip catalog release and compatibility-version checks. They still 
 
 ### Package preparation
 
+Issue #17 implements `packages.rs` and its transfer helper for approved `starframe_managed_zip` artifacts. The existing storage worker owns a three-worker preparation queue and schema-7 operation/file records. A focused `package_action` command accepts release IDs, request IDs and cancellation intent. Files move from private staging to the content-addressed library before a single completion transaction; game deployment remains separate. [Package verification](docs/verification/packages.md) defines enforced limits, recovery and remaining format support.
+
 Extract into private staging, never directly into the game folder. Reject absolute paths, parent traversal, link entries, Windows device/alternate-stream paths, case-insensitive target collisions, and archives exceeding configured file-count or expanded-size limits. Check the final destination and reparse points as well as archive strings. Never run archive-supplied scripts or load a DLL into Starframe to inspect it.
 
 Initial support covers reviewed ZIP layouts and explicit local DLL/folder imports using supported activation contracts. Starframe-managed mods, conventional BepInEx plugins, content overlays, and bootstrap packages have different capabilities. An arbitrary DLL is not automatically compatible with Starframe's lifecycle. Unknown layouts receive an actionable unsupported result rather than a guessed destination. Required downloaded dependencies resolve to approved exact releases; a matching explicitly imported local dependency can satisfy a compatible requirement without becoming a catalog release.

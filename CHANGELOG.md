@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added bounded downloads, exact hash verification, guarded ZIP extraction and immutable package preparation for approved releases (#17).
+- Added schema-7 package history, atomic library completion, cancellation, verified-content reuse and interruption recovery. Package operations have a focused native command; their screens remain issue #19.
 - Added catalog schema 1, stable release validation, exact artifact metadata and withdrawal checks (#16).
 - Added independent catalog refresh with conditional HTTP requests, bounded transfers, automatic retries and a validated SQLite cache. Catalog changes preserve installed releases and collection references.
 - Added live catalog check status and catalog validation to the required Windows CI job. The initial metadata file contains no approved releases.

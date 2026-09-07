@@ -6,6 +6,7 @@ fn main() {
             "cancel_operation",
             "open_external",
             "game_action",
+            "package_action",
         ]),
     ))
     .expect("Tauri build configuration");

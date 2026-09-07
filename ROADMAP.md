@@ -75,7 +75,7 @@ The package investigation in #13 explicitly includes managed DLLs, conventional 
 
 ### 0.3.0: Curated mod management
 
-Active from 7 September 2026, starting with issue #16. The development branch uses 0.3.0-dev.1; main retains completed 0.2.0. Catalog validation, refresh and caching are implemented locally; endpoint publication remains pending merge. Issues #17–#19 have not started. Deliver independently refreshed catalog data, verified package preparation, install/enable/disable/uninstall, version warnings and Downloads. Exit: an approved release completes the full lifecycle with interruption and file-ownership checks.
+Active from 7 September 2026, starting with issue #16. The development branch uses 0.3.0-dev.1; main retains completed 0.2.0. Catalog validation, refresh and caching are implemented locally; endpoint publication remains pending merge. Issue #17 is complete locally with [verified package preparation and Windows checks](docs/verification/packages.md). Issues #18–#19 have not started. Deliver independently refreshed catalog data, verified package preparation, install/enable/disable/uninstall, version warnings and Downloads. Exit: an approved release completes the full lifecycle with interruption and file-ownership checks.
 
 - [#16: Publish and refresh the curated release catalog independently](https://github.com/Mastervoliumpl/Starframe/issues/16)
 - [#17: Download and prepare approved packages safely](https://github.com/Mastervoliumpl/Starframe/issues/17)

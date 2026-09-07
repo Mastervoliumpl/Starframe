@@ -7,9 +7,11 @@ use std::{
 };
 use uuid::Uuid;
 
-const SCHEMA: i64 = 6;
+mod packages;
+
+const SCHEMA: i64 = 7;
 const APPLICATION_ID: i64 = 0x53544652;
-const MIGRATIONS: [&str; 6] = [
+const MIGRATIONS: [&str; 7] = [
     "CREATE TABLE metadata (id INTEGER PRIMARY KEY CHECK(id = 1), engine TEXT NOT NULL CHECK(engine = 'sqlite'), revision INTEGER NOT NULL CHECK(revision >= 0));
      INSERT INTO metadata VALUES (1, 'sqlite', 0);
      CREATE TABLE library (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author) <= 200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(mod_id, hash), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL)));
@@ -20,6 +22,7 @@ const MIGRATIONS: [&str; 6] = [
     "SELECT 1;",
     "CREATE TABLE deployments (root TEXT PRIMARY KEY NOT NULL, record TEXT NOT NULL CHECK(length(record) <= 1048576 AND json_valid(record))); CREATE TABLE deployment_blobs (hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash)=64), bytes BLOB NOT NULL CHECK(length(bytes)<=8388608));",
     "CREATE TABLE catalog_cache (id INTEGER PRIMARY KEY CHECK(id=1), record TEXT NOT NULL CHECK(length(record)<=2105344 AND json_valid(record)));",
+    "CREATE TABLE package_operations (id TEXT PRIMARY KEY NOT NULL, request_id TEXT UNIQUE NOT NULL, record TEXT NOT NULL CHECK(length(record)<=8192 AND json_valid(record))); CREATE TABLE prepared_artifacts (hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash)=64 AND hash NOT GLOB '*[^0-9a-f]*'), record TEXT NOT NULL CHECK(length(record)<=2097152 AND json_valid(record)));",
 ];
 
 #[derive(Debug)]
@@ -798,11 +801,11 @@ mod tests {
         store.put_library_entry(&entry(), 0).unwrap();
         store
             .conn
-            .execute_batch("DROP TABLE catalog_cache; PRAGMA user_version=5;")
+            .execute_batch("DROP TABLE package_operations; DROP TABLE prepared_artifacts; DROP TABLE catalog_cache; PRAGMA user_version=5;")
             .unwrap();
         drop(store);
         let mut store = Storage::open(root.path()).unwrap();
-        assert_eq!(integer(&store.conn, "PRAGMA user_version").unwrap(), 6);
+        assert_eq!(integer(&store.conn, "PRAGMA user_version").unwrap(), SCHEMA);
         assert_eq!(store.load().unwrap().library, vec![entry()]);
         assert!(store.catalog_cache().unwrap().is_none());
         let cache = Cache {
@@ -840,7 +843,7 @@ mod tests {
         store.put_library_entry(&entry(), 0).unwrap();
         store
             .conn
-            .execute_batch("DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; PRAGMA user_version = 2;")
+            .execute_batch("DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 2;")
             .unwrap();
         drop(store);
         let mut store = Storage::open(root.path()).unwrap();
@@ -935,7 +938,7 @@ mod tests {
         store
             .conn
             .execute_batch(
-                "DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; PRAGMA user_version = 1;",
+                "DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 1;",
             )
             .unwrap();
         let backup = store.backup().unwrap();
@@ -1074,7 +1077,7 @@ mod tests {
             if mode == "migration" {
                 store
                     .conn
-                    .execute_batch("DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; PRAGMA user_version = 1;")
+                    .execute_batch("DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 1;")
                     .unwrap();
                 store.backup().unwrap();
                 store.conn.execute("BEGIN IMMEDIATE", []).unwrap();

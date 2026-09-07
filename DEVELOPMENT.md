@@ -2,6 +2,8 @@
 
 Status: development policy adopted on 6 September 2026. Milestones 0.1.0, 0.1.1 and 0.2.0 are complete. Milestone 0.3.0 is active, starting with issue #16; later milestones remain planned.
 
+Issue #17 adds package preparation through the existing storage worker, with schema-7 operation history and immutable file manifests. [Package checks and recovery](docs/verification/packages.md) record the supported format and limits. Its native fixture runs with the existing native suite; screen integration remains issue #19.
+
 Read [DESIGN.md](DESIGN.md) for behavior and presentation, [ARCHITECTURE.md](ARCHITECTURE.md) for structure and recovery rules, and [ROADMAP.md](ROADMAP.md) for the current milestone. GitHub issues hold task scope, dependencies, acceptance criteria and verification evidence.
 
 ## Work one milestone at a time

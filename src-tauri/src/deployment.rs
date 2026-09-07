@@ -116,7 +116,7 @@ struct Engine {
     pins: Vec<File>,
     pinned: BTreeSet<PathBuf>,
 }
-fn regular_metadata(path: &Path, directory: bool) -> Result<fs::Metadata> {
+pub(crate) fn regular_metadata(path: &Path, directory: bool) -> Result<fs::Metadata> {
     let metadata = fs::symlink_metadata(path).map_err(|e| format!("{}: {e}", path.display()))?;
     #[cfg(windows)]
     {
@@ -136,7 +136,7 @@ fn regular_metadata(path: &Path, directory: bool) -> Result<fs::Metadata> {
     }
     Ok(metadata)
 }
-fn pin(path: &Path) -> Result<File> {
+pub(crate) fn pin(path: &Path) -> Result<File> {
     regular_metadata(path, true)?;
     let mut options = OpenOptions::new();
     options.read(true);
