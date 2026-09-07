@@ -5,6 +5,16 @@
     <Reference Include="BepInEx"><HintPath>$(BootstrapPath)/BepInEx/core/BepInEx.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine"><HintPath>$(GameManagedPath)/UnityEngine.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameManagedPath)/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UIModule"><HintPath>$(GameManagedPath)/UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(GameManagedPath)/UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.TextMeshPro"><HintPath>$(GameManagedPath)/Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(GameManagedPath)/UnityEngine.InputLegacyModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.ImageConversionModule"><HintPath>$(GameManagedPath)/UnityEngine.ImageConversionModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.AnimationModule"><HintPath>$(GameManagedPath)/UnityEngine.AnimationModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Trebuchet"><HintPath>$(GameManagedPath)/Trebuchet.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Michsky.UI.Beam"><HintPath>$(GameManagedPath)/Michsky.UI.Beam.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(BootstrapPath)/BepInEx/core/0Harmony.dll</HintPath><Private>false</Private></Reference>
+    <EmbeddedResource Include="Resources/starframe-mark-mono.png" />
   </ItemGroup>
   <Target Name="RequireGameReferences" BeforeTargets="ResolveReferences">
     <Error Condition="!Exists('$(GameManagedPath)/UnityEngine.CoreModule.dll') Or !Exists('$(BootstrapPath)/BepInEx/core/BepInEx.dll')" Text="Set GameManagedPath to the installed game's Managed directory and BootstrapPath to the verified prepared BepInEx directory. References are never distributed." />

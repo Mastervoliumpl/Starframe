@@ -389,6 +389,8 @@ Use a versioned JSON activation document as the initial desktop/runtime handoff.
 
 ### Mod settings have one owner
 
+The 0.2.0 implementation registers typed settings through `IModContext.Settings` in the reference-free core. The bootstrap adapts them to per-mod BepInEx files and the game-native menu. [Settings verification](docs/verification/runtime-settings.md) records supported types, atomic save behavior, effective versus saved values, and the remaining input/scaling checks.
+
 Mod settings are values such as key bindings, UI scale, or feature options. They are not collection membership, load order, or copies of the whole game configuration.
 
 Starframe adds a `Mods` entry to the game's main menu and owns its installed/enabled mod list and settings behavior. Reuse Sanctuary's menu components, styling, navigation and transitions where supported. Inspect the game's UI hooks before choosing the C# presentation implementation; the earlier browser overlay is superseded. Use Starframe's monochrome mark in the main-menu entry, tinted and sized like adjacent game icons. This remains our runtime; it does not depend on another community manager.
