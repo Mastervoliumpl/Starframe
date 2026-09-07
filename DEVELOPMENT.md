@@ -1,12 +1,12 @@
 # Starframe development and checks
 
-Status: development policy adopted on 6 September 2026. Milestones 0.1.0 and 0.1.1 are complete. Milestone 0.2.0 is active; later milestones remain planned.
+Status: development policy adopted on 6 September 2026. Milestones 0.1.0, 0.1.1 and 0.2.0 are complete; later milestones remain planned.
 
 Read [DESIGN.md](DESIGN.md) for behavior and presentation, [ARCHITECTURE.md](ARCHITECTURE.md) for structure and recovery rules, and [ROADMAP.md](ROADMAP.md) for the current milestone. GitHub issues hold task scope, dependencies, acceptance criteria and verification evidence.
 
 ## Work one milestone at a time
 
-The design handoff and desktop foundation **0.1.0** are complete. The SQLite corrective milestone **0.1.1** is complete. The user authorized milestone 0.2.0; begin with issue #11. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
+The design handoff and desktop foundation **0.1.0** are complete. The SQLite corrective milestone **0.1.1** is complete. The runtime milestone **0.2.0** is complete. Milestone **0.3.0** remains planned. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
 
 Work on an issue only when its milestone is active and its prerequisites are complete. Keep issue dependencies in a `Depends on` section with issue links. Each issue must state its scope, observable completion criteria and checks. Split an issue when it contains independently reviewable outcomes; avoid splitting one small change into tasks that cannot be tested separately.
 

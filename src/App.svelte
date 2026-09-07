@@ -96,7 +96,7 @@
 <div class="app-shell">
   <aside class="sidebar" aria-label="Starframe">
     <div class="brand">
-      <img src={mark} width="36" height="36" alt="" /><span>Starframe</span>
+      <img src={mark} width="36" height="36" alt="" /><span>STARFRAME</span>
     </div>
     {@render navigation()}
     <p class="build-version">Development build<br />{version}</p>

@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Oxanium';
+  src: url('./assets/Oxanium.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+}
+
 :root {
   font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
   color: #cbd5e1;
@@ -113,10 +121,10 @@ textarea {
 .brand {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 12px;
   color: var(--text);
   font:
-    600 1.714286rem/2.142857rem Bahnschrift,
+    800 1.5rem/2.142857rem Oxanium,
     'Segoe UI',
     sans-serif;
 }
@@ -327,9 +335,10 @@ progress {
   color: var(--text);
   border-color: var(--accent);
   text-align: left;
+  font-family: Oxanium, 'Segoe UI', sans-serif;
   font-size: 1.142857rem;
   line-height: 1.571429rem;
-  font-weight: 600;
+  font-weight: 800;
 }
 .launch-art,
 .launch-tint {
@@ -361,8 +370,6 @@ progress {
   display: inline-block;
   position: relative;
   max-width: 85%;
-  padding: 4px 6px;
-  background: rgb(15 23 42 / 90%);
 }
 .launch-button:focus-visible .launch-art,
 .launch-button:hover:not(:disabled) .launch-art {
@@ -387,9 +394,6 @@ progress {
   .launch-art,
   .launch-tint {
     display: none;
-  }
-  .launch-label {
-    background: ButtonFace;
   }
 }
 .text-button {
@@ -504,7 +508,7 @@ progress {
     grid-template-columns: 176px minmax(0, 1fr);
   }
   .brand {
-    font-size: 1.428571rem;
+    font-size: 1.142857rem;
   }
 }
 @media (max-width: 899px) {

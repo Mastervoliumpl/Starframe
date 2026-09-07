@@ -1,6 +1,6 @@
 # Starframe design review
 
-Prepared and approved on 6 September 2026 for issues #3 and #4; amended later that day in issue #34. The logo and first-version desktop layout remain accepted. The previous in-game screen is superseded by DESIGN.md revision 0.7.
+Prepared and approved on 6 September 2026 for issues #3 and #4; amended later that day in issue #34. The logo and first-version desktop layout remain accepted. The previous in-game screen is superseded by DESIGN.md revision 0.8.
 
 Open [review.html](review.html) directly in a browser. It is self-contained apart from the adjacent SVG marks; no build, network request, persistent storage or game access is required. A local HTTP preview is optional, not a shipped service.
 
@@ -60,4 +60,4 @@ Local Edge/Playwright checks passed for all three views at 1280, 853 and 640 CSS
 
 ## Issue #15 launch control
 
-The implemented launch action uses the official Dyson-sphere image, static navy fade and orange tint. The owner supplied FoneE’s permission conditions on 7 September 2026; [the artwork notice](../notices/Sanctuary-artwork.md) records the source and conditions separately from the AGPL code license. [Launch verification](../verification/game-launch.md) records state captures, full-label reflow, rendered contrast, missing-image fallback and remaining Windows scaling checks.
+The implemented launch action uses the official Dyson-sphere image, static navy fade and orange tint. The owner supplied FoneE’s permission conditions on 7 September 2026; [the artwork notice](../notices/Sanctuary-artwork.md) records the source and conditions separately from the AGPL code license. [Launch verification](../verification/game-launch.md) records state captures, full-label reflow, rendered contrast, missing-image fallback and the owner-approved Windows scaling review.

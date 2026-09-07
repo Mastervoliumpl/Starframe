@@ -1,6 +1,6 @@
 # Runtime settings verification
 
-Issue #14 is complete on the 0.2.0 branch. Its focused keyboard smoke check passed on 7 September 2026. By owner decision, the full Windows display-scale matrix belongs to final milestone validation. The desktop launch issue #15 has not started.
+Issue #14 is complete in 0.2.0. Its focused keyboard smoke check passed on 7 September 2026. By owner decision, the full Windows display-scale matrix belongs to final milestone validation. Desktop launch issue #15 is also complete.
 
 ## Implemented behavior
 
@@ -39,10 +39,12 @@ Guarded removal cleaned up the test-owned integration afterward. Original engine
 
 ## Final milestone display checks
 
-The following matrix remains part of the 0.2.0 exit checks, rather than a blocker for #14:
+The final display review covered the requested scaling procedure alongside prior layout checks:
 
 - Windows display scaling at 100%, 150% and 200%.
 - Narrow/windowed sizes, long mod names and descriptions, and enlarged text.
 - Wrapping, scrolling, visible selection and preservation of unfinished edits.
 
-Use the [guarded fixture preparation commands](runtime-activation.md#local-build-and-smoke-commands), with only product DLLs in the bootstrap output. Close the desktop before testing the game. Compare the added controls with the adjacent native menus; no full retest of Sanctuary's UI framework is required. The already completed normal/enlarged-text and Windows keyboard smoke checks are #14's acceptance evidence. Main remains on completed 0.1.1 until the rest of 0.2.0 passes its exit checks.
+Use the [guarded fixture preparation commands](runtime-activation.md#local-build-and-smoke-commands), with only product DLLs in the bootstrap output. Close the desktop before testing the game. Compare the added controls with the adjacent native menus; no full retest of Sanctuary's UI framework is required. The already completed normal/enlarged-text and Windows keyboard smoke checks are #14's acceptance evidence. The owner’s manual display review completes the visual acceptance for 0.2.0.
+
+The owner subsequently supplied three game settings screenshots and six desktop screenshots after the requested scaling procedure, approving their readability on 7 September 2026. See [the display review](display-scaling.md) for the retained evidence and limits. The owner subsequently authorized milestone completion.
