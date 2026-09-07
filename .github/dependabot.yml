@@ -28,3 +28,11 @@ updates:
     groups:
       desktop-rust:
         patterns: ['*']
+  - package-ecosystem: nuget
+    directory: /runtime
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      runtime-dotnet:
+        patterns: ['*']

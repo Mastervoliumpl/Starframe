@@ -1,0 +1,387 @@
+[
+  {
+    "file": "activation.json",
+    "kind": "activation",
+    "valid": true
+  },
+  {
+    "file": "capabilities.json",
+    "kind": "capabilities",
+    "valid": true
+  },
+  {
+    "file": "report.json",
+    "kind": "report",
+    "valid": true
+  },
+  {
+    "file": "activation-local.json",
+    "kind": "activation",
+    "valid": true
+  },
+  {
+    "file": "activation-local-reordered.json",
+    "kind": "activation",
+    "valid": true
+  },
+  {
+    "file": "activation-empty.json",
+    "kind": "activation",
+    "valid": true
+  },
+  {
+    "file": "activation-dependencies.json",
+    "kind": "activation",
+    "valid": true
+  },
+  {
+    "file": "activation-schemaVersion.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "capabilities-schemaVersion.json",
+    "kind": "capabilities",
+    "valid": false
+  },
+  {
+    "file": "report-schemaVersion.json",
+    "kind": "report",
+    "valid": false
+  },
+  {
+    "file": "activation-runtimeContractVersion.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "capabilities-runtimeContractVersion.json",
+    "kind": "capabilities",
+    "valid": false
+  },
+  {
+    "file": "report-runtimeContractVersion.json",
+    "kind": "report",
+    "valid": false
+  },
+  {
+    "file": "activation-duplicate-inventory.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-missing-inventory.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-duplicate-active.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-disabled-executable-field.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-disabled-required.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-self-required.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-unknown-source.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-source-path.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-missing-assembly.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-invalid-entry-type.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-hash-case.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-short-hash.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-file-case-collision.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-file-parent-collision.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-inventory-limit.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-name-utf8-limit.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-name-control.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-null-name.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-revision-number.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-revision-leading-zero.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-wrong-integration.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-unknown-field.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-missing-mods.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-path-0.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-path-1.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-path-2.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-path-3.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-path-4.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-path-5.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-path-6.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-path-7.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-path-8.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-path-9.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-path-10.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-path-11.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-path-12.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-root-overlap.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-local-mismatch.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-dependency-order.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-duplicate-requirement.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "capabilities-reason.json",
+    "kind": "capabilities",
+    "valid": false
+  },
+  {
+    "file": "capabilities-boolean.json",
+    "kind": "capabilities",
+    "valid": false
+  },
+  {
+    "file": "capabilities-missing.json",
+    "kind": "capabilities",
+    "valid": false
+  },
+  {
+    "file": "report-failed.json",
+    "kind": "report",
+    "valid": true
+  },
+  {
+    "file": "report-skipped_dependency.json",
+    "kind": "report",
+    "valid": true
+  },
+  {
+    "file": "report-pid-zero.json",
+    "kind": "report",
+    "valid": false
+  },
+  {
+    "file": "report-pid-overflow.json",
+    "kind": "report",
+    "valid": false
+  },
+  {
+    "file": "report-session-empty.json",
+    "kind": "report",
+    "valid": false
+  },
+  {
+    "file": "report-session-format.json",
+    "kind": "report",
+    "valid": false
+  },
+  {
+    "file": "report-missing-start.json",
+    "kind": "report",
+    "valid": false
+  },
+  {
+    "file": "report-duplicate-mod.json",
+    "kind": "report",
+    "valid": false
+  },
+  {
+    "file": "report-unknown-outcome.json",
+    "kind": "report",
+    "valid": false
+  },
+  {
+    "file": "report-loaded-error.json",
+    "kind": "report",
+    "valid": false
+  },
+  {
+    "file": "report-failure-no-details.json",
+    "kind": "report",
+    "valid": false
+  },
+  {
+    "file": "duplicate-json.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "float-version.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "comment.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "trailing-comma.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "trailing-document.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "invalid-surrogate.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-content.json",
+    "kind": "activation",
+    "valid": true
+  },
+  {
+    "file": "activation-content-half-entry.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-content-empty.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-v1.json",
+    "kind": "activation",
+    "valid": false
+  }
+]

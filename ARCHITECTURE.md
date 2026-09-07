@@ -243,6 +243,8 @@ Local records identify exact content, so a shared collection can reuse the same 
 
 Keep database schema versions separate from catalog and collection-file format versions. Back up records before migrations, reject unsupported newer formats, and never silently replace a corrupt database with an empty library. Preserve user data and provide a repair path. Logs are diagnostic; the recovery record carries the information needed to repair an interrupted operation.
 
+The initial managed runtime and process-bound reports are implemented in #13. [Activation verification](docs/verification/runtime-activation.md) distinguishes verified managed fixtures from unsupported content and conventional plugin activation. The core targets .NET Standard 2.0 for complete Mono dependency packaging; the Unity bootstrap targets 2.1 against installed references.
+
 ## 6. Catalog and downloads
 
 Keep `catalog/releases.json` in the Starframe repository and publish it independently of desktop releases. The proposed initial endpoint is `https://raw.githubusercontent.com/Mastervoliumpl/Starframe/main/catalog/releases.json`; it does not exist yet. A maintainer's catalog commit becomes available at that endpoint without rebuilding or updating the app. GitHub/CDN cache timing can delay visibility; the app must not claim instant global propagation.
@@ -387,6 +389,8 @@ Use a versioned JSON activation document as the initial desktop/runtime handoff.
 
 ### Mod settings have one owner
 
+The 0.2.0 implementation registers typed settings through `IModContext.Settings` in the reference-free core. The bootstrap adapts them to per-mod BepInEx files and the game-native menu. [Settings verification](docs/verification/runtime-settings.md) records supported types, atomic save behavior, effective versus saved values, the completed keyboard smoke check, and the final milestone display-scaling matrix.
+
 Mod settings are values such as key bindings, UI scale, or feature options. They are not collection membership, load order, or copies of the whole game configuration.
 
 Starframe adds a `Mods` entry to the game's main menu and owns its installed/enabled mod list and settings behavior. Reuse Sanctuary's menu components, styling, navigation and transitions where supported. Inspect the game's UI hooks before choosing the C# presentation implementation; the earlier browser overlay is superseded. Use Starframe's monochrome mark in the main-menu entry, tinted and sized like adjacent game icons. This remains our runtime; it does not depend on another community manager.
@@ -415,6 +419,8 @@ This is a required seam, not permission to implement a speculative native adapte
 When native support ships, verify it, map native mod IDs to stable Starframe identities, and offer a migration preview. Keep the old setup recoverable until the native path is verified. Remove only Starframe-owned bootstrap files that are no longer needed; do not delete another tool's BepInEx installation. Avoid activating the same mod through two loaders. Collection names, references, and order should survive even if some mods require a native-compatible release. Actual native conversion rules remain unknown until the developers publish their interface.
 
 ### Discovery and launch
+
+Issue #15 connects the existing desktop game worker to journaled runtime preparation, revision-checked executable launch and process-bound report observation. [Implementation and limits](docs/verification/game-launch.md) distinguish empty-collection support, missing build resources, external launches and the game shutdown smoke-check limitation.
 
 Game discovery reads Steam library/install metadata, validates the executable and layout, and falls back to a native folder picker. Keep app IDs and release/playtest differences in game metadata. Earlier local inspection found a Unity/Mono x64 playtest installation, app 4511930, build 25135612; this is dated evidence, not a universal path or a runtime compatibility claim. Reverify supported game layouts before implementation.
 

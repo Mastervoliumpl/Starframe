@@ -5,6 +5,9 @@ use serde::Serialize;
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum GameAction {
     Discover,
+    Setup,
+    Launch,
+    RemoveRuntime,
     ChooseFolder,
     Select { id: String },
 }

@@ -4,6 +4,7 @@
   import { version } from '../package.json';
   import DiagnosticList from './features/DiagnosticList.svelte';
   import GameSettings from './features/GameSettings.svelte';
+  import LaunchBar from './features/LaunchBar.svelte';
   import { createDesktop } from './lib/state';
   import { getTransport } from './lib/native';
 
@@ -95,7 +96,7 @@
 <div class="app-shell">
   <aside class="sidebar" aria-label="Starframe">
     <div class="brand">
-      <img src={mark} width="36" height="36" alt="" /><span>Starframe</span>
+      <img src={mark} width="36" height="36" alt="" /><span>STARFRAME</span>
     </div>
     {@render navigation()}
     <p class="build-version">Development build<br />{version}</p>
@@ -306,33 +307,28 @@
         <div class="settings-section">
           <h2>Project help</h2>
           <p>Log export is not available yet.</p>
+          <details>
+            <summary>Artwork credit</summary>
+            <p>
+              Sanctuary: Shattered Sun launch artwork belongs to Enhearten Media
+              and its artists. Used with the permission supplied by the project
+              owner: no claim of ownership or use for profit. This artwork is
+              separate from Starframe’s AGPL code license.
+            </p>
+          </details>
           <button onclick={() => desktop.open('repository')}
             >Open Starframe on GitHub</button
           >
         </div>
       </section>
     </main>
-    <footer class="launch-footer">
-      <div>
-        <strong>Active collection: {activeCollection}</strong>
-        <p id="launch-reason">
-          {$desktop.snapshot?.game.running === 'running'
-            ? 'Game running. '
-            : $desktop.snapshot?.game.selectedPath &&
-                $desktop.snapshot.game.running === 'unknown'
-              ? 'Game state unknown. '
-              : ''}Setup and launch are not available in this build.
-        </p>
-        {#if active}<button
-            class="text-button"
-            onclick={() => navigate('downloads')}
-            >Diagnostic running · View progress</button
-          >{/if}
-      </div>
-      <button class="launch-button" disabled aria-describedby="launch-reason"
-        >Launch Sanctuary Shattered Sun</button
-      >
-    </footer>
+    <LaunchBar
+      game={$desktop.snapshot?.game}
+      unavailable={$desktop.connection !== 'connected' || $desktop.gameRequest}
+      collection={activeCollection}
+      onsetup={() => navigate('settings')}
+      onlaunch={() => desktop.game({ kind: 'launch' })}
+    />
   </div>
 </div>
 <p class="sr-only" role="status">

@@ -37,7 +37,10 @@ await writeFile(
   join(steam, 'steamapps/libraryfolders.vdf'),
   '"libraryfolders" {}',
 );
-const env = { STARFRAME_TEST_STEAM_ROOT: steam };
+const env = {
+  STARFRAME_TEST_STEAM_ROOT: steam,
+  STARFRAME_INTEGRATION_DIR: join(root, 'missing-integration'),
+};
 const data = join(root, 'data');
 const original = await readFile(executable);
 await withDesktop(
@@ -54,6 +57,15 @@ await withDesktop(
     await expect(
       page.getByText('Game not running', { exact: true }),
     ).toBeVisible();
+    await page.getByRole('button', { name: 'Install or retry setup' }).click();
+    await expect(page.locator('#launch-reason')).toContainText(
+      'does not include the game runtime',
+    );
+    await page.getByRole('button', { name: 'My mods', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: 'My mods', exact: true }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     const choose = page.getByRole('button', { name: 'Choose game folder' });
     const picker = (folder) =>
       execFileSync(

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0 — 2026-09-07
+
+Internal runtime milestone; no published installer or app release.
+
+- Added the .NET Standard runtime contract library, matching Rust validation, shared fixtures and internal lifecycle interfaces (#11).
+- Added locked C# builds, formatting/analyzers, fixture CI and synchronized informational versions.
+- Added pinned BepInEx bootstrap preparation, journaled installation/removal, schema-5 deployment backups, process guards and restart recovery (#12).
+- Added the BepInEx entry plugin, ordered managed activation, failure propagation and process-bound reports (#13). Activation schema 2 represents content-only packages without executable metadata; their activation adapters remain unsupported.
+- Verified fixture activation inside the current playtest. The core runtime targets .NET Standard 2.0 with explicit Mono dependencies; its Unity entry plugin targets 2.1.
+- Added internal typed settings registration, per-mod BepInEx persistence with atomic replacement, and the game-native Mods/settings page (#14). Runtime tests, game-side save/restart checks and the focused Windows keyboard smoke check pass. The owner approved the desktop and in-game scaling review.
+- Added desktop runtime setup/removal, revision-checked executable launch, process-bound runtime results and the credited Sanctuary artwork launch control (#15). Non-empty collection preparation remains later work.
+- Scoped DLL, Lua-only, map-only and mixed packages; deferred AI support pending game facilities.
+- Matched the sidebar wordmark and launch label to the Oxanium brand font, removed the launch label’s separate background, and recorded nine owner-supplied display review screenshots.
+
 ## 0.1.1 — 2026-09-06
 
 SQLite corrective milestone; internal build with no published installer or app release.

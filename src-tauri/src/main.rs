@@ -66,12 +66,15 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
-                window
-                    .state::<app::Shared>()
-                    .lock()
-                    .expect("state lock")
-                    .stopped = true;
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let writing = window.state::<game_service::GameService>().writing();
+                let state = window.state::<app::Shared>();
+                let mut core = state.lock().expect("state lock");
+                if writing {
+                    api.prevent_close();
+                    core.closing_game_operation();
+                }
+                core.stopped = true;
             }
         })
         .invoke_handler(tauri::generate_handler![

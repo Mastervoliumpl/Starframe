@@ -1,6 +1,6 @@
 # Starframe: design direction
 
-Status: revision 0.7, 6 September 2026. Product name: Starframe. The user retained the logo and accepted the desktop layout for the first version. This revision supersedes the earlier in-game presentation and plans the revised launch action.
+Status: revision 0.8, 7 September 2026. Product name: Starframe. The user retained the logo and accepted the desktop layout for the first version. This revision supersedes the earlier in-game presentation and plans the revised launch action.
 
 This is the accepted design handoff. The user authorized milestone 0.1.0 on 6 September 2026, including desktop navigation and live state in issue #8. Later feature screens remain planned. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
@@ -112,7 +112,7 @@ Body face: Segoe UI Variable, with Segoe UI and system sans-serif fallbacks. The
 | Metadata | 12 / 18 | Regular |
 | Paths and diagnostic values | 12 / 18 | System monospace |
 
-Use sentence case. Reserve monospace for paths, versions when alignment matters, and logs. Use tabular numerals for download progress. Do not add wide letter spacing to navigation or labels. Logo and wordmark typography remain open.
+Use sentence case. Reserve monospace for paths, versions when alignment matters, and logs. Use tabular numerals for download progress. Do not add wide letter spacing to navigation or labels. Use the bundled Oxanium ExtraBold (800) for the uppercase STARFRAME sidebar wordmark and the launch button, matching the social preview’s source identity. Keep other controls and page headings in their existing faces. The launch label has no separate background fill; its contrast comes from the fade across the artwork.
 
 Spacing scale: 4, 8, 12, 16, 24, 32, 48. Use 8 between related icon/label pairs, 12 within control groups, 16 within sections, 24 for page padding, and 32 between distinct sections. Alignment has priority over filling empty space.
 

@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-Completed milestones: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)**, **[0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9)**, **[0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2)** and **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)**. Current product version: **0.1.1**, an internal desktop foundation build. No app release or installer has been published. Milestone **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)** is complete; [SQLite recovery and build evidence](docs/verification/sqlite.md) records its exit checks. No later milestone is active.
+Completed milestones: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)**, **[0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9)**, **[0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2)**, **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)** and **[0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3)**. Current product version: **0.2.0**, an internal desktop/runtime build. No app release or installer has been published. Milestone **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)** is complete; [SQLite recovery and build evidence](docs/verification/sqlite.md) records its exit checks. Milestone **[0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3)** is complete; [exit evidence](docs/verification/milestone-0.2.0.md) records its checks. Milestone 0.3.0 remains planned.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -12,12 +12,14 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | [0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9) | Game-native menu and desktop launch design amendments | Complete |
 | [0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2) | Desktop foundation | Complete |
 | [0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10) | Replace Turso with bundled SQLite and preserve existing data | Complete |
-| [0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3) | Starframe in-game runtime | Planned |
+| [0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3) | Starframe in-game runtime | Complete |
 | [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Planned |
 | [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Planned |
 | [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Planned |
 | [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Planned |
 | [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Native game integration | Blocked on official game API |
+
+AI-package support is deferred until the game provides suitable AI extension/selection facilities. Automated replacement of the shipped AI is outside the current scope. Assign that work to a future milestone after those facilities can be verified; it is not a promised 0.7.0 feature.
 
 Versions describe bounded outcomes, not dates. The native integration target may move when the official API becomes available; it must not block corrective releases to existing features. Add a patch milestone such as `0.6.1` when a released version needs fixes. Finish or explicitly pause the active milestone before changing focus.
 
@@ -61,7 +63,9 @@ Complete. Bundled SQLite preserves supported legacy records and backups through 
 
 ### 0.2.0: Starframe in-game runtime
 
-Planned; starts after 0.1.1 closes. Issue #11 explicitly depends on the SQLite exit issue [#41](https://github.com/Mastervoliumpl/Starframe/issues/41). Deliver reversible bootstrap deployment, a Starframe-owned C# runtime and settings UI, and a verified launch path. Exit: a fixture mod loads through BepInEx, settings persist, and cleanup/recovery are demonstrated.
+Complete through PR #43. Runtime contracts and [bootstrap deployment/recovery](docs/verification/bootstrap.md) are implemented; managed fixture activation and reports are implemented. The game-native settings page and persistence are complete, including the [focused Windows keyboard smoke check](docs/verification/runtime-settings.md). Desktop setup, executable launch and runtime observation are implemented for an empty collection; [verification and build limits](docs/verification/game-launch.md) record the game smoke check and shutdown limitation. Content/plugin compatibility limits are recorded in [activation verification](docs/verification/runtime-activation.md). Issue #11 explicitly depends on the SQLite exit issue [#41](https://github.com/Mastervoliumpl/Starframe/issues/41). Deliver reversible bootstrap deployment, a Starframe-owned C# runtime and settings UI, and a verified launch path. Exit: a fixture mod loads through BepInEx, settings persist, and cleanup/recovery are demonstrated. The owner approved the desktop and game settings views after the Windows 100%/150%/200% scaling procedure; [display review](docs/verification/display-scaling.md) records the supplied evidence and limits.
+
+The package investigation in #13 explicitly includes managed DLLs, conventional BepInEx plugins, Lua-only content, map-only content and mixed packages. [Map source evidence](docs/planning/map-support.md) distinguishes content-only maps from DLL dependencies and records current-build verification gaps. Review the DLL-required activation format before implementing map support; no wrapper DLL should be required solely for package metadata. AI support remains deferred.
 
 - [#11: Add the C# runtime project and shared activation contracts](https://github.com/Mastervoliumpl/Starframe/issues/11)
 - [#12: Deploy and remove the Starframe bootstrap with recovery](https://github.com/Mastervoliumpl/Starframe/issues/12)

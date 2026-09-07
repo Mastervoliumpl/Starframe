@@ -395,19 +395,25 @@ fn interrupted_production_switch_and_backups_retry_without_replacing_originals()
         }
         assert!(source.join("ready").exists(), "{phase}: missing signal");
         drop(child);
+        let interrupted_backup = phase.starts_with("backup-").then(|| {
+            let backups: Vec<_> = fs::read_dir(source.join("backups"))
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .collect();
+            assert_eq!(
+                backups.len(),
+                1,
+                "backup captured before startup can create another migration backup"
+            );
+            backups[0].clone()
+        });
         let store = Storage::open(&source).unwrap();
         assert_eq!(
             snapshot(&store.conn, SCHEMA).unwrap(),
             expected(&source),
             "{phase}"
         );
-        if phase.starts_with("backup-") {
-            let backup = fs::read_dir(source.join("backups"))
-                .unwrap()
-                .next()
-                .unwrap()
-                .unwrap()
-                .path();
+        if let Some(backup) = interrupted_backup {
             let result = Storage::restore_into(&backup, &temp.path().join("restored"));
             assert_eq!(result.is_ok(), phase == "backup-complete");
         }

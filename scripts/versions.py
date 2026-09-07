@@ -1,4 +1,4 @@
-"""Check or copy VERSION into the desktop manifests and root lockfile entries."""
+"""Check or copy VERSION into desktop manifests, lockfile entries and C# build properties."""
 
 import argparse
 import json
@@ -7,6 +7,9 @@ from pathlib import Path
 import re
 import tempfile
 import tomllib
+import xml.etree.ElementTree as ET
+
+RUNTIME_PROPS = "runtime/Directory.Build.props"
 
 
 JSON_FIELDS = {
@@ -87,6 +90,18 @@ def version_updates(root: Path, version: str) -> dict[str, str]:
             raise ValueError(f"{name}: {exc}") from exc
         if updated != text:
             updates[name] = updated
+    text = (root / RUNTIME_PROPS).read_text(encoding="utf-8")
+    try:
+        document = ET.fromstring(text)
+        fields = document.findall("./PropertyGroup/InformationalVersion")
+        if len(fields) != 1 or not fields[0].text or len(fields[0]):
+            raise ValueError("expected one literal InformationalVersion")
+        if fields[0].text != version:
+            fields[0].text = version
+            ET.indent(document, space="  ")
+            updates[RUNTIME_PROPS] = ET.tostring(document, encoding="unicode") + "\n"
+    except (ET.ParseError, ValueError) as exc:
+        raise ValueError(f"{RUNTIME_PROPS}: {exc}") from exc
     return updates
 
 

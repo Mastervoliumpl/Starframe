@@ -1,7 +1,7 @@
 use std::{mem::size_of, path::PathBuf};
 use windows::{
     Win32::{
-        Foundation::{CloseHandle, ERROR_NO_MORE_FILES, HANDLE},
+        Foundation::{CloseHandle, ERROR_NO_MORE_FILES, FILETIME, HANDLE},
         System::{
             Diagnostics::ToolHelp::{
                 CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
@@ -9,8 +9,8 @@ use windows::{
             },
             Registry::{HKEY_CURRENT_USER, RRF_RT_REG_SZ, RegGetValueW},
             Threading::{
-                OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
-                QueryFullProcessImageNameW,
+                GetProcessTimes, OpenProcess, PROCESS_NAME_WIN32,
+                PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
             },
         },
     },
@@ -58,7 +58,16 @@ pub fn steam_root() -> Result<PathBuf, String> {
     Ok(root)
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct GameProcess {
+    pub path: PathBuf,
+    pub pid: u32,
+    pub start: String,
+}
 pub fn processes() -> Result<Vec<Option<PathBuf>>, String> {
+    Ok(observe()?.into_iter().map(|p| p.map(|p| p.path)).collect())
+}
+pub fn observe() -> Result<Vec<Option<GameProcess>>, String> {
     // Snapshot and process handles are owned here and closed on every return path.
     unsafe {
         let snapshot =
@@ -95,9 +104,24 @@ pub fn processes() -> Result<Vec<Option<PathBuf>>, String> {
                         &mut len,
                     )
                     .ok()?;
-                    PathBuf::from(String::from_utf16(&path[..len as usize]).ok()?)
+                    let path = PathBuf::from(String::from_utf16(&path[..len as usize]).ok()?)
                         .canonicalize()
-                        .ok()
+                        .ok()?;
+                    let (mut created, mut exited, mut kernel, mut user) = (
+                        FILETIME::default(),
+                        FILETIME::default(),
+                        FILETIME::default(),
+                        FILETIME::default(),
+                    );
+                    GetProcessTimes(process.0, &mut created, &mut exited, &mut kernel, &mut user)
+                        .ok()?;
+                    Some(GameProcess {
+                        path,
+                        pid: entry.th32ProcessID,
+                        start: ((u64::from(created.dwHighDateTime) << 32)
+                            | u64::from(created.dwLowDateTime))
+                        .to_string(),
+                    })
                 });
                 paths.push(path);
             }
@@ -110,4 +134,18 @@ pub fn processes() -> Result<Vec<Option<PathBuf>>, String> {
         }
         Ok(paths)
     }
+}
+
+/// Launch only the revalidated selected executable, with no shell or user arguments.
+pub fn launch(game: &crate::game::Installation) -> Result<(), String> {
+    crate::deployment::guard_game(game)?;
+    std::process::Command::new(&game.executable)
+        .current_dir(
+            std::path::Path::new(&game.executable)
+                .parent()
+                .ok_or("Game directory is missing.")?,
+        )
+        .spawn()
+        .map_err(|e| format!("Windows did not accept the game launch: {e}"))?;
+    Ok(())
 }

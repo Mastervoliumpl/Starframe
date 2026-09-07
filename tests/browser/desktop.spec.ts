@@ -29,7 +29,7 @@ test('game selection remains readable and keyboard accessible at large text size
     page.getByRole('heading', { name: 'Selected installation' }),
   ).toBeFocused();
   await page.setViewportSize({ width: 1024, height: 720 });
-  await page.addStyleTag({ content: 'html { font-size: 175%; }' });
+  await page.addStyleTag({ content: ':root { font-size: 175%; }' });
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
   const folder = page.getByText('C:\\Fixture library\\Sanctuary', {
     exact: true,
@@ -122,7 +122,7 @@ test('narrow navigation traps focus and Escape restores it; layouts keep the ful
       ),
     ).toBe(true);
     await expect(
-      page.getByRole('button', { name: 'Launch Sanctuary Shattered Sun' }),
+      page.getByRole('button', { name: 'Finish setup' }),
     ).toBeVisible();
   }
   const menu = page.getByRole('button', { name: 'Menu', exact: true });
@@ -187,4 +187,41 @@ test('100 fixture searches paint within the responsiveness budget', async ({
   });
   expect(p95).toBeLessThan(100);
   await page.screenshot({ path: testInfo.outputPath('diagnostics.png') });
+});
+
+test('setup enables launch and an accepted request leaves navigation usable', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Finish setup', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Settings', exact: true }),
+  ).toBeFocused();
+  await page.getByRole('button', { name: 'Find in Steam' }).click();
+  await page.getByRole('button', { name: /^Use installation:/ }).click();
+  await page.getByRole('button', { name: 'Install or retry setup' }).click();
+  const launch = page.getByRole('button', {
+    name: 'Launch Sanctuary Shattered Sun',
+  });
+  await expect(launch).toBeEnabled();
+  await page.setViewportSize({ width: 640, height: 800 });
+  await page.addStyleTag({ content: ':root { font-size: 175%; }' });
+  await launch.focus();
+  await page.keyboard.press('Enter');
+  await expect(launch).toBeDisabled();
+  await expect(page.locator('#launch-reason')).toContainText(
+    'Waiting for the game process',
+  );
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'My mods', exact: true })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'My mods', exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });
