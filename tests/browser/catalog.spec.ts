@@ -40,7 +40,9 @@ test('offline catalog retains revision and check time at enlarged text sizes', a
   await page.setViewportSize({ width: 1024, height: 720 });
   await page.addStyleTag({ content: ':root { font-size: 200%; }' });
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
-  await expect(catalog.getByRole('heading')).toBeVisible();
+  await expect(
+    catalog.getByRole('heading', { name: 'Approved release catalog' }),
+  ).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

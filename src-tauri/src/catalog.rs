@@ -23,6 +23,10 @@ pub struct Mod {
     pub name: String,
     pub author: String,
     pub source_url: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub unmaintained: bool,
     pub releases: Vec<Release>,
 }
 
@@ -32,9 +36,21 @@ pub struct Release {
     pub id: String,
     pub version: String,
     pub withdrawn: bool,
+    #[serde(default)]
+    pub withdrawal_reason: Option<String>,
+    #[serde(default)]
+    pub compatibility_problems: Vec<CompatibilityProblem>,
     pub artifact: Artifact,
     pub requires: Vec<String>,
     pub tested_game_builds: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompatibilityProblem {
+    pub game_build: String,
+    pub note: String,
+    pub source_url: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -135,6 +151,9 @@ impl Catalog {
             text(&m.name, 200)?;
             text(&m.author, 200)?;
             https(&m.source_url)?;
+            if !m.description.is_empty() {
+                text(&m.description, 4000)?;
+            }
             ensure(
                 !m.releases.is_empty() && m.releases.len() <= 256,
                 "each mod needs 1–256 releases",
@@ -146,6 +165,23 @@ impl Catalog {
                     "duplicate release ID",
                 )?;
                 text(&r.version, 128)?;
+                if let Some(reason) = &r.withdrawal_reason {
+                    ensure(r.withdrawn, "withdrawal reason on an available release")?;
+                    text(reason, 2000)?;
+                }
+                ensure(
+                    r.compatibility_problems.len() <= 64,
+                    "too many compatibility findings",
+                )?;
+                for problem in &r.compatibility_problems {
+                    text(&problem.game_build, 128)?;
+                    text(&problem.note, 2000)?;
+                    https(&problem.source_url)?;
+                    ensure(
+                        !r.tested_game_builds.contains(&problem.game_build),
+                        "build listed as both tested and incompatible",
+                    )?;
+                }
                 https(&r.artifact.url)?;
                 ensure(
                     r.artifact.sha256.len() == 64

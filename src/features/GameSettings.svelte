@@ -109,9 +109,9 @@
 <div class="settings-section game-settings">
   <h2>Game runtime</h2>
   <p>
-    Install the Starframe runtime to add the in-game Mods menu. This build can
-    launch with an empty collection; mod imports and collection editing come
-    later.
+    Install the Starframe runtime to add the in-game Mods menu. Enable installed
+    releases in My mods. Saved changes apply automatically while the game is
+    closed.
   </p>
   <p>{game?.launch.message ?? 'Runtime setup requires the desktop app.'}</p>
   {#if game?.launch.details.length}

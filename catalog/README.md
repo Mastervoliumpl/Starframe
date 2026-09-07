@@ -16,10 +16,13 @@ The Rust [catalog validator](../src-tauri/src/catalog.rs) defines the accepted s
 | Mod `id` | Stable ID, 1–128 lowercase ASCII letters, digits, dots, underscores or hyphens. Start with a letter or digit. |
 | Mod `name`, `author` | Nonblank display text, each at most 200 UTF-8 bytes, without control characters. |
 | Mod `sourceUrl` | HTTPS author/source page. No credentials or fragment. At most 2,048 bytes. |
+| Mod `description`, `unmaintained` | Optional description (up to 4,000 bytes) and maintenance flag. Defaults are empty/false for earlier caches. Unmaintained mods remain usable. |
 | Mod `releases` | 1–256 release records. |
 | Release `id` | Globally unique stable ID, with the same spelling rules as mod IDs. |
 | Release `version` | Author's display label, at most 128 bytes. It need not be SemVer. |
 | Release `withdrawn` | Boolean. Withdrawn identities remain in the catalog. New downloads of them or releases that require them are blocked. |
+| Release `withdrawalReason` | Optional nonblank reason, up to 2,000 bytes; allowed only when withdrawn. Supply it for new withdrawals. Earlier records without a reason display that omission explicitly. Ordinary withdrawal preserves installed copies/settings. |
+| Release `compatibilityProblems` | Optional list of up to 64 findings with exact `gameBuild`, `note` (up to 2,000 bytes) and HTTPS `sourceUrl` evidence. A build cannot also appear in `testedGameBuilds`. Warnings allow enable/launch. |
 | Release `artifact` | Exact `url`, lowercase SHA-256 `sha256`, integer `sizeBytes` (1 byte–2 GiB), and `layout`. The hash identifies the reviewed archive bytes. |
 | Release `requires` | Up to 64 exact release IDs. References must exist. Reject duplicates, self dependencies, cycles and multiple direct requirements for the same mod. |
 | Release `testedGameBuilds` | Up to 64 distinct observed build labels, each at most 128 bytes. An empty list means no recorded test evidence. These labels do not impose enable/launch restrictions. |
@@ -33,7 +36,7 @@ Paths reuse the runtime's Windows alias/device/path checks. Artifact URLs have t
 
 1. Review the exact author release, its archive layout, dependencies and redistribution/source links. Approval does not establish that code is free of malware.
 2. Add a new stable release ID for changed bytes, version labels, package layouts or dependency requirements. Existing identities cannot be reassigned to another mod. A mirror URL may change only for identical reviewed bytes.
-3. Retain every previous release. Set `withdrawn` to `true` to stop new downloads. Withdrawal is permanent for that release ID; a new approval needs a new ID.
+3. Retain every previous release. Set `withdrawn` to `true` and supply `withdrawalReason` to stop new downloads. One failed request does not withdraw a release. Withdrawal is permanent for that release ID; a new approval needs a new ID.
 4. Increase `catalogRevision`. Names, author/source links, tested-build evidence and identical-byte mirror URLs can change with a new revision.
 5. Run `cargo run --manifest-path src-tauri/Cargo.toml --locked --bin check_catalog -- catalog/releases.json --git-base main`. The required Windows job runs the same validator against the PR base or previous main revision.
 6. Merge only after the review and required checks. The raw GitHub file is the publication; no binary hosting or app update is involved.

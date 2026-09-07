@@ -1,6 +1,7 @@
 import type { Snapshot } from '../lib/generated/model';
 import type { Transport } from '../lib/state';
 import { version } from '../../package.json';
+import { fixtureManagement } from './management';
 
 // Browser tests opt into this fixture with ?fixture; production builds omit it.
 export function fixtureTransport(): Transport {
@@ -52,6 +53,17 @@ export function fixtureTransport(): Transport {
   let work: ReturnType<typeof setInterval>;
   const publish = () => receiver?.(structuredClone(snapshot));
   return {
+    ...fixtureManagement((data) => {
+      snapshot.savedData = {
+        status: 'ready',
+        revision: data.revision,
+        libraryCount: data.library.length,
+        collectionCount: data.collections.length,
+        activeCollectionName: data.collections[0]?.name ?? null,
+      };
+      snapshot.revision = String(BigInt(snapshot.revision) + 1n);
+      publish();
+    }),
     async watch(receive) {
       receiver = receive;
       publish();

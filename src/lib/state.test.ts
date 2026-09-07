@@ -49,6 +49,8 @@ test('a successful reconnect clears its connection error', async () => {
         receive(snapshot('1'));
         return vi.fn();
       }),
+    mods: vi.fn(),
+    packages: vi.fn(),
     start: vi.fn(),
     cancel: vi.fn(),
     open: vi.fn(),
@@ -69,6 +71,8 @@ test('stale revisions, sessions and retired subscriptions cannot overwrite curre
       listeners.push(receive);
       return vi.fn();
     }),
+    mods: vi.fn(),
+    packages: vi.fn(),
     start: vi.fn(),
     cancel: vi.fn(),
     open: vi.fn(),
@@ -98,6 +102,8 @@ test('a lost acknowledgement can be retried with the same request ID', async () 
       receive(snapshot('1'));
       return vi.fn();
     }),
+    mods: vi.fn(),
+    packages: vi.fn(),
     start: vi
       .fn()
       .mockImplementationOnce(() => new Promise(() => {}))
@@ -140,6 +146,8 @@ test('cancellation acknowledgement does not mark an operation cancelled and repe
       });
       return vi.fn();
     }),
+    mods: vi.fn(),
+    packages: vi.fn(),
     start: vi.fn(),
     cancel: vi.fn(
       () =>
@@ -173,6 +181,8 @@ test('silent channels reconnect and pending actions do not duplicate or claim su
       callback(snapshot('1'));
       return vi.fn();
     }),
+    mods: vi.fn(),
+    packages: vi.fn(),
     start: vi.fn(
       () =>
         new Promise<string[]>((resolve) => {

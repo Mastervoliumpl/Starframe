@@ -30,6 +30,31 @@ fn response(value: &Value) -> Response {
 }
 
 #[test]
+fn maintenance_compatibility_and_withdrawal_are_independent_facts() {
+    let mut value = fixture();
+    value["mods"][0]["description"] = json!("A maintained record of an older release.");
+    value["mods"][0]["unmaintained"] = json!(true);
+    value["mods"][0]["releases"][0]["compatibilityProblems"] = json!([{"gameBuild":"new-build","note":"Verified fixture conflict.","sourceUrl":"https://example.invalid/report"}]);
+    let catalog = read(&value).unwrap();
+    assert!(catalog.downloadable("fixture.core.1").is_ok());
+    value["mods"][0]["releases"][0]["withdrawn"] = json!(true);
+    value["mods"][0]["releases"][0]["withdrawalReason"] = json!("Author removed the archive.");
+    assert!(
+        read(&value)
+            .unwrap()
+            .downloadable("fixture.core.1")
+            .is_err()
+    );
+    value["mods"][0]["releases"][0]["compatibilityProblems"][0]["gameBuild"] =
+        json!("fixture-build");
+    assert!(read(&value).is_err());
+    value["mods"][0]["releases"][0]["compatibilityProblems"][0]["gameBuild"] = json!("new-build");
+    value["mods"][0]["releases"][0]["compatibilityProblems"][0]["sourceUrl"] =
+        json!("javascript:alert(1)");
+    assert!(read(&value).is_err());
+}
+
+#[test]
 fn schema_rejects_ambiguous_identities_hashes_layouts_and_dependencies() {
     let good = fixture();
     assert!(read(&good).is_ok());

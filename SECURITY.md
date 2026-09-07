@@ -10,8 +10,9 @@ Starframe is in internal development. There is no public installer release. Cura
 - Bootstrap/runtime deployment ownership, backups, Windows path guards, installation locks and interrupted-operation recovery. Game mutations require an observed stopped process.
 - Saved mod enable/disable intent, streamed deployment, confirmed uninstall and retryable owned-artifact cleanup. Space estimates precede downloads, extraction and deployment; failed writes still require recovery.
 - Runtime manifest and payload verification before managed activation. This is not a mod sandbox.
+- Separate maintenance, compatibility and availability metadata in live management screens. Compatibility warnings permit use; ordinary withdrawal prevents new downloads but preserves installed copies. Persistent download errors remain retryable.
 
-See [package evidence](docs/verification/packages.md), [mod lifecycle evidence](docs/verification/mods.md), [bootstrap evidence](docs/verification/bootstrap.md) and [runtime evidence](docs/verification/runtime-activation.md). Tests establish the stated cases, not a complete security audit. Mod lifecycle issue #18 is implemented locally; management screens remain #19. The status distinctions below include requirements still to be implemented in catalog metadata and screens.
+See [package evidence](docs/verification/packages.md), [mod lifecycle evidence](docs/verification/mods.md), [management screens](docs/verification/management.md), [bootstrap evidence](docs/verification/bootstrap.md) and [runtime evidence](docs/verification/runtime-activation.md). Tests establish the stated cases, not a complete security audit. The status distinctions below are implemented for the internal curated-mod workflow; security advisory delivery remains separate future work.
 
 ## Current milestone: 0.3.0
 

@@ -1,0 +1,183 @@
+import type {
+  CatalogMod,
+  ManagementTransport,
+  ModView,
+  PackageOperation,
+} from '../lib/management';
+export function fixtureManagement(
+  changed: (data: ModView) => void,
+): ManagementTransport {
+  const populated = new URLSearchParams(location.search).has('mods');
+  const count = new URLSearchParams(location.search).has('large') ? 1200 : 4;
+  const mods: CatalogMod[] = populated
+    ? Array.from({ length: count }, (_, i) => ({
+        id: `fixture.mod${i}`,
+        name:
+          [
+            'Terrain tools fixture',
+            'Core library fixture',
+            'Withdrawn fixture',
+            'Failed transfer fixture',
+          ][i] ?? `Mod fixture ${i}`,
+        author: 'Test fixture',
+        sourceUrl: 'https://example.invalid/source',
+        description:
+          'Inert test data for the management screens. No author mod is downloaded or executed.',
+        unmaintained: i === 0,
+        releases: [
+          {
+            id: `fixture.mod${i}.1`,
+            version: '1.0',
+            withdrawn: i === 2,
+            withdrawalReason: i === 2 ? 'Author removed this release.' : null,
+            compatibilityProblems:
+              i === 1
+                ? [
+                    {
+                      gameBuild: 'Steam 123 · Unity fixture',
+                      note: 'Fixture conflict with this build.',
+                      sourceUrl: 'https://example.invalid/report',
+                    },
+                  ]
+                : [],
+            testedGameBuilds: ['Steam 100 · Unity fixture'],
+            requires: [],
+            artifact: {
+              url: 'https://example.invalid/package.zip',
+              sha256: i.toString(16).padStart(64, '0'),
+              sizeBytes: 10485760,
+              layout: {
+                kind: 'starframe_managed_zip',
+                root: 'package',
+                entryAssembly: 'Mod.dll',
+                entryType: 'Fixture.Mod',
+              },
+            },
+          },
+        ],
+      }))
+    : [];
+  const data: ModView = {
+    revision: '0',
+    catalog: { schemaVersion: 1, catalogRevision: '1', mods },
+    library: mods.slice(0, 3).map((m) => ({
+      name: m.name,
+      author: m.author,
+      version: m.releases[0].version,
+      reference: {
+        modId: m.id,
+        hash: m.releases[0].artifact.sha256,
+        origin: 'catalog',
+        releaseId: m.releases[0].id,
+      },
+    })),
+    enabled: [],
+    collections: [],
+    cleanupErrors: [],
+  };
+  const operations: PackageOperation[] = [];
+  const commit = () => {
+    data.revision = String(BigInt(data.revision) + 1n);
+    changed(data);
+  };
+  return {
+    async mods(action) {
+      if (action.kind === 'set_enabled' || action.kind === 'uninstall') {
+        if (action.expectedRevision !== data.revision)
+          throw new Error(
+            'The library changed. Retry with its current revision.',
+          );
+        const entry = data.library.find(
+          (e) =>
+            e.reference.modId === action.modId &&
+            e.reference.hash === action.hash,
+        );
+        if (!entry) throw new Error('Exact release is not installed.');
+        data.enabled = data.enabled.filter((r) => r.modId !== action.modId);
+        if (action.kind === 'set_enabled' && action.enabled)
+          data.enabled.push(entry.reference);
+        if (action.kind === 'uninstall')
+          data.library = data.library.filter((e) => e !== entry);
+        data.collections = [
+          {
+            id: 'default',
+            name: 'Default',
+            revision: 1,
+            entries: [...data.enabled],
+          },
+        ];
+        commit();
+      }
+      return structuredClone(data);
+    },
+    async packages(action) {
+      if (action.kind === 'prepare') {
+        const mod = mods.find((m) =>
+          m.releases.some((r) => r.id === action.releaseId),
+        );
+        const release = mod?.releases[0];
+        if (!release || release.withdrawn)
+          throw new Error('Release withdrawn. New downloads are blocked.');
+        if (
+          operations.some(
+            (o) =>
+              o.releaseId === release.id &&
+              (o.status === 'preparing' || o.status === 'cancelling'),
+          )
+        )
+          throw new Error('This release is already being prepared.');
+        const op: PackageOperation = {
+          id: crypto.randomUUID(),
+          requestId: action.requestId,
+          releaseId: release.id,
+          hash: release.artifact.sha256,
+          status: 'preparing',
+          message: 'Downloading fixture bytes…',
+          receivedBytes: 0,
+          totalBytes: release.artifact.sizeBytes,
+        };
+        operations.unshift(op);
+        const timer = setInterval(() => {
+          if (op.status !== 'preparing') {
+            clearInterval(timer);
+            return;
+          }
+          op.receivedBytes += 1048576;
+          if (
+            op.receivedBytes >= op.totalBytes / 2 &&
+            release.id === 'fixture.mod3.1'
+          ) {
+            op.status = 'failed';
+            op.message =
+              'Download unavailable: HTTP 404. Retry or check the author source.';
+            clearInterval(timer);
+          } else if (op.receivedBytes >= op.totalBytes) {
+            op.status = 'completed';
+            op.message = 'Package verified in the library.';
+            if (!data.library.some((e) => e.reference.hash === op.hash))
+              data.library.push({
+                name: mod!.name,
+                author: mod!.author,
+                version: release.version,
+                reference: {
+                  modId: mod!.id,
+                  hash: op.hash,
+                  origin: 'catalog',
+                  releaseId: release.id,
+                },
+              });
+            commit();
+            clearInterval(timer);
+          }
+        }, 400);
+      } else if (action.kind === 'cancel') {
+        const op = operations.find((o) => o.id === action.operationId);
+        if (op?.status === 'preparing') {
+          op.status = 'cancelled';
+          op.message = 'Cancelled. No game files changed.';
+        }
+      }
+      return structuredClone(operations);
+    },
+  };
+}

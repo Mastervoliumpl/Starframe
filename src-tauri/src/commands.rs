@@ -71,9 +71,29 @@ pub fn external_url(page: &str) -> Result<&'static str, CommandError> {
 }
 
 #[tauri::command]
-pub fn open_external(app: tauri::AppHandle, page: String) -> Result<(), CommandError> {
+pub async fn open_external(
+    app: tauri::AppHandle,
+    service: State<'_, crate::game_service::GameService>,
+    page: String,
+) -> Result<(), CommandError> {
+    let url = if let Some(id) = page.strip_prefix("mod:") {
+        service
+            .mods(starframe::mods::Action::List)
+            .await?
+            .catalog
+            .and_then(|catalog| catalog.mods.into_iter().find(|m| m.id == id))
+            .map(|m| m.source_url)
+            .ok_or_else(|| {
+                CommandError::new(
+                    "invalid_link",
+                    "This mod source is not in the cached catalog.",
+                )
+            })?
+    } else {
+        external_url(&page)?.to_owned()
+    };
     app.opener()
-        .open_url(external_url(&page)?, None::<&str>)
+        .open_url(url, None::<&str>)
         .map_err(|_| CommandError::new("open_failed", "Could not open the browser. Try again."))
 }
 

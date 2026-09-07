@@ -40,6 +40,7 @@ pub enum Action {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct View {
+    pub catalog: Option<Catalog>,
     pub revision: String,
     pub library: Vec<LibraryEntry>,
     pub enabled: Vec<ModReference>,
@@ -55,6 +56,10 @@ pub fn view(store: &Storage) -> Result<View> {
         .find(|c| Some(&c.id) == records.active_collection.as_ref())
         .map_or(vec![], |c| c.entries.clone());
     Ok(View {
+        catalog: store
+            .catalog_cache()
+            .map_err(|e| e.to_string())?
+            .and_then(|c| c.catalog),
         revision: records.revision.to_string(),
         library: records.library,
         enabled,
@@ -270,7 +275,12 @@ pub fn requested(store: &Storage) -> Result<Value> {
                     .ok_or("Required release metadata is missing.")
             })
             .collect::<std::result::Result<_, _>>()?;
-        mods.push(json!({"modId": reference.mod_id, "source": {"kind":"catalog", "releaseId": release.id}, "root": format!("mods/{}", reference.hash), "entryAssembly": format!("{root}/{entry_assembly}"), "entryType": entry_type, "requires":requires, "files":prepared.files.iter().map(|f| json!({"path":f.path,"sha256":f.sha256})).collect::<Vec<_>>() }));
+        let entry_path = if root.is_empty() {
+            entry_assembly.clone()
+        } else {
+            format!("{root}/{entry_assembly}")
+        };
+        mods.push(json!({"modId": reference.mod_id, "source": {"kind":"catalog", "releaseId": release.id}, "root": format!("mods/{}", reference.hash), "entryAssembly": entry_path, "entryType": entry_type, "requires":requires, "files":prepared.files.iter().map(|f| json!({"path":f.path,"sha256":f.sha256})).collect::<Vec<_>>() }));
     }
     let value = json!({"schemaVersion":2, "runtimeContractVersion":1, "integrationId":"starframe.bepinex", "deploymentRevision":records.revision.to_string(), "installedMods":inventory(&records, entries),"mods":mods});
     runtime_contract::read(

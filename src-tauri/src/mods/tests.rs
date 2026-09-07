@@ -25,7 +25,7 @@ fn fixture() -> (tempfile::TempDir, Storage, Vec<LibraryEntry>) {
             author: "Fixture".into(),
             version: "1".into(),
         };
-        mods.push(json!({"id":id,"name":id,"author":"Fixture","sourceUrl":"https://example.invalid/source","releases":[{"id":release_id,"version":"1","withdrawn":false,"testedGameBuilds":[],"requires":if index == 0 {vec![]} else {vec!["fixture.core.1"]},"artifact":{"url":"https://example.invalid/package.zip","sha256":artifact_hash,"sizeBytes":10,"layout":{"kind":"starframe_managed_zip","root":"package","entryAssembly":"Fixture.dll","entryType":"Fixture.Entry"}}}]}));
+        mods.push(json!({"id":id,"name":id,"author":"Fixture","sourceUrl":"https://example.invalid/source","releases":[{"id":release_id,"version":"1","withdrawn":false,"testedGameBuilds":[],"requires":if index == 0 {vec![]} else {vec!["fixture.core.1"]},"artifact":{"url":"https://example.invalid/package.zip","sha256":artifact_hash,"sizeBytes":10,"layout":{"kind":"starframe_managed_zip","root":if index == 0 {""} else {"package"},"entryAssembly":if index == 0 {"package/Fixture.dll"} else {"Fixture.dll"},"entryType":"Fixture.Entry"}}}]}));
         let path = store
             .artifact_directory(&entry.reference)
             .unwrap()
@@ -134,6 +134,18 @@ fn membership_orders_exact_dependencies_and_survives_restart_and_withdrawal() {
     drop(store);
     let store = Storage::open(temp.path()).unwrap();
     assert!(super::view(&store).unwrap().enabled.is_empty());
+}
+
+#[test]
+fn archive_root_entry_is_relative_in_the_activation_manifest() {
+    let (_temp, mut store, entries) = fixture();
+    enable(&mut store, &entries[0], true);
+    let activation = requested(&store).unwrap();
+    assert_eq!(
+        activation["mods"][0]["entryAssembly"],
+        "package/Fixture.dll"
+    );
+    assert_eq!(payload(&store, &activation).unwrap().len(), 1);
 }
 
 #[test]

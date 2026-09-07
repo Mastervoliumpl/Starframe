@@ -151,6 +151,7 @@ const catalog = {
           id: reference.releaseId,
           version: '1',
           withdrawn: true,
+          withdrawalReason: 'Author removed this fixture release.',
           requires: [],
           testedGameBuilds: [],
           artifact: {
@@ -234,11 +235,27 @@ try {
     data,
     async (page) => {
       await expect.poll(async () => (await list(page)).library.length).toBe(1);
-      await setEnabled(page, true);
+      await page
+        .getByRole('switch', { name: 'Enable Native fixture 1', exact: true })
+        .click();
+      await expect(
+        page.getByRole('switch', {
+          name: 'Enable Native fixture 1',
+          exact: true,
+        }),
+      ).toBeChecked();
       await expect
         .poll(async () => (await activation()).mods.length, { timeout: 30000 })
         .toBe(1);
       expect(await readFile(deployed)).toEqual(bytes);
+      await page.screenshot({ path: 'test-results/native/my-mods-live.png' });
+      await page
+        .getByRole('button', { name: 'Native fixture', exact: true })
+        .click();
+      await page.screenshot({
+        path: 'test-results/native/mod-details-live.png',
+      });
+      await page.getByRole('button', { name: 'Back to list' }).click();
       running = spawn(join(engine, 'Sanctuary.exe'), ['-t', '127.0.0.1'], {
         windowsHide: true,
         stdio: 'ignore',
@@ -286,13 +303,14 @@ try {
         confirmReferences: false,
       }).catch((error) => error);
       expect(error.message).toContain('affects collections');
-      await action(page, {
-        kind: 'uninstall',
-        modId: reference.modId,
-        hash: artifactHash,
-        expectedRevision,
-        confirmReferences: true,
-      });
+      await page
+        .getByRole('button', {
+          name: 'Uninstall Native fixture 1',
+          exact: true,
+        })
+        .click();
+      await expect(page.getByRole('dialog')).toContainText('Default');
+      await page.getByRole('button', { name: 'Confirm uninstall' }).click();
       await expect
         .poll(async () => (await activation()).mods.length, { timeout: 30000 })
         .toBe(0);

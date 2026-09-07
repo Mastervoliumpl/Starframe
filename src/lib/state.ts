@@ -1,11 +1,12 @@
 import { writable } from 'svelte/store';
 import type { Snapshot, GameAction } from './generated/model';
+import type { ManagementTransport } from './management';
 
-export interface Transport {
+export interface Transport extends ManagementTransport {
   watch(receive: (snapshot: Snapshot) => void): Promise<() => void>;
   start(requestId: string, fail: boolean): Promise<string[]>;
   cancel(operationId: string): Promise<void>;
-  open(page: 'repository' | 'releases'): Promise<void>;
+  open(page: string): Promise<void>;
   game(action: GameAction): Promise<void>;
 }
 
@@ -26,7 +27,7 @@ class ResponseTimeout extends Error {
   }
 }
 
-async function confirmed<T>(request: Promise<T>): Promise<T> {
+export async function confirmed<T>(request: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -185,7 +186,7 @@ export function createDesktop(transport: Transport | null) {
           });
       }
     },
-    async open(page: 'repository' | 'releases') {
+    async open(page: string) {
       if (!transport) {
         window.open(
           `https://github.com/Mastervoliumpl/Starframe${page === 'releases' ? '/releases' : ''}`,
