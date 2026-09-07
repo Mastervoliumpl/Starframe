@@ -1,0 +1,151 @@
+use super::*;
+
+impl Storage {
+    pub fn set_mod_membership(&mut self, entries: &[ModReference], expected: i64) -> Result<i64> {
+        if entries.len() > 256 {
+            return Err(Error::Invalid(
+                "This runtime supports at most 256 active mods.".into(),
+            ));
+        }
+        let mut ids = std::collections::HashSet::new();
+        for entry in entries {
+            validate_reference(entry)?;
+            if !ids.insert(&entry.mod_id) {
+                return Err(Error::Invalid(
+                    "Only one version of a mod can be enabled.".into(),
+                ));
+            }
+        }
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let result = (|| {
+            check_revision(&tx, expected)?;
+            let selected: Option<String> = tx.query_row(
+                "SELECT active_collection FROM preferences WHERE id=1",
+                [],
+                |r| r.get(0),
+            )?;
+            let id = selected.unwrap_or_else(|| Uuid::new_v4().to_string());
+            tx.execute("INSERT INTO collections (id,name,revision) VALUES (?, 'Default', 1) ON CONFLICT(id) DO UPDATE SET revision=revision+1", [&id])?;
+            tx.execute(
+                "UPDATE preferences SET active_collection=? WHERE id=1",
+                [&id],
+            )?;
+            tx.execute(
+                "DELETE FROM collection_entries WHERE collection_id=?",
+                [&id],
+            )?;
+            for (position, entry) in entries.iter().enumerate() {
+                tx.execute("INSERT INTO collection_entries (collection_id,position,mod_id,hash,origin,release_id) VALUES (?,?,?,?,?,?)", rusqlite::params![id, position as i64, entry.mod_id, entry.hash, entry.origin.as_str(), entry.release_id])?;
+            }
+            bump(&tx)
+        })();
+        finish(tx, result)
+    }
+
+    pub fn uninstall_mod(
+        &mut self,
+        mod_id: &str,
+        hash: &str,
+        expected: i64,
+        confirmed: bool,
+    ) -> Result<i64> {
+        let records = self.load()?;
+        if records.revision != expected {
+            return Err(Error::Invalid(
+                "The library changed. Retry with its current revision.".into(),
+            ));
+        }
+        let entry = records
+            .library
+            .iter()
+            .find(|e| e.reference.mod_id == mod_id && e.reference.hash == hash)
+            .ok_or_else(|| Error::Invalid("This exact package is not in the library.".into()))?;
+        validate_reference(&entry.reference)?;
+        let affected: Vec<_> = records
+            .collections
+            .iter()
+            .filter(|c| {
+                c.entries
+                    .iter()
+                    .any(|r| r.mod_id == mod_id && r.hash == hash)
+            })
+            .map(|c| c.name.as_str())
+            .collect();
+        if !affected.is_empty() && !confirmed {
+            return Err(Error::Invalid(format!(
+                "Uninstall affects collections: {}. Confirm removal; other collections will retain an unresolved reference.",
+                affected.join(", ")
+            )));
+        }
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let result = (|| {
+            check_revision(&tx, expected)?;
+            if let Some(active) = records
+                .collections
+                .iter()
+                .find(|c| Some(&c.id) == records.active_collection.as_ref())
+            {
+                let remaining: Vec<_> = active
+                    .entries
+                    .iter()
+                    .filter(|r| !(r.mod_id == mod_id && r.hash == hash))
+                    .collect();
+                tx.execute(
+                    "DELETE FROM collection_entries WHERE collection_id=?",
+                    [&active.id],
+                )?;
+                for (position, entry) in remaining.iter().enumerate() {
+                    tx.execute("INSERT INTO collection_entries (collection_id,position,mod_id,hash,origin,release_id) VALUES (?,?,?,?,?,?)", rusqlite::params![active.id, position as i64, entry.mod_id, entry.hash, entry.origin.as_str(), entry.release_id])?;
+                }
+                tx.execute(
+                    "UPDATE collections SET revision=revision+1 WHERE id=?",
+                    [&active.id],
+                )?;
+            }
+            tx.execute(
+                "DELETE FROM library WHERE mod_id=? AND hash=?",
+                [mod_id, hash],
+            )?;
+            if tx.query_row("SELECT count(*) FROM library WHERE hash=?", [hash], |r| {
+                r.get::<_, i64>(0)
+            })? == 0
+            {
+                tx.execute(
+                    "INSERT OR IGNORE INTO pending_removals(hash) VALUES (?)",
+                    [hash],
+                )?;
+            }
+            bump(&tx)
+        })();
+        finish(tx, result)
+    }
+
+    pub(crate) fn pending_removals(&self) -> Result<Vec<(String, String)>> {
+        self.conn
+            .prepare("SELECT hash,error FROM pending_removals ORDER BY hash")?
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<std::result::Result<_, _>>()
+            .map_err(Error::from)
+    }
+
+    pub(crate) fn finish_removal(&mut self, hash: &str, error: Option<&str>) -> Result<()> {
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if let Some(error) = error {
+            tx.execute(
+                "UPDATE pending_removals SET error=? WHERE hash=?",
+                [error, hash],
+            )?;
+        } else {
+            tx.execute("DELETE FROM prepared_artifacts WHERE hash=?", [hash])?;
+            tx.execute("DELETE FROM pending_removals WHERE hash=?", [hash])?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+}

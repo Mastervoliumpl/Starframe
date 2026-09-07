@@ -65,6 +65,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@94196ee1d15439c1b6651cd87ef14e88ec435966
         with:
           node-version-file: .node-version
@@ -80,9 +81,16 @@ jobs:
       - name: Prepare WebView2 for native tests
         timeout-minutes: 5
         run: ./scripts/prepare_windows_tests.ps1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
       - run: npm ci
       - run: npm run build
       - run: npm run check:rust
+      - name: Validate catalog and retained release identities
+        env:
+          CATALOG_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
+        run: cargo run --manifest-path src-tauri/Cargo.toml --locked --bin check_catalog -- catalog/releases.json --git-base $env:CATALOG_BASE
       - run: npm run tauri -- build --debug --no-bundle -- --locked
       - run: npm run test:native
       - run: npm run tauri -- build --no-bundle -- --locked

@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-Completed milestones: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)**, **[0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9)**, **[0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2)**, **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)** and **[0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3)**. Current product version: **0.2.0**, an internal desktop/runtime build. No app release or installer has been published. Milestone **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)** is complete; [SQLite recovery and build evidence](docs/verification/sqlite.md) records its exit checks. Milestone **[0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3)** is complete; [exit evidence](docs/verification/milestone-0.2.0.md) records its checks. Milestone 0.3.0 remains planned.
+Completed milestones: **0.0.1**, **0.0.2**, **0.1.0**, **0.1.1**, **0.2.0** and **[0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4)**. This change finalizes the internal 0.3.0 build; [exit evidence](docs/verification/milestone-0.3.0.md) records the delivered workflow and limits. No app release or installer is published. Milestone 0.4.0 remains planned until the owner starts it.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -13,13 +13,15 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | [0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2) | Desktop foundation | Complete |
 | [0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10) | Replace Turso with bundled SQLite and preserve existing data | Complete |
 | [0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3) | Starframe in-game runtime | Complete |
-| [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Planned |
+| [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Complete |
 | [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Planned |
 | [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Planned |
 | [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Planned |
 | [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Native game integration | Blocked on official game API |
 
 AI-package support is deferred until the game provides suitable AI extension/selection facilities. Automated replacement of the shipped AI is outside the current scope. Assign that work to a future milestone after those facilities can be verified; it is not a promised 0.7.0 feature.
+
+[Security scope](SECURITY.md) keeps 0.3.0 focused on the internal mod lifecycle, accurate status messages, disk/write recovery checks and separate dependency auditing. Catalog signing/advisory delivery must precede public catalog access; Windows signing and hosted release approval remain in 0.6.0 unless distribution moves earlier. Broader fuzzing and detailed compatibility reporting are follow-up work. Publishing an empty development catalog is not approval to open a live catalog to general users.
 
 Versions describe bounded outcomes, not dates. The native integration target may move when the official API becomes available; it must not block corrective releases to existing features. Add a patch milestone such as `0.6.1` when a released version needs fixes. Finish or explicitly pause the active milestone before changing focus.
 
@@ -75,7 +77,7 @@ The package investigation in #13 explicitly includes managed DLLs, conventional 
 
 ### 0.3.0: Curated mod management
 
-Planned; starts after 0.2.0 closes. Deliver independently refreshed catalog data, verified package preparation, install/enable/disable/uninstall, version warnings and Downloads. Exit: an approved release completes the full lifecycle with interruption and file-ownership checks.
+Complete. Version 0.3.0 delivers catalog refresh, verified downloads, installed-mod lifecycle and live management screens. [Exit evidence](docs/verification/milestone-0.3.0.md) records checks and limits. The initial catalog is empty; public catalog access and installer delivery remain separate gates.
 
 - [#16: Publish and refresh the curated release catalog independently](https://github.com/Mastervoliumpl/Starframe/issues/16)
 - [#17: Download and prepare approved packages safely](https://github.com/Mastervoliumpl/Starframe/issues/17)
@@ -100,6 +102,8 @@ Planned; starts after 0.4.0 closes. Deliver local DLL/folder imports, normal man
 - [#26: Verify the local developer workflow and document its limits](https://github.com/Mastervoliumpl/Starframe/issues/26)
 
 ### 0.6.0: Windows alpha distribution
+
+Pre-publication follow-ups: [#46: Catalog authentication and security advisory delivery](https://github.com/Mastervoliumpl/Starframe/issues/46) and [#47: Broader archive/path fuzzing](https://github.com/Mastervoliumpl/Starframe/issues/47). Move the relevant gate forward if public distribution starts earlier; neither blocks internal 0.3.0 implementation.
 
 Planned; starts after 0.5.0 closes. Deliver signed user-initiated updates, NSIS install/uninstall, release checks and user documentation. Exit: whole-app Windows verification passes and a draft installer release is reviewable. Publishing remains a maintainer action.
 

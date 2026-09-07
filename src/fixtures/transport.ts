@@ -1,6 +1,7 @@
 import type { Snapshot } from '../lib/generated/model';
 import type { Transport } from '../lib/state';
 import { version } from '../../package.json';
+import { fixtureManagement } from './management';
 
 // Browser tests opt into this fixture with ?fixture; production builds omit it.
 export function fixtureTransport(): Transport {
@@ -9,6 +10,14 @@ export function fixtureTransport(): Transport {
     revision: '0',
     appVersion: version,
     operations: [],
+    catalog: {
+      revision: '1',
+      releaseCount: 0,
+      checking: false,
+      lastChecked: null,
+      lastSuccess: null,
+      error: null,
+    },
     game: {
       launch: {
         phase: 'setup_required',
@@ -31,16 +40,46 @@ export function fixtureTransport(): Transport {
       activeCollectionName: null,
     },
   };
+  const catalogCase = new URLSearchParams(location.search).get('catalog');
+  if (catalogCase === 'offline') {
+    snapshot.catalog.lastChecked = '1788820000';
+    snapshot.catalog.lastSuccess = '1788819700';
+    snapshot.catalog.error =
+      'Fixture connection failed. Starframe will retry automatically.';
+  } else if (catalogCase === 'update') {
+    snapshot.catalog.checking = true;
+  }
   let receiver: ((snapshot: Snapshot) => void) | undefined;
   let work: ReturnType<typeof setInterval>;
   const publish = () => receiver?.(structuredClone(snapshot));
   return {
+    ...fixtureManagement((data) => {
+      snapshot.savedData = {
+        status: 'ready',
+        revision: data.revision,
+        libraryCount: data.library.length,
+        collectionCount: data.collections.length,
+        activeCollectionName: data.collections[0]?.name ?? null,
+      };
+      snapshot.revision = String(BigInt(snapshot.revision) + 1n);
+      publish();
+    }),
     async watch(receive) {
       receiver = receive;
       publish();
       const heartbeat = setInterval(publish, 2000);
+      const catalogUpdate =
+        catalogCase === 'update'
+          ? setTimeout(() => {
+              snapshot.catalog.revision = '2';
+              snapshot.catalog.checking = false;
+              snapshot.revision = String(Number(snapshot.revision) + 1);
+              publish();
+            }, 1500)
+          : undefined;
       return () => {
         clearInterval(heartbeat);
+        clearTimeout(catalogUpdate);
         if (receiver === receive) receiver = undefined;
       };
     },

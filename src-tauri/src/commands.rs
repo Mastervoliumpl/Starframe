@@ -6,6 +6,22 @@ use tauri::{State, ipc::Channel};
 use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
+pub async fn mod_action(
+    service: State<'_, crate::game_service::GameService>,
+    action: starframe::mods::Action,
+) -> Result<starframe::mods::View, CommandError> {
+    service.mods(action).await
+}
+
+#[tauri::command]
+pub async fn package_action(
+    service: State<'_, crate::game_service::GameService>,
+    action: starframe::packages::Action,
+) -> Result<Vec<starframe::packages::Operation>, CommandError> {
+    service.package(action).await
+}
+
+#[tauri::command]
 pub fn game_action(
     app: tauri::AppHandle,
     service: State<'_, crate::game_service::GameService>,
@@ -55,9 +71,29 @@ pub fn external_url(page: &str) -> Result<&'static str, CommandError> {
 }
 
 #[tauri::command]
-pub fn open_external(app: tauri::AppHandle, page: String) -> Result<(), CommandError> {
+pub async fn open_external(
+    app: tauri::AppHandle,
+    service: State<'_, crate::game_service::GameService>,
+    page: String,
+) -> Result<(), CommandError> {
+    let url = if let Some(id) = page.strip_prefix("mod:") {
+        service
+            .mods(starframe::mods::Action::List)
+            .await?
+            .catalog
+            .and_then(|catalog| catalog.mods.into_iter().find(|m| m.id == id))
+            .map(|m| m.source_url)
+            .ok_or_else(|| {
+                CommandError::new(
+                    "invalid_link",
+                    "This mod source is not in the cached catalog.",
+                )
+            })?
+    } else {
+        external_url(&page)?.to_owned()
+    };
     app.opener()
-        .open_url(external_url(&page)?, None::<&str>)
+        .open_url(url, None::<&str>)
         .map_err(|_| CommandError::new("open_failed", "Could not open the browser. Try again."))
 }
 

@@ -5,6 +5,9 @@
   import DiagnosticList from './features/DiagnosticList.svelte';
   import GameSettings from './features/GameSettings.svelte';
   import LaunchBar from './features/LaunchBar.svelte';
+  import ModList from './features/ModList.svelte';
+  import PackageDownloads from './features/PackageDownloads.svelte';
+  import { createManagement } from './lib/management';
   import { createDesktop } from './lib/state';
   import { getTransport } from './lib/native';
 
@@ -19,11 +22,16 @@
   type Page = (typeof pages)[number]['id'];
   let page = $state<Page>('mods');
   let desktop = $state(createDesktop(null));
+  let manager = $state(createManagement(null));
   let drawer: HTMLDialogElement;
   let menu: HTMLButtonElement;
   let heading: HTMLHeadingElement;
   let fail = $state(false);
   const operations = $derived($desktop.snapshot?.operations ?? []);
+  const catalog = $derived($desktop.snapshot?.catalog);
+  const managementError = $derived(
+    $desktop.snapshot?.savedData.status === 'unavailable' ? '' : $manager.error,
+  );
   const activeCollection = $derived(
     $desktop.snapshot?.savedData.status === 'ready'
       ? ($desktop.snapshot.savedData.activeCollectionName ?? 'None')
@@ -60,9 +68,12 @@
   onMount(() => {
     let disposed = false;
     let stop: (() => void) | undefined;
+    let stopManagement: (() => void) | undefined;
     void getTransport().then((transport) => {
       if (disposed) return;
       desktop = createDesktop(transport);
+      manager = createManagement(transport);
+      stopManagement = manager.start();
       stop = desktop.startWatching();
     });
     const wide = matchMedia('(min-width: 900px)');
@@ -76,6 +87,7 @@
     return () => {
       disposed = true;
       stop?.();
+      stopManagement?.();
       wide.removeEventListener('change', closeDrawer);
     };
   });
@@ -138,26 +150,67 @@
       <section class="page" hidden={page !== 'mods'} aria-label="My mods">
         <div class="toolbar">
           <p>Active collection: <strong>{activeCollection}</strong></p>
-          <p class="muted">Library management coming later</p>
+          <p class="muted">Switches change the active collection.</p>
         </div>
-        <div class="empty-state">
-          <h2>Saved library</h2>
-          <p>Mod management is not available in this build.</p>
-          <button onclick={() => navigate('catalog')}>Browse catalog</button>
-        </div>
+        {#if managementError}<p class="error" role="alert">
+            {managementError}<button onclick={() => manager.dismissError()}
+              >Dismiss</button
+            >
+          </p>{/if}
+        <ModList
+          mode="mods"
+          {manager}
+          game={$desktop.snapshot?.game}
+          unavailable={$desktop.connection !== 'connected'}
+          onsource={(id) => desktop.open(`mod:${id}`)}
+        />
       </section>
       <section class="page" hidden={page !== 'catalog'} aria-label="Catalog">
-        <div class="empty-state">
-          <h2>The catalog is not connected yet</h2>
+        <div class="catalog-status">
+          <h2>Approved release catalog</h2>
+          <p role="status" aria-live={page === 'catalog' ? 'polite' : 'off'}>
+            {#if catalog?.checking}
+              Checking for catalog changes…
+            {:else if catalog?.revision}
+              Catalog revision {catalog.revision}. {catalog.releaseCount} approved
+              releases.
+            {:else}
+              No catalog is cached yet.
+            {/if}
+          </p>
+          {#if catalog?.error}
+            <p class="error" role="alert">{catalog.error}</p>
+            {#if catalog.revision}<p>
+                Cached revision {catalog.revision} remains available.
+              </p>{/if}
+          {/if}
+          {#if catalog?.lastSuccess}
+            <p class="muted">
+              Last successful check: {new Date(
+                Number(catalog.lastSuccess) * 1000,
+              ).toLocaleString()}
+            </p>
+          {/if}
           <p>
-            Approved releases will appear here. Downloads will come from their
-            authors. Curation does not guarantee that a binary is free of
-            malware.
+            Downloads come from authors. Curation does not guarantee that a
+            binary is free of malware.
           </p>
           <button onclick={() => desktop.open('repository')}
             >View Starframe on GitHub</button
           >
         </div>
+        {#if managementError}<p class="error" role="alert">
+            {managementError}<button onclick={() => manager.dismissError()}
+              >Dismiss</button
+            >
+          </p>{/if}
+        <ModList
+          mode="catalog"
+          {manager}
+          game={$desktop.snapshot?.game}
+          unavailable={$desktop.connection !== 'connected'}
+          onsource={(id) => desktop.open(`mod:${id}`)}
+        />
       </section>
       <section
         class="page"
@@ -177,8 +230,17 @@
         hidden={page !== 'downloads'}
         aria-label="Downloads"
       >
+        {#if managementError}<p class="error" role="alert">
+            {managementError}<button onclick={() => manager.dismissError()}
+              >Dismiss</button
+            >
+          </p>{/if}
+        <PackageDownloads
+          {manager}
+          unavailable={$desktop.connection !== 'connected'}
+        />
         <div class="toolbar">
-          <p>Operations</p>
+          <p>Responsiveness diagnostics</p>
           <p class="muted">
             {$desktop.connection !== 'connected'
               ? 'Actions wait for the desktop connection.'

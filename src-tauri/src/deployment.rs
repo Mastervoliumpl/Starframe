@@ -9,6 +9,11 @@ use std::{
 };
 use uuid::Uuid;
 
+mod content;
+#[cfg(test)]
+mod stream_tests;
+pub(crate) use content::Source;
+
 type Result<T> = std::result::Result<T, String>;
 type Files = BTreeMap<String, String>;
 const MAX_FILE: u64 = 8_388_608;
@@ -42,8 +47,8 @@ fn relative(value: &str) -> Result<()> {
     crate::runtime_contract::relative_path(value).map(|_| ())
 }
 fn validate_files(files: &Files) -> Result<()> {
-    if files.len() > 512 {
-        return Err("Too many bootstrap files.".into());
+    if files.len() > 8704 {
+        return Err("Too many deployment files.".into());
     }
     let mut paths = BTreeSet::new();
     for (path, digest) in files {
@@ -116,7 +121,7 @@ struct Engine {
     pins: Vec<File>,
     pinned: BTreeSet<PathBuf>,
 }
-fn regular_metadata(path: &Path, directory: bool) -> Result<fs::Metadata> {
+pub(crate) fn regular_metadata(path: &Path, directory: bool) -> Result<fs::Metadata> {
     let metadata = fs::symlink_metadata(path).map_err(|e| format!("{}: {e}", path.display()))?;
     #[cfg(windows)]
     {
@@ -136,7 +141,7 @@ fn regular_metadata(path: &Path, directory: bool) -> Result<fs::Metadata> {
     }
     Ok(metadata)
 }
-fn pin(path: &Path) -> Result<File> {
+pub(crate) fn pin(path: &Path) -> Result<File> {
     regular_metadata(path, true)?;
     let mut options = OpenOptions::new();
     options.read(true);
@@ -245,13 +250,13 @@ impl Engine {
         path: &str,
         guard: &mut impl FnMut() -> Result<()>,
     ) -> Result<Option<String>> {
-        Ok(read(&self.path(path, false, guard)?)?.map(|v| hash(&v)))
+        content::digest_file(&self.path(path, false, guard)?)
     }
     fn replace(
         &mut self,
         path: &str,
         expected: Option<&String>,
-        bytes: Option<&[u8]>,
+        bytes: Option<Box<dyn Read>>,
         guard: &mut impl FnMut() -> Result<()>,
         event: &mut impl FnMut(&str) -> Result<()>,
     ) -> Result<()> {
@@ -262,14 +267,18 @@ impl Engine {
                 "Repair required: {path} changed outside this operation. Files and backups were retained."
             ));
         }
-        if let Some(bytes) = bytes {
+        if let Some(mut bytes) = bytes {
             let temp = destination.with_file_name(format!(".starframe-{}.tmp", Uuid::new_v4()));
             let mut file = OpenOptions::new()
                 .write(true)
                 .create_new(true)
                 .open(&temp)
                 .map_err(|e| e.to_string())?;
-            file.write_all(bytes).map_err(|e| e.to_string())?;
+            let size = std::io::copy(&mut (&mut bytes).take(content::FILE_LIMIT + 1), &mut file)
+                .map_err(|e| e.to_string())?;
+            if size > content::FILE_LIMIT {
+                return Err("Deployment content exceeds its size limit.".into());
+            }
             file.sync_all().map_err(|e| e.to_string())?;
             drop(file);
             event("temporary-written")?;
@@ -341,9 +350,9 @@ fn rollback(
             ));
         }
         let bytes = before
-            .map(|hash| store.deployment_blob(hash).map_err(|e| e.to_string()))
+            .map(|hash| content::reader(store, hash))
             .transpose()?;
-        engine.replace(&path, after, bytes.as_deref(), guard, event)?;
+        engine.replace(&path, after, bytes, guard, event)?;
     }
     for (path, expected) in &record.owned {
         if engine.digest(path, guard)?.as_ref() != Some(expected) {
@@ -364,6 +373,28 @@ fn apply(
     guard: &mut impl FnMut() -> Result<()>,
     event: &mut impl FnMut(&str) -> Result<()>,
 ) -> Result<usize> {
+    if files.iter().map(|(_, bytes)| bytes.len()).sum::<usize>() > MAX_TOTAL {
+        return Err("Oversized bootstrap payload.".into());
+    }
+    apply_sources(
+        store,
+        engine,
+        files
+            .into_iter()
+            .map(|(path, bytes)| (path, Source::Bytes(bytes)))
+            .collect(),
+        guard,
+        event,
+    )
+}
+
+fn apply_sources(
+    store: &mut Storage,
+    engine: &mut Engine,
+    files: Vec<(String, Source)>,
+    guard: &mut impl FnMut() -> Result<()>,
+    event: &mut impl FnMut(&str) -> Result<()>,
+) -> Result<usize> {
     guard()?;
     let mut record = load(store, &engine.root)?;
     if record.pending.is_some() {
@@ -371,28 +402,51 @@ fn apply(
     }
     let mut desired = Files::new();
     let mut blobs = Vec::new();
-    let mut total = 0;
-    for (path, bytes) in files {
-        total += bytes.len();
-        if bytes.len() as u64 > MAX_FILE
-            || total > MAX_TOTAL
-            || desired.insert(path, hash(&bytes)).is_some()
-        {
-            return Err("Invalid or oversized bootstrap payload.".into());
+    let mut total = 0u64;
+    for (path, source) in files {
+        guard()?;
+        let (digest, size) = match source {
+            Source::Bytes(bytes) => {
+                if bytes.len() as u64 > MAX_FILE {
+                    return Err("Oversized bootstrap file.".into());
+                }
+                let digest = hash(&bytes);
+                let size = bytes.len() as u64;
+                blobs.push((digest.clone(), bytes));
+                (digest, size)
+            }
+            Source::File { path, hash, size } => {
+                content::retain_file(store, &path, &hash, size)?;
+                (hash, size)
+            }
+        };
+        total = total.checked_add(size).ok_or("Deployment size overflow.")?;
+        if total > content::TOTAL_LIMIT || desired.insert(path, digest).is_some() {
+            return Err("Invalid or oversized deployment payload.".into());
         }
-        blobs.push((hash(&bytes), bytes));
     }
     validate_files(&desired)?;
     let mut next = Files::new();
     let mut borrowed = Files::new();
     for (path, expected) in &record.owned {
-        let current = read(&engine.path(path, false, guard)?)?;
-        if current.as_ref().map(|v| hash(v)).as_ref() != Some(expected) {
+        let current = engine.path(path, false, guard)?;
+        if content::digest_file(&current)?.as_ref() != Some(expected) {
             return Err(format!(
                 "Repair required: owned file {path} changed or is missing. It was retained."
             ));
         }
-        blobs.push((expected.clone(), current.unwrap()));
+        let size = regular_metadata(&current, false)?.len();
+        if size <= MAX_FILE
+            && !store
+                .package_root()
+                .join("deployment-content")
+                .join(expected)
+                .exists()
+        {
+            blobs.push((expected.clone(), read(&current)?.unwrap()));
+        } else {
+            content::retain_file(store, &current, expected, size)?;
+        }
     }
     for (path, expected) in desired {
         if record.owned.contains_key(&path) {
@@ -413,6 +467,15 @@ fn apply(
             }
         }
     }
+    crate::space::require(&engine.root, total)?;
+    crate::space::require(
+        store.package_root(),
+        blobs
+            .iter()
+            .map(|(_, bytes)| bytes.len() as u64)
+            .sum::<u64>()
+            .saturating_mul(3),
+    )?;
     record.pending = Some(Journal {
         id: Uuid::new_v4(),
         next,
@@ -421,20 +484,15 @@ fn apply(
     save(store, &engine.root, &record, &blobs)?;
     event("journal-committed")?;
     let outcome = (|| {
+        crate::space::require(&engine.root, total)?;
         let pending = record.pending.as_ref().unwrap();
         for path in changed(&record.owned, &pending.next) {
             let bytes = pending
                 .next
                 .get(&path)
-                .map(|hash| store.deployment_blob(hash).map_err(|e| e.to_string()))
+                .map(|hash| content::reader(store, hash))
                 .transpose()?;
-            engine.replace(
-                &path,
-                record.owned.get(&path),
-                bytes.as_deref(),
-                guard,
-                event,
-            )?;
+            engine.replace(&path, record.owned.get(&path), bytes, guard, event)?;
         }
         for (path, expected) in pending.next.iter().chain(pending.borrowed.iter()) {
             if engine.digest(path, guard)?.as_ref() != Some(expected) {
@@ -636,10 +694,8 @@ pub fn prepare_desktop(
         .find(|(p, _)| p == "Starframe/activation.json")
         .unwrap();
     let template = crate::runtime_contract::read(&template.1, "activation")?;
-    if !template["mods"].as_array().unwrap().is_empty()
-        || !activation["mods"].as_array().unwrap().is_empty()
-    {
-        return Err("This build cannot prepare a collection with mods yet. The existing deployment was retained.".into());
+    if !template["mods"].as_array().unwrap().is_empty() {
+        return Err("The distributed runtime template must not contain third-party mods.".into());
     }
     files.retain(|(p, _)| p != "Starframe/activation.json");
     files.push((
@@ -647,6 +703,11 @@ pub fn prepare_desktop(
         serde_json::to_vec(activation).map_err(|e| e.to_string())?,
     ));
     files.extend(payload(&resources.join("bootstrap"))?);
+    let mut files: Vec<_> = files
+        .into_iter()
+        .map(|(path, bytes)| (path, Source::Bytes(bytes)))
+        .collect();
+    files.extend(crate::mods::payload(store, activation)?);
     let mut guard = || {
         if cancelled() {
             return Err("Starframe is closing. Preparation stopped at a safe boundary.".into());
@@ -654,7 +715,7 @@ pub fn prepare_desktop(
         guard_game(game)
     };
     let mut engine = Engine::open(&engine_root(game)?, &mut guard)?;
-    apply(store, &mut engine, files, &mut guard, &mut |_| Ok(()))
+    apply_sources(store, &mut engine, files, &mut guard, &mut |_| Ok(()))
 }
 
 /// Read confirmed ownership without creating directories, locks or game files.
@@ -671,7 +732,7 @@ pub fn prepared_activation(
         return Ok(None);
     };
     for (path, digest) in &record.owned {
-        if read(&root.join(path))?.as_ref().map(|v| hash(v)).as_ref() != Some(digest) {
+        if content::digest_file(&root.join(path))?.as_ref() != Some(digest) {
             return Err(format!(
                 "Repair required: {path} changed or is missing. Files were retained."
             ));

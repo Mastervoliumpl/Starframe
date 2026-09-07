@@ -1,0 +1,83 @@
+name: Dependency security
+
+on:
+  pull_request:
+    paths:
+      - 'package*.json'
+      - 'src-tauri/Cargo.*'
+      - 'runtime/**/*.csproj'
+      - 'runtime/**/packages.lock.json'
+      - 'runtime/*.props'
+      - 'runtime/NuGet.Config'
+      - 'runtime/global.json'
+      - 'runtime/*.slnx'
+      - '.github/workflows/dependencies.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'package*.json'
+      - 'src-tauri/Cargo.*'
+      - 'runtime/**/*.csproj'
+      - 'runtime/**/packages.lock.json'
+      - 'runtime/*.props'
+      - 'runtime/NuGet.Config'
+      - 'runtime/global.json'
+      - 'runtime/*.slnx'
+      - '.github/workflows/dependencies.yml'
+  schedule:
+    - cron: '23 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependencies-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Audit ${{ matrix.ecosystem }} dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        ecosystem: [npm, cargo, nuget]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@94196ee1d15439c1b6651cd87ef14e88ec435966
+        if: matrix.ecosystem == 'npm'
+        with:
+          node-version-file: .node-version
+      - name: Audit npm lockfile without installing or executing packages
+        if: matrix.ecosystem == 'npm'
+        run: npm audit --package-lock-only --ignore-scripts --audit-level=low
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        if: matrix.ecosystem == 'cargo'
+        with:
+          toolchain: 1.98.1
+      - uses: actions/cache@3edfce9056124e459a23f683a21433670d47daca
+        if: matrix.ecosystem == 'cargo'
+        id: audit-tool
+        with:
+          path: ${{ runner.temp }}/cargo-audit
+          key: cargo-audit-0.22.2-${{ runner.os }}-${{ runner.arch }}
+      - name: Install pinned audit tool on cache miss
+        if: matrix.ecosystem == 'cargo' && steps.audit-tool.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --version 0.22.2 --locked --root "$RUNNER_TEMP/cargo-audit"
+      - name: Audit Cargo lockfile against current RustSec advisories
+        if: matrix.ecosystem == 'cargo'
+        run: '"$RUNNER_TEMP/cargo-audit/bin/cargo-audit" audit --file src-tauri/Cargo.lock'
+      - uses: actions/setup-dotnet@bbbb8c9ab609f9ab643834ffe948a0f577bc4c0c
+        if: matrix.ecosystem == 'nuget'
+        with:
+          global-json-file: runtime/global.json
+          cache: true
+          cache-dependency-path: runtime/**/packages.lock.json
+      - name: Audit direct and transitive NuGet packages without building
+        if: matrix.ecosystem == 'nuget'
+        working-directory: runtime
+        run: dotnet restore Starframe.Runtime.slnx --locked-mode --force --no-http-cache -p:NuGetAudit=true -p:NuGetAuditMode=all -p:NuGetAuditLevel=low -warnaserror

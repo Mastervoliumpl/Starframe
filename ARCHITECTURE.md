@@ -193,7 +193,7 @@ sequenceDiagram
 
 An accepted command is not a completed operation. Persisted changes become confirmed only after their commit. Rust assigns operation IDs and recognizes repeated request IDs during the session so a retry does not start a second install. A duplicate pending action reuses its existing operation. After restart, recovery examines saved operation records instead of blindly repeating the request.
 
-For rapid toggles, the frontend shows the latest intent immediately and sends at most one edit per collection at a time, coalescing later edits. Each edit includes the collection revision it was based on. Rust rejects a stale edit with the current revision. The UI preserves the user's draft and reconciles it; it does not silently overwrite a newer edit from an import or another action.
+In 0.3.0 the frontend allows one membership request at a time and shows a pending message until acknowledgement. Switches reflect confirmed membership; navigation, search and selection remain usable. Bulk actions send exact references sequentially using each confirmed saved-data revision. A stale edit stops with an error and retains earlier successful edits. Rust rejects stale revisions instead of silently overwriting a newer change. Coalesced rapid edits and collection priority controls remain 0.4.0 work.
 
 Use async I/O for transfers and bounded background workers for SQLite, extraction, hashing and other synchronous work. Keep the existing single database owner and request queue. Never hold a shared-state lock through network or file work. Simply marking a function async does not make expensive synchronous work nonblocking. Cancellation of blocking work must be cooperative; aborting its async handle cannot stop a blocking task that has already started. [Tokio blocking-task behavior](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
 
@@ -203,7 +203,7 @@ The 0.1.1 build uses bundled SQLite through pinned rusqlite 0.40.2 with default 
 
 The historical 0.1.0 implementation from issue #9 used pinned Turso 0.7.2 with defaults disabled. Its required Windows checks passed. The SQLite decision is based on the accepted workload and dependency reduction, not a failed Turso gate. SQL and ordered migrations live in src-tauri/src/storage.rs. Schema 1 stores library entries, collections, ordered references and a database revision; schema 2 adds active selection; schema 3 adds the selected game installation. References retain exact content independently of local availability. Artifact paths derive from validated lowercase SHA-256 values; binaries remain outside SQL.
 
-The storage module owns one connection and an OS file lock. Short immediate transactions validate expected revisions; failed edits roll back. The app opens storage after creating the shell and publishes ready/error status through the existing channel. Database revisions cross that channel as decimal strings. Library and collection editing commands remain later work.
+The storage module owns one connection and an OS file lock. Short immediate transactions validate expected revisions; failed edits roll back. The app opens storage after creating the shell and publishes ready/error status through the existing channel. Database revisions cross that channel as decimal strings. Issue #18 adds library membership and uninstall commands; named collection editing remains 0.4.0.
 
 SQLite uses WAL, foreign keys, synchronous=FULL, immediate transactions and a 250 ms busy timeout. Backups use SQLite's backup API, sync the completed database and write a completion marker. Schema changes and version updates commit together. Startup validates ownership, engine, version, integrity and logical records. Invalid data produces a visible error without resetting the library.
 
@@ -247,7 +247,7 @@ The initial managed runtime and process-bound reports are implemented in #13. [A
 
 ## 6. Catalog and downloads
 
-Keep `catalog/releases.json` in the Starframe repository and publish it independently of desktop releases. The proposed initial endpoint is `https://raw.githubusercontent.com/Mastervoliumpl/Starframe/main/catalog/releases.json`; it does not exist yet. A maintainer's catalog commit becomes available at that endpoint without rebuilding or updating the app. GitHub/CDN cache timing can delay visibility; the app must not claim instant global propagation.
+Keep `catalog/releases.json` in the Starframe repository and publish it independently of desktop releases. Issue #16 implements the initial empty metadata file and fixes the client endpoint at `https://raw.githubusercontent.com/Mastervoliumpl/Starframe/main/catalog/releases.json`; publication awaits merge to main. [Catalog schema and publication](catalog/README.md) define validation, retained identities, HTTP limits and the SQLite cache. A maintainer's catalog commit becomes available at that endpoint without rebuilding or updating the app. GitHub/CDN cache timing can delay visibility; the app must not claim instant global propagation.
 
 Each approved artifact records a stable release ID, exact URL, SHA-256, expected archive layout, dependencies, ordering metadata, and tested game builds. Separate `schemaVersion`, which controls how to read the file, from `catalogRevision`, which changes when entries change. Adding releases within a supported schema needs no app update. Display author versions as labels; do not assume every author uses semantic versioning.
 
@@ -275,13 +275,15 @@ A newly approved mod release appears live, but never silently replaces versions 
 
 ### Game-version warnings
 
-When a detected game build changes, recalculate the displayed compatibility evidence for each catalog mod. If the last supported build is older, show `Made for a previous game version` with that build and the current build in details. If no useful evidence exists, show `Not checked for this game version`. A lack of testing is not proof that a mod is broken.
+When a detected game build changes, recalculate the displayed compatibility evidence for each catalog mod. Show `Not tested with this version` unless evidence establishes a specific incompatibility, and show tested/current builds in details. An unmaintained mod stays usable with a maintenance label. Maintenance, compatibility, download availability and security findings are separate facts; [security scope](SECURITY.md) defines their behavior and implementation phases. A failed request does not establish withdrawal, and ordinary withdrawal does not block activation of a verified installed copy.
 
 These warnings do not disable a mod, remove it from the collection, or prevent trying a launch. The launch area can summarize warnings with a route to details while keeping launch available. Missing executable files, an unusable loader, missing required dependencies, invalid activation contracts, or an incomplete deployment are separate actionable failures. Do not disguise a game-version mismatch as a hard dependency failure to bypass the warning policy.
 
 Local imports skip catalog release and compatibility-version checks. They still participate in dependency, load-order and structural validation. Preserve any author version label as metadata without turning it into an online update check.
 
 ### Package preparation
+
+Issue #17 implements `packages.rs` and its transfer helper for approved `starframe_managed_zip` artifacts. The existing storage worker owns a three-worker preparation queue and schema-7 operation/file records. A focused `package_action` command accepts release IDs, request IDs and cancellation intent. Files move from private staging to the content-addressed library before a single completion transaction; game deployment remains separate. [Package verification](docs/verification/packages.md) defines enforced limits, recovery and remaining format support.
 
 Extract into private staging, never directly into the game folder. Reject absolute paths, parent traversal, link entries, Windows device/alternate-stream paths, case-insensitive target collisions, and archives exceeding configured file-count or expanded-size limits. Check the final destination and reparse points as well as archive strings. Never run archive-supplied scripts or load a DLL into Starframe to inspect it.
 
@@ -290,6 +292,8 @@ Initial support covers reviewed ZIP layouts and explicit local DLL/folder import
 ## 7. Deploying a collection safely
 
 The library is what the user has locally. A collection is what the user wants enabled. The deployment records what is actually prepared for the game. Keep all three separate.
+
+Issue #18 implements internal managed-package lifecycle commands, automatic stopped-game application and schema-8 uninstall cleanup. [Lifecycle verification](docs/verification/mods.md) records the command boundary, streaming recovery files, space estimates and remaining limits. The existing runtime setup remains explicit; management screens are issue #19. Signing and advisory infrastructure stay outside this internal implementation.
 
 ```mermaid
 flowchart LR
@@ -462,7 +466,7 @@ An explicitly requested installer may run to replace the app after its process e
 
 ## 10. Dependencies and security scope
 
-The repository has no application dependencies yet. The following are candidates to validate when implementing the relevant behavior, not an instruction to install everything now.
+The repository now uses the desktop, runtime, HTTP, archive and SQLite dependencies recorded in its lockfiles. The following table also includes candidates for later work; it is not an instruction to install everything now. [Security scope](SECURITY.md) distinguishes implemented checks, lightweight 0.3.0 work and pre-distribution signing/advisory requirements. Internal development continues without signing; public catalog and installer access require the corresponding checks first.
 
 | Need | Proposed reuse |
 | --- | --- |

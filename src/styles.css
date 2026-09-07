@@ -207,6 +207,196 @@ main {
   padding-top: 48px;
   max-width: 600px;
 }
+.catalog-status {
+  display: grid;
+  gap: 8px;
+  padding-block: 16px;
+}
+.catalog-status > button {
+  justify-self: start;
+}
+.mod-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+.mod-workspace.details-open {
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+.mod-browse {
+  min-width: 0;
+}
+.bulk-actions,
+.pagination,
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding-block: 16px;
+}
+.bulk-actions {
+  min-height: 76px;
+}
+.result-count {
+  padding-block: 12px;
+}
+.mod-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.mod-list > li {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 8px;
+  min-height: 76px;
+  border-block-end: 1px solid var(--selected);
+}
+.mod-list > li:hover {
+  background: var(--surface);
+}
+.mod-list > li.selected {
+  background: var(--selected);
+}
+.mod-summary {
+  flex: 1;
+  min-width: 0;
+}
+.mod-name {
+  border: 0;
+  padding: 0 0 4px;
+  min-height: 32px;
+  background: transparent;
+  text-align: left;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.mod-summary p {
+  font-size: 0.9rem;
+}
+.mod-summary .compatibility {
+  margin-top: 6px;
+}
+.mod-actions {
+  display: grid;
+  gap: 8px;
+  width: 132px;
+  flex-shrink: 0;
+}
+.mod-actions small {
+  overflow-wrap: anywhere;
+}
+.enable-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+.enable-control input {
+  appearance: none;
+  width: 36px;
+  height: 22px;
+  border: 1px solid var(--outline);
+  border-radius: 12px;
+  background: var(--canvas);
+  margin: 0;
+  position: relative;
+}
+.enable-control input::after {
+  content: '';
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--body);
+  position: absolute;
+  left: 3px;
+  top: 3px;
+}
+.enable-control input:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.enable-control input:checked::after {
+  transform: translateX(14px);
+  background: var(--canvas);
+}
+.mod-details {
+  border-inline-start: 1px solid var(--outline);
+  padding-inline-start: 24px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.mod-details h2 {
+  margin-top: 24px;
+}
+.mod-details h3 {
+  margin: 24px 0 8px;
+}
+.mod-details p + p {
+  margin-top: 8px;
+}
+.primary-action {
+  background: var(--accent);
+  color: var(--canvas);
+}
+.uninstall-dialog {
+  width: min(560px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: 24px;
+  background: var(--surface);
+  color: var(--body);
+  border: 1px solid var(--outline);
+  border-radius: 12px;
+}
+.uninstall-dialog p {
+  margin-block: 12px;
+}
+.uninstall-dialog::backdrop {
+  background: #0009;
+}
+.download-title {
+  margin-top: 24px;
+}
+@media (max-width: 1279px) {
+  .mod-workspace.details-open {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .details-open .mod-browse {
+    display: none;
+  }
+  .mod-details {
+    border: 0;
+    padding: 0;
+  }
+}
+@media (max-width: 700px) {
+  .mod-list > li {
+    flex-wrap: wrap;
+  }
+  .mod-summary {
+    flex-basis: calc(100% - 50px);
+  }
+  .mod-actions {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    padding-inline-start: 34px;
+  }
+}
+@media (forced-colors: active) {
+  .enable-control input {
+    appearance: auto;
+  }
+  .enable-control input::after {
+    display: none;
+  }
+}
 .settings-section {
   padding: 24px 0;
   border-top: 1px solid var(--selected);

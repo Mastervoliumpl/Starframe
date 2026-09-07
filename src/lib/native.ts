@@ -3,6 +3,8 @@ import type { Snapshot } from './generated/model';
 import type { Transport } from './state';
 
 const native: Transport = {
+  mods: (action) => invoke('mod_action', { action }),
+  packages: (action) => invoke('package_action', { action }),
   async watch(receive) {
     const channel = new Channel<Snapshot>();
     channel.onmessage = receive;

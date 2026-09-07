@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+No changes yet.
+
+## 0.3.0 - 2026-09-07
+
+Internal curated-mod milestone; no published installer or app release. The metadata-only catalog starts empty.
+
+- Added live My mods, Catalog and Downloads screens with search, details, selection, bulk actions, separate enable switches and confirmed uninstall (#19).
+- Added distinct maintenance, compatibility and withdrawal metadata, author/source links and persistent exact-release download failures. Compatibility warnings allow enable/launch.
+- Added mod enable/disable/uninstall commands, exact dependency preparation, automatic stopped-game deployment and schema-8 uninstall cleanup (#18).
+- Added streamed mod deployment/recovery content, disk-space estimates and lifecycle/lock/interruption fixtures. Ordinary withdrawal preserves verified installed copies and settings.
+- Added separate scheduled/dependency-change audits and a phased security plan. Catalog/advisory signing and Windows release signing remain pre-distribution work.
+
+- Added bounded downloads, exact hash verification, guarded ZIP extraction and immutable package preparation for approved releases (#17).
+- Added schema-7 package history, atomic library completion, cancellation, verified-content reuse and interruption recovery.
+- Added catalog schema 1, stable release validation, exact artifact metadata and withdrawal checks (#16).
+- Added independent catalog refresh with conditional HTTP requests, bounded transfers, automatic retries and a validated SQLite cache. Catalog changes preserve installed releases and collection references.
+- Added live catalog check status and catalog validation to the required Windows CI job. The initial metadata file contains no approved releases.
+
 ## 0.2.0 — 2026-09-07
 
 Internal runtime milestone; no published installer or app release.
