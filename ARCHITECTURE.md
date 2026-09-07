@@ -247,7 +247,7 @@ The initial managed runtime and process-bound reports are implemented in #13. [A
 
 ## 6. Catalog and downloads
 
-Keep `catalog/releases.json` in the Starframe repository and publish it independently of desktop releases. The proposed initial endpoint is `https://raw.githubusercontent.com/Mastervoliumpl/Starframe/main/catalog/releases.json`; it does not exist yet. A maintainer's catalog commit becomes available at that endpoint without rebuilding or updating the app. GitHub/CDN cache timing can delay visibility; the app must not claim instant global propagation.
+Keep `catalog/releases.json` in the Starframe repository and publish it independently of desktop releases. Issue #16 implements the initial empty metadata file and fixes the client endpoint at `https://raw.githubusercontent.com/Mastervoliumpl/Starframe/main/catalog/releases.json`; publication awaits merge to main. [Catalog schema and publication](catalog/README.md) define validation, retained identities, HTTP limits and the SQLite cache. A maintainer's catalog commit becomes available at that endpoint without rebuilding or updating the app. GitHub/CDN cache timing can delay visibility; the app must not claim instant global propagation.
 
 Each approved artifact records a stable release ID, exact URL, SHA-256, expected archive layout, dependencies, ordering metadata, and tested game builds. Separate `schemaVersion`, which controls how to read the file, from `catalogRevision`, which changes when entries change. Adding releases within a supported schema needs no app update. Display author versions as labels; do not assume every author uses semantic versioning.
 

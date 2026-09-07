@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Added catalog schema 1, stable release validation, exact artifact metadata and withdrawal checks (#16).
+- Added independent catalog refresh with conditional HTTP requests, bounded transfers, automatic retries and a validated SQLite cache. Catalog changes preserve installed releases and collection references.
+- Added live catalog check status and catalog validation to the required Windows CI job. The initial metadata file contains no approved releases.
+
 ## 0.2.0 — 2026-09-07
 
 Internal runtime milestone; no published installer or app release.
