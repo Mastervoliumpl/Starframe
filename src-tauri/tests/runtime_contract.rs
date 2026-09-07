@@ -37,3 +37,59 @@ fn shared_runtime_fixtures() {
         .is_err()
     );
 }
+
+#[test]
+fn reports_require_current_process_revision_and_complete_ordered_results() {
+    let activation = runtime_contract::read(
+        include_bytes!("../../contracts/fixtures/activation.json"),
+        "activation",
+    )
+    .unwrap();
+    let report = runtime_contract::read(
+        include_bytes!("../../contracts/fixtures/report.json"),
+        "report",
+    )
+    .unwrap();
+    assert!(runtime_contract::report_matches(
+        &activation,
+        &report,
+        456,
+        "134331234567890000"
+    ));
+    assert!(!runtime_contract::report_matches(
+        &activation,
+        &report,
+        457,
+        "134331234567890000"
+    ));
+    assert!(!runtime_contract::report_matches(
+        &activation,
+        &report,
+        456,
+        "134331234567890001"
+    ));
+    let mut changed = activation.clone();
+    changed["deploymentRevision"] = "13".into();
+    assert!(!runtime_contract::report_matches(
+        &changed,
+        &report,
+        456,
+        "134331234567890000"
+    ));
+    let mut missing = report.clone();
+    missing["mods"] = serde_json::json!([]);
+    assert!(!runtime_contract::report_matches(
+        &activation,
+        &missing,
+        456,
+        "134331234567890000"
+    ));
+    let mut foreign = report.clone();
+    foreign["mods"][0]["modId"] = "different.mod".into();
+    assert!(!runtime_contract::report_matches(
+        &activation,
+        &foreign,
+        456,
+        "134331234567890000"
+    ));
+}

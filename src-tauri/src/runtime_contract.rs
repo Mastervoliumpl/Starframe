@@ -12,7 +12,10 @@ pub fn read(bytes: &[u8], kind: &str) -> Result<Value> {
     require(bytes.len() <= MAX_DOCUMENT_BYTES, "document size")?;
     let Strict(value) = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
     depth(&value, 0)?;
-    require(value["schemaVersion"].as_u64() == Some(1), "schema version")?;
+    require(
+        value["schemaVersion"].as_u64() == Some(if kind == "activation" { 2 } else { 1 }),
+        "schema version",
+    )?;
     require(
         value["runtimeContractVersion"].as_u64() == Some(1),
         "runtime contract version",
@@ -89,18 +92,25 @@ fn activation(root: &Value) -> Result<()> {
             "overlapping roots",
         )?;
         roots.push(directory);
-        let assembly = path(&item["entryAssembly"])?;
-        require(assembly.ends_with(".dll"), "entry assembly")?;
-        let entry = text(&item["entryType"], 256, false)?;
-        require(
-            entry.split('.').all(|part| {
-                !part.is_empty()
-                    && part.bytes().enumerate().all(|(i, c)| {
-                        c == b'_' || c.is_ascii_alphabetic() || (i > 0 && c.is_ascii_digit())
-                    })
-            }),
-            "entry type",
-        )?;
+        let content = item["entryAssembly"].is_null();
+        let assembly = if content {
+            require(item["entryType"].is_null(), "content entry type")?;
+            None
+        } else {
+            let assembly = path(&item["entryAssembly"])?;
+            require(assembly.ends_with(".dll"), "entry assembly")?;
+            let entry = text(&item["entryType"], 256, false)?;
+            require(
+                entry.split('.').all(|part| {
+                    !part.is_empty()
+                        && part.bytes().enumerate().all(|(i, c)| {
+                            c == b'_' || c.is_ascii_alphabetic() || (i > 0 && c.is_ascii_digit())
+                        })
+                }),
+                "entry type",
+            )?;
+            Some(assembly)
+        };
         let mut paths: Vec<String> = Vec::new();
         for file in array(&item["files"], 1024)? {
             fields(file, &["path", "sha256"])?;
@@ -122,7 +132,9 @@ fn activation(root: &Value) -> Result<()> {
             require(total_files <= 8192, "total files")?;
         }
         require(
-            paths.contains(&assembly),
+            assembly
+                .as_ref()
+                .map_or(!paths.is_empty(), |assembly| paths.contains(assembly)),
             "entry assembly missing from files",
         )?;
         let source = &item["source"];
@@ -394,4 +406,21 @@ impl<'de> Deserialize<'de> for Strict {
         }
         deserializer.deserialize_any(StrictVisitor)
     }
+}
+
+/// Bind a parsed report to the selected process and complete prepared activation list.
+pub fn report_matches(activation: &Value, report: &Value, pid: u32, start_file_time: &str) -> bool {
+    report["deploymentRevision"] == activation["deploymentRevision"]
+        && report["processId"].as_u64() == Some(u64::from(pid))
+        && report["processStartFileTime"].as_str() == Some(start_file_time)
+        && activation["mods"]
+            .as_array()
+            .zip(report["mods"].as_array())
+            .is_some_and(|(expected, actual)| {
+                expected.len() == actual.len()
+                    && expected
+                        .iter()
+                        .zip(actual)
+                        .all(|(a, b)| a["modId"] == b["modId"])
+            })
 }

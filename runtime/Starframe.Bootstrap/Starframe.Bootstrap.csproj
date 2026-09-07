@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>netstandard2.1</TargetFramework><CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Starframe.Runtime/Starframe.Runtime.csproj" />
+    <Reference Include="BepInEx"><HintPath>$(BootstrapPath)/BepInEx/core/BepInEx.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(GameManagedPath)/UnityEngine.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameManagedPath)/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <Target Name="RequireGameReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GameManagedPath)/UnityEngine.CoreModule.dll') Or !Exists('$(BootstrapPath)/BepInEx/core/BepInEx.dll')" Text="Set GameManagedPath to the installed game's Managed directory and BootstrapPath to the verified prepared BepInEx directory. References are never distributed." />
+  </Target>
+  <Target Name="CopyMonoDependencies" AfterTargets="Build">
+    <ItemGroup><MonoDependency Include="../Starframe.Runtime/bin/$(Configuration)/netstandard2.0/*.dll" /></ItemGroup>
+    <Copy SourceFiles="@(MonoDependency)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

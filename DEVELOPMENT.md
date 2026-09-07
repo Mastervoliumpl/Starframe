@@ -51,6 +51,10 @@ Use the .NET SDK pinned in [runtime/global.json](runtime/global.json). From `run
 
 [Runtime target and licensing](docs/verification/runtime-contracts.md) records inspected game evidence and the limits of these checks. [Contract v1](contracts/README.md) defines the shared files. Run `cargo test --manifest-path src-tauri/Cargo.toml --locked --test runtime_contract` for the matching Rust fixtures. During issue work, run these focused checks; run the affected full suites before pushing a coherent milestone update. Keep the milestone PR in draft until its exit checks pass.
 
+## Runtime game verification
+
+[Runtime activation verification](docs/verification/runtime-activation.md) gives the local entry-plugin build and game smoke commands. The core runtime and fixture DLLs build in ordinary CI. The Unity entry plugin requires compile-only references from a lawful local game installation and the verified BepInEx package; it is built and exercised locally, not silently substituted with reference stubs in CI. Run that build after changing entry-plugin code. Do not publish game assemblies or fixture packages.
+
 ## Bootstrap development
 
 [Bootstrap commands and recovery](docs/verification/bootstrap.md) describe pinned package preparation and the guarded install/remove/recover command. Run `cargo test --manifest-path src-tauri/Cargo.toml --locked --lib deployment::tests` for focused deployment tests. They use temporary installations and exercise forced process exit; never substitute a personal game directory. The package preparation tests use synthetic archives, so required CI does not need a live BepInEx download.

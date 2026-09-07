@@ -118,7 +118,7 @@ jobs:
           cache-dependency-path: runtime/**/packages.lock.json
       - run: dotnet restore Starframe.Runtime.slnx --locked-mode
       - run: dotnet format Starframe.Runtime.slnx --verify-no-changes --no-restore
-      - name: Build the netstandard2.1 runtime and net10.0 test host
+      - name: Build the netstandard2.0 runtime and net10.0 test host
         run: dotnet build Starframe.Runtime.slnx --no-restore --configuration Release
       - name: Run fixture checks (does not launch Unity or BepInEx)
         run: dotnet test Starframe.Runtime.slnx --no-build --configuration Release --logger "trx;LogFileName=runtime.trx"

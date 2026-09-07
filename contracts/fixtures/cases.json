@@ -363,5 +363,25 @@
     "file": "invalid-surrogate.json",
     "kind": "activation",
     "valid": false
+  },
+  {
+    "file": "activation-content.json",
+    "kind": "activation",
+    "valid": true
+  },
+  {
+    "file": "activation-content-half-entry.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-content-empty.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-v1.json",
+    "kind": "activation",
+    "valid": false
   }
 ]

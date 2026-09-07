@@ -43,7 +43,7 @@ public sealed class ContractTests
         using var expected = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(Fixtures, "canonical-inventory.json")));
         Assert.AreEqual(expected.RootElement.GetProperty("contentId").GetString(), Contracts.ContentId(activation.RootElement.GetProperty("mods")[0].GetProperty("files")));
         var assembly = typeof(Contracts).Assembly;
-        Assert.AreEqual(".NETStandard,Version=v2.1", assembly.GetCustomAttribute<TargetFrameworkAttribute>()!.FrameworkName);
+        Assert.AreEqual(".NETStandard,Version=v2.0", assembly.GetCustomAttribute<TargetFrameworkAttribute>()!.FrameworkName);
         Assert.AreEqual(typeof(ContractTests).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion, assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion);
     }
 

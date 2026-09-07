@@ -2,6 +2,8 @@
 
 Issue [#11](https://github.com/Mastervoliumpl/Starframe/issues/11), milestone 0.2.0, checked on 6 September 2026. This change builds the owned runtime contract library and tests its file formats. It does not install BepInEx, invoke a game entry point or establish in-game compatibility.
 
+The later #13 [game verification](runtime-activation.md) supersedes the original core target below: the core uses .NET Standard 2.0 with complete Mono dependency output, while the Unity entry plugin uses 2.1. Activation documents now use schema 2. The original #11 results below remain historical evidence.
+
 ## Inspected target
 
 The installed Sanctuary playtest (Steam app 4511930, build 25135612) contains Unity 6000.3.22f1, MonoBleedingEdge and `netstandard.dll` 2.1.0.0. The read-only inspection recorded these SHA-256 values:

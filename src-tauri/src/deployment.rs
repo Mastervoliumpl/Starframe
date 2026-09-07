@@ -602,6 +602,87 @@ fn external_dll(
     Ok(false)
 }
 
+/// Development entry: deploy an explicitly selected, hash-inventoried runtime package.
+/// Author downloads must pass catalog/package approval before using this boundary.
+pub fn install_runtime(
+    store: &mut Storage,
+    game: &game::Installation,
+    bootstrap: &Path,
+    prepared: &Path,
+) -> Result<usize> {
+    let extra = runtime_payload(prepared)?;
+    let mut files = payload(bootstrap)?;
+    files.extend(extra);
+    let mut guard = || guard_game(game);
+    let mut engine = Engine::open(&engine_root(game)?, &mut guard)?;
+    apply(store, &mut engine, files, &mut guard, &mut |_| Ok(()))
+}
+
+fn runtime_payload(prepared: &Path) -> Result<Vec<(String, Vec<u8>)>> {
+    let mut files = Vec::new();
+    let inventory = read(&prepared.join("runtime-package.json"))?
+        .ok_or("Runtime package inventory is missing.")?;
+    if inventory.len() > 1_048_576 {
+        return Err("Runtime inventory is too large.".into());
+    }
+    let sources: Vec<SourceFile> = serde_json::from_slice(&inventory).map_err(|e| e.to_string())?;
+    if sources.len() > 256 {
+        return Err("Runtime inventory has too many files.".into());
+    }
+    let mut manifest = None;
+    let mut hashes = Files::new();
+    for source in sources {
+        relative(&source.path)?;
+        if !(source.path.starts_with("BepInEx/plugins/Starframe/")
+            || source.path.starts_with("Starframe/mods/")
+            || source.path == "Starframe/activation.json")
+        {
+            return Err(
+                "Runtime inventory contains a path outside runtime deployment roots.".into(),
+            );
+        }
+        let bytes =
+            read(&prepared.join(&source.path))?.ok_or("Runtime package file is missing.")?;
+        if hash(&bytes) != source.sha256
+            || hashes.insert(source.path.clone(), source.sha256).is_some()
+        {
+            return Err("Runtime package hash/path mismatch.".into());
+        }
+        if source.path == "Starframe/activation.json" {
+            manifest = Some(crate::runtime_contract::read(&bytes, "activation")?);
+        }
+        files.push((source.path, bytes));
+    }
+    validate_files(&hashes)?;
+    if !hashes.contains_key("BepInEx/plugins/Starframe/Starframe.Bootstrap.dll")
+        || !hashes.contains_key("BepInEx/plugins/Starframe/Starframe.Runtime.dll")
+    {
+        return Err("Runtime entry libraries are missing.".into());
+    }
+    let manifest = manifest.ok_or("Activation manifest is missing.")?;
+    let mut expected = BTreeSet::new();
+    for item in manifest["mods"].as_array().unwrap() {
+        let root = item["root"].as_str().unwrap();
+        if !root.starts_with("mods/") {
+            return Err("Mod roots must be below Starframe/mods.".into());
+        }
+        for file in item["files"].as_array().unwrap() {
+            let path = format!("Starframe/{root}/{}", file["path"].as_str().unwrap());
+            if hashes.get(&path).map(String::as_str) != file["sha256"].as_str() {
+                return Err("Activation inventory differs from prepared files.".into());
+            }
+            expected.insert(path);
+        }
+    }
+    if hashes
+        .keys()
+        .any(|path| path.starts_with("Starframe/mods/") && !expected.contains(path))
+    {
+        return Err("Unlisted mod payload in runtime package.".into());
+    }
+    Ok(files)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1126,4 +1207,36 @@ mod tests {
             .unwrap();
         }
     }
+}
+
+#[cfg(test)]
+#[test]
+fn prepared_runtime_inventory_rejects_unlisted_content_and_hash_changes() {
+    let root = std::env::temp_dir().join(format!("starframe-runtime-package-{}", Uuid::new_v4()));
+    let plugin = root.join("BepInEx/plugins/Starframe");
+    fs::create_dir_all(&plugin).unwrap();
+    fs::create_dir_all(root.join("Starframe")).unwrap();
+    let mut inventory = Vec::new();
+    for name in ["Starframe.Bootstrap.dll", "Starframe.Runtime.dll"] {
+        let path = format!("BepInEx/plugins/Starframe/{name}");
+        fs::write(root.join(&path), b"fixture").unwrap();
+        inventory.push(serde_json::json!({"path":path,"sha256":hash(b"fixture")}));
+    }
+    let manifest = include_bytes!("../../contracts/fixtures/activation-empty.json");
+    fs::write(root.join("Starframe/activation.json"), manifest).unwrap();
+    inventory.push(serde_json::json!({"path":"Starframe/activation.json","sha256":hash(manifest)}));
+    let index = root.join("runtime-package.json");
+    fs::write(&index, serde_json::to_vec(&inventory).unwrap()).unwrap();
+    assert_eq!(runtime_payload(&root).unwrap().len(), 3);
+    fs::write(plugin.join("Starframe.Runtime.dll"), b"changed").unwrap();
+    assert!(runtime_payload(&root).unwrap_err().contains("hash/path"));
+    fs::write(plugin.join("Starframe.Runtime.dll"), b"fixture").unwrap();
+    fs::create_dir_all(root.join("Starframe/mods/disabled")).unwrap();
+    fs::write(root.join("Starframe/mods/disabled/extra.dll"), b"fixture").unwrap();
+    inventory.push(
+        serde_json::json!({"path":"Starframe/mods/disabled/extra.dll","sha256":hash(b"fixture")}),
+    );
+    fs::write(&index, serde_json::to_vec(&inventory).unwrap()).unwrap();
+    assert!(runtime_payload(&root).unwrap_err().contains("Unlisted"));
+    fs::remove_dir_all(root).unwrap();
 }

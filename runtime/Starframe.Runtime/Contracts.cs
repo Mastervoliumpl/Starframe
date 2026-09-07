@@ -21,7 +21,7 @@ public static class Contracts
         {
             var root = document.RootElement;
             CheckDuplicates(root);
-            Require(root.GetProperty("schemaVersion").GetRawText() == "1", "schema version");
+            Require(root.GetProperty("schemaVersion").GetRawText() == (kind == "activation" ? "2" : "1"), "schema version");
             Require(root.GetProperty("runtimeContractVersion").GetRawText() == "1", "runtime contract version");
             Require(Text(root, "integrationId", 64) == "starframe.bepinex", "integration ID");
             switch (kind)
@@ -70,9 +70,10 @@ public static class Contracts
             string directory = Path(Text(mod, "root", 240)).ToLowerInvariant();
             Require(!roots.Any(other => Overlaps(directory, other)), "overlapping roots");
             roots.Add(directory);
-            string assembly = Path(Text(mod, "entryAssembly", 240)).ToLowerInvariant();
-            Require(assembly.EndsWith(".dll", StringComparison.Ordinal), "entry assembly");
-            Require(Matches(Text(mod, "entryType", 256), @"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*"), "entry type");
+            bool content = mod.GetProperty("entryAssembly").ValueKind == JsonValueKind.Null;
+            string? assembly = content ? null : Path(Text(mod, "entryAssembly", 240)).ToLowerInvariant();
+            Require(content ? mod.GetProperty("entryType").ValueKind == JsonValueKind.Null : assembly!.EndsWith(".dll", StringComparison.Ordinal), "entry assembly");
+            if (!content) Require(Matches(Text(mod, "entryType", 256), @"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*"), "entry type");
             var paths = new HashSet<string>(StringComparer.Ordinal);
             foreach (var file in Array(mod, "files", 1024))
             {
@@ -82,7 +83,7 @@ public static class Contracts
                 Require(Matches(Text(file, "sha256", 64), "[0-9a-f]{64}"), "file hash");
                 Require(++totalFiles <= 8192, "total files");
             }
-            Require(paths.Contains(assembly), "entry assembly missing from files");
+            Require(content ? paths.Count > 0 : paths.Contains(assembly!), "entry assembly missing from files");
             var source = mod.GetProperty("source");
             switch (Text(source, "kind", 16))
             {

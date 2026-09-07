@@ -5,7 +5,9 @@
 - Added the .NET Standard 2.1 runtime contract library, matching Rust validation, shared fixtures and internal lifecycle interfaces (#11).
 - Added locked C# builds, formatting/analyzers, fixture CI and synchronized informational versions.
 - Added pinned BepInEx bootstrap preparation, journaled installation/removal, schema-5 deployment backups, process guards and restart recovery (#12).
-- Explicitly scoped DLL, Lua-only, map-only and mixed packages; deferred AI support pending game facilities. Activation, settings and desktop launch remain in progress for 0.2.0.
+- Added the BepInEx entry plugin, ordered managed activation, failure propagation and process-bound reports (#13). Activation schema 2 represents content-only packages without executable metadata; their activation adapters remain unsupported.
+- Verified fixture activation inside the current playtest. The core runtime targets .NET Standard 2.0 with explicit Mono dependencies; its Unity entry plugin targets 2.1.
+- Explicitly scoped DLL, Lua-only, map-only and mixed packages; deferred AI support pending game facilities. Settings and desktop launch remain in progress for 0.2.0.
 
 ## 0.1.1 — 2026-09-06
 

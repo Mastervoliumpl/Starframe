@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "runtimeContractVersion": 1,
   "integrationId": "starframe.bepinex",
   "deploymentRevision": "0",

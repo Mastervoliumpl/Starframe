@@ -9,6 +9,7 @@ public interface IMod
 public interface IModContext
 {
     string ModId { get; }
+    string ContentRoot { get; }
     void Log(string message);
 }
 

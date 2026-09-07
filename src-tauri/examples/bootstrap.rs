@@ -4,11 +4,16 @@ use std::path::PathBuf;
 fn main() -> Result<(), String> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     if args.len() < 3 {
-        return Err("Usage: bootstrap <install|remove|recover> <app-data-directory> <game-installation> [prepared-bootstrap-directory]".into());
+        return Err("Usage: bootstrap <install|runtime|remove|recover> <app-data-directory> <game-installation> [prepared-bootstrap-directory] [prepared-runtime-directory]".into());
     }
     let action = args[0].to_str().ok_or("Invalid action")?;
-    if !matches!(action, "install" | "remove" | "recover")
-        || args.len() != if action == "install" { 4 } else { 3 }
+    if !matches!(action, "install" | "runtime" | "remove" | "recover")
+        || args.len()
+            != match action {
+                "runtime" => 5,
+                "install" => 4,
+                _ => 3,
+            }
     {
         return Err("Invalid bootstrap action or arguments.".into());
     }
@@ -19,6 +24,17 @@ fn main() -> Result<(), String> {
             let owned = deployment::install(&mut storage, &game, &PathBuf::from(&args[3]))?;
             println!(
                 "Bootstrap files prepared; {owned} files owned. Game/runtime activation is not verified."
+            );
+        }
+        "runtime" => {
+            let owned = deployment::install_runtime(
+                &mut storage,
+                &game,
+                &PathBuf::from(&args[3]),
+                &PathBuf::from(&args[4]),
+            )?;
+            println!(
+                "Runtime prepared; {owned} files owned. Activation requires a fresh game launch."
             );
         }
         "remove" => {

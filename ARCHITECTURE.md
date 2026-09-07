@@ -243,6 +243,8 @@ Local records identify exact content, so a shared collection can reuse the same 
 
 Keep database schema versions separate from catalog and collection-file format versions. Back up records before migrations, reject unsupported newer formats, and never silently replace a corrupt database with an empty library. Preserve user data and provide a repair path. Logs are diagnostic; the recovery record carries the information needed to repair an interrupted operation.
 
+The initial managed runtime and process-bound reports are implemented in #13. [Activation verification](docs/verification/runtime-activation.md) distinguishes verified managed fixtures from unsupported content and conventional plugin activation. The core targets .NET Standard 2.0 for complete Mono dependency packaging; the Unity bootstrap targets 2.1 against installed references.
+
 ## 6. Catalog and downloads
 
 Keep `catalog/releases.json` in the Starframe repository and publish it independently of desktop releases. The proposed initial endpoint is `https://raw.githubusercontent.com/Mastervoliumpl/Starframe/main/catalog/releases.json`; it does not exist yet. A maintainer's catalog commit becomes available at that endpoint without rebuilding or updating the app. GitHub/CDN cache timing can delay visibility; the app must not claim instant global propagation.

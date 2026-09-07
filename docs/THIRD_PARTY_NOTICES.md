@@ -39,3 +39,5 @@ Rust's contract reader directly uses sha2 0.10.9, already present in the depende
 ## Prepared BepInEx bootstrap
 
 The development preparation command downloads the unchanged official BepInEx 5.4.23.5 Windows x64 archive and verifies its SHA-256. The installer includes the [BepInEx MIT notice](notices/BepInEx-5.4.23.5.txt) from that exact release. The archive also contains Harmony, Mono.Cecil and MonoMod components. Before bundling a redistributable bootstrap with an app installer, inventory their exact notices/source requirements as part of #27. This repository contains the release inventory and notice, not those binaries. Public SDK publication remains outside this issue.
+
+Issue #13 uses compile-only Unity references from the local installed game and BepInEx references from the verified package. They are not copied into build outputs or committed. The core runtime targets .NET Standard 2.0; NETStandard.Library is a build reference under Microsoft .NET terms, and the existing locked MIT dependency notices still apply. Runtime preparation includes the complete Microsoft dependency output needed by Mono.

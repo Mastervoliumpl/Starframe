@@ -8,6 +8,8 @@
     <PackageReference Include="MSTest.TestAdapter" Version="[4.4.0]" />
     <PackageReference Include="MSTest.TestFramework" Version="[4.4.0]" />
     <ProjectReference Include="../Starframe.Runtime/Starframe.Runtime.csproj" />
+    <ProjectReference Include="../Starframe.FixtureMods/Starframe.FixtureMods.csproj" ReferenceOutputAssembly="false" />
+    <None Include="../Starframe.FixtureMods/bin/$(Configuration)/netstandard2.0/Starframe.FixtureMods.dll" Link="fixture-binaries/Starframe.FixtureMods.dll" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../contracts/fixtures/**" Link="fixtures/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
