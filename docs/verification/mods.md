@@ -36,4 +36,4 @@ Verified on Windows on 7 September 2026:
 - PASS: the complete native suite, including the mod lifecycle fixture and existing desktop, storage, game, catalog and package checks.
 - PASS: frontend formatting, ESLint, Svelte/TypeScript checks, six Vitest tests and the production build; 18 Python tests and repository/version checks.
 
-Issue #18 is complete locally. Remote CI has not run for this unpushed work. The fixture does not establish compatibility with a real author mod; screen integration and milestone exit checks remain #19.
+These were the original local checks for #18 before publication. [Screen integration](management.md) and [milestone exit evidence](milestone-0.3.0.md) record the subsequent #19 checks and merge gates. The fixture does not establish compatibility with a real author mod.

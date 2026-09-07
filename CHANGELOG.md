@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+No changes yet.
+
+## 0.3.0 - 2026-09-07
+
+Internal curated-mod milestone; no published installer or app release. The metadata-only catalog starts empty.
+
 - Added live My mods, Catalog and Downloads screens with search, details, selection, bulk actions, separate enable switches and confirmed uninstall (#19).
 - Added distinct maintenance, compatibility and withdrawal metadata, author/source links and persistent exact-release download failures. Compatibility warnings allow enable/launch.
 - Added mod enable/disable/uninstall commands, exact dependency preparation, automatic stopped-game deployment and schema-8 uninstall cleanup (#18).

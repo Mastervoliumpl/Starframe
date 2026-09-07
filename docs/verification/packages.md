@@ -56,6 +56,6 @@ Verified on Windows on 7 September 2026:
 - PASS: frontend formatting, ESLint, Svelte/TypeScript checks, six Vitest tests and the production build.
 - PASS: 18 Python tests, repository/version/link checks and whitespace validation.
 
-Issue #17 is complete locally. The branch has not been pushed, so remote CI has not run for these changes. No catalog release, app release or installer has been published.
+These were the original local checks for #17 before publication. [Milestone exit evidence](milestone-0.3.0.md) records subsequent integration checks and merge gates. No app release or installer is published by the internal milestone.
 
 Issue #18 subsequently adds free-space estimates before download/extraction and prevents preparation while the same artifact awaits uninstall cleanup. [Mod lifecycle verification](mods.md) records the combined checks and current schema-8 behavior.

@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-Completed milestones: **[0.0.1](https://github.com/Mastervoliumpl/Starframe/milestone/1)**, **[0.0.2](https://github.com/Mastervoliumpl/Starframe/milestone/9)**, **[0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2)**, **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)** and **[0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3)**. This branch uses **0.3.0-dev.1**; main retains completed **0.2.0**. No app release or installer has been published. Milestone **[0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10)** is complete; [SQLite recovery and build evidence](docs/verification/sqlite.md) records its exit checks. Milestone **[0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3)** is complete; [exit evidence](docs/verification/milestone-0.2.0.md) records its checks. Milestone 0.3.0 is active; issue #19 is next.
+Completed milestones: **0.0.1**, **0.0.2**, **0.1.0**, **0.1.1**, **0.2.0** and **[0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4)**. This change finalizes the internal 0.3.0 build; [exit evidence](docs/verification/milestone-0.3.0.md) records the delivered workflow and limits. No app release or installer is published. Milestone 0.4.0 remains planned until the owner starts it.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -13,7 +13,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | [0.1.0](https://github.com/Mastervoliumpl/Starframe/milestone/2) | Desktop foundation | Complete |
 | [0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10) | Replace Turso with bundled SQLite and preserve existing data | Complete |
 | [0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3) | Starframe in-game runtime | Complete |
-| [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Active: issue #19 next |
+| [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Complete |
 | [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Planned |
 | [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Planned |
 | [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Planned |
@@ -77,7 +77,7 @@ The package investigation in #13 explicitly includes managed DLLs, conventional 
 
 ### 0.3.0: Curated mod management
 
-Active from 7 September 2026, starting with issue #16. The development branch uses 0.3.0-dev.1; main retains completed 0.2.0. Catalog validation, refresh and caching are implemented locally; endpoint publication remains pending merge. Issue #17 is complete locally with [verified package preparation and Windows checks](docs/verification/packages.md). Issue #18 is complete locally with saved membership, automatic stopped-game deployment and confirmed uninstall; see [mod lifecycle verification](docs/verification/mods.md). Issue #19 and the additional catalog status metadata remain pending. Deliver independently refreshed catalog data, verified package preparation, install/enable/disable/uninstall, version warnings and Downloads. Exit: an approved release completes the full lifecycle with interruption and file-ownership checks.
+Complete. Version 0.3.0 delivers catalog refresh, verified downloads, installed-mod lifecycle and live management screens. [Exit evidence](docs/verification/milestone-0.3.0.md) records checks and limits. The initial catalog is empty; public catalog access and installer delivery remain separate gates.
 
 - [#16: Publish and refresh the curated release catalog independently](https://github.com/Mastervoliumpl/Starframe/issues/16)
 - [#17: Download and prepare approved packages safely](https://github.com/Mastervoliumpl/Starframe/issues/17)
