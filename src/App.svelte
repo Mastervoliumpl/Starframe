@@ -24,6 +24,7 @@
   let heading: HTMLHeadingElement;
   let fail = $state(false);
   const operations = $derived($desktop.snapshot?.operations ?? []);
+  const catalog = $derived($desktop.snapshot?.catalog);
   const activeCollection = $derived(
     $desktop.snapshot?.savedData.status === 'ready'
       ? ($desktop.snapshot.savedData.activeCollectionName ?? 'None')
@@ -148,7 +149,34 @@
       </section>
       <section class="page" hidden={page !== 'catalog'} aria-label="Catalog">
         <div class="empty-state">
-          <h2>The catalog is not connected yet</h2>
+          <h2>Approved release catalog</h2>
+          <p role="status" aria-live={page === 'catalog' ? 'polite' : 'off'}>
+            {#if catalog?.checking}
+              Checking for catalog changes…
+            {:else if catalog?.revision}
+              Catalog revision {catalog.revision}. {catalog.releaseCount} approved
+              releases.
+            {:else}
+              No catalog is cached yet.
+            {/if}
+          </p>
+          {#if catalog?.error}
+            <p class="error" role="alert">{catalog.error}</p>
+            {#if catalog.revision}<p>
+                Cached revision {catalog.revision} remains available.
+              </p>{/if}
+          {/if}
+          {#if catalog?.lastSuccess}
+            <p class="muted">
+              Last successful check: {new Date(
+                Number(catalog.lastSuccess) * 1000,
+              ).toLocaleString()}
+            </p>
+          {/if}
+          <p>
+            Starframe checks automatically while open. Browsing and installing
+            releases will be added in a later build.
+          </p>
           <p>
             Approved releases will appear here. Downloads will come from their
             authors. Curation does not guarantee that a binary is free of

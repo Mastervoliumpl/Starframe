@@ -2,7 +2,8 @@
 import type { GameView } from './game';
 export type OperationStatus = "running" | "cancelling" | "cancelled" | "completed" | "failed";
 export type Operation = { id: string, requestId: string, label: string, progress: number, status: OperationStatus, message: string, };
-export type Snapshot = { sessionId: string, revision: string, appVersion: string, operations: Array<Operation>, savedData: SavedData, game: GameView, };
+export type Snapshot = { sessionId: string, revision: string, appVersion: string, operations: Array<Operation>, savedData: SavedData, catalog: CatalogStatus, game: GameView, };
 export type CommandError = { code: string, message: string, affectedIds: Array<string>, recoverable: boolean, };
 export type SavedData = { "status": "loading" } | { "status": "ready", revision: string, libraryCount: number, collectionCount: number, activeCollectionName: string | null, } | { "status": "unavailable", message: string, };
 export type GameAction = { "kind": "discover" } | { "kind": "setup" } | { "kind": "launch" } | { "kind": "remove_runtime" } | { "kind": "choose_folder" } | { "kind": "select", id: string, };
+export type CatalogStatus = { revision: string | null, releaseCount: number, checking: boolean, lastChecked: string | null, lastSuccess: string | null, error: string | null, };

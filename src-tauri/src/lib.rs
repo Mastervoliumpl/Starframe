@@ -1,3 +1,4 @@
+pub mod catalog;
 pub mod deployment;
 pub mod game;
 pub mod launch;

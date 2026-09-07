@@ -1,8 +1,9 @@
 use crate::{
     app::Shared,
-    model::{CommandError, GameAction, SavedData},
+    model::{CatalogStatus, CommandError, GameAction, SavedData},
 };
 use starframe::{
+    catalog::refresh::Refresh,
     deployment,
     game::{self, GameView, Running},
     launch::{self, LaunchView, Phase},
@@ -232,6 +233,24 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
             }
         };
         let mut selected = None;
+        let mut catalog = match storage.as_ref().map(Refresh::load).transpose() {
+            Ok(value) => value,
+            Err(error) => {
+                core.lock().expect("state lock").catalog(CatalogStatus {
+                    error: Some(error),
+                    ..Default::default()
+                });
+                None
+            }
+        };
+        if storage.is_none() {
+            core.lock().expect("state lock").catalog(CatalogStatus {
+                error: Some(
+                    "Catalog refresh is unavailable because saved data could not be opened.".into(),
+                ),
+                ..Default::default()
+            });
+        }
         if let Some(storage) = &storage {
             match storage.selected_game() {
                 Ok(value) => selected = value,
@@ -257,6 +276,34 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                 break;
             }
             let now = SystemTime::now();
+            if let (Some(catalog), Some(storage)) = (&mut catalog, &mut storage) {
+                let (ready, stopped) = {
+                    let core = core.lock().expect("state lock");
+                    (core.shell_ready(), core.stopped)
+                };
+                catalog.tick(
+                    storage,
+                    now.duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
+                    ready,
+                    stopped,
+                );
+                core.lock().expect("state lock").catalog(CatalogStatus {
+                    revision: catalog
+                        .cache
+                        .catalog
+                        .as_ref()
+                        .map(|c| c.catalog_revision.clone()),
+                    release_count: catalog.cache.catalog.as_ref().map_or(0, |c| {
+                        c.releases().filter(|(_, r)| !r.withdrawn).count() as u32
+                    }),
+                    checking: catalog.checking,
+                    last_checked: catalog.cache.last_checked.map(|t| t.to_string()),
+                    last_success: catalog.cache.last_success.map(|t| t.to_string()),
+                    error: catalog.cache.error.clone(),
+                });
+            }
             if game::observation_expired(observed, now)
                 || validated.elapsed() >= Duration::from_secs(30)
             {

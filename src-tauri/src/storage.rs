@@ -7,9 +7,9 @@ use std::{
 };
 use uuid::Uuid;
 
-const SCHEMA: i64 = 5;
+const SCHEMA: i64 = 6;
 const APPLICATION_ID: i64 = 0x53544652;
-const MIGRATIONS: [&str; 5] = [
+const MIGRATIONS: [&str; 6] = [
     "CREATE TABLE metadata (id INTEGER PRIMARY KEY CHECK(id = 1), engine TEXT NOT NULL CHECK(engine = 'sqlite'), revision INTEGER NOT NULL CHECK(revision >= 0));
      INSERT INTO metadata VALUES (1, 'sqlite', 0);
      CREATE TABLE library (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author) <= 200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(mod_id, hash), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL)));
@@ -19,6 +19,7 @@ const MIGRATIONS: [&str; 5] = [
     "CREATE TABLE game_selection (singleton INTEGER PRIMARY KEY CHECK(singleton = 1), installation_id TEXT NOT NULL, path TEXT NOT NULL CHECK(length(path) BETWEEN 1 AND 32768));",
     "SELECT 1;",
     "CREATE TABLE deployments (root TEXT PRIMARY KEY NOT NULL, record TEXT NOT NULL CHECK(length(record) <= 1048576 AND json_valid(record))); CREATE TABLE deployment_blobs (hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash)=64), bytes BLOB NOT NULL CHECK(length(bytes)<=8388608));",
+    "CREATE TABLE catalog_cache (id INTEGER PRIMARY KEY CHECK(id=1), record TEXT NOT NULL CHECK(length(record)<=2105344 AND json_valid(record)));",
 ];
 
 #[derive(Debug)]
@@ -160,6 +161,54 @@ fn finish<T>(tx: Transaction<'_>, result: Result<T>) -> Result<T> {
 }
 
 impl Storage {
+    pub fn catalog_cache(&self) -> Result<Option<crate::catalog::refresh::Cache>> {
+        use rusqlite::OptionalExtension;
+        let record: Option<String> = self
+            .conn
+            .query_row("SELECT record FROM catalog_cache WHERE id=1", [], |r| {
+                r.get(0)
+            })
+            .optional()?;
+        record
+            .map(|record| {
+                crate::catalog::refresh::Cache::read(record.as_bytes()).map_err(Error::Invalid)
+            })
+            .transpose()
+    }
+
+    pub fn save_catalog_cache(&mut self, cache: &crate::catalog::refresh::Cache) -> Result<()> {
+        let record = serde_json::to_vec(cache).map_err(|e| Error::Invalid(e.to_string()))?;
+        crate::catalog::refresh::Cache::read(&record).map_err(Error::Invalid)?;
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        {
+            use rusqlite::OptionalExtension;
+            let previous: Option<String> = tx
+                .query_row("SELECT record FROM catalog_cache WHERE id=1", [], |r| {
+                    r.get(0)
+                })
+                .optional()?;
+            if let Some(previous) = previous {
+                let previous = crate::catalog::refresh::Cache::read(previous.as_bytes())
+                    .map_err(Error::Invalid)?;
+                if let Some(old) = previous.catalog {
+                    cache
+                        .catalog
+                        .as_ref()
+                        .ok_or_else(|| {
+                            Error::Invalid("Cannot discard the validated catalog cache.".into())
+                        })?
+                        .accepts_after(&old)
+                        .map_err(Error::Invalid)?;
+                }
+            }
+        }
+        tx.execute("INSERT INTO catalog_cache (id, record) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET record=excluded.record", [String::from_utf8(record).map_err(|e| Error::Invalid(e.to_string()))?])?;
+        tx.commit()?;
+        Ok(())
+    }
+
     pub(crate) fn deployment_record(&self, root: &str) -> Result<Option<String>> {
         use rusqlite::OptionalExtension;
         Ok(self
@@ -742,13 +791,56 @@ mod tests {
     }
 
     #[test]
+    fn catalog_migration_and_failed_replacement_retain_records() {
+        use crate::catalog::{Catalog, refresh::Cache};
+        let root = tempfile::tempdir().unwrap();
+        let mut store = Storage::open(root.path()).unwrap();
+        store.put_library_entry(&entry(), 0).unwrap();
+        store
+            .conn
+            .execute_batch("DROP TABLE catalog_cache; PRAGMA user_version=5;")
+            .unwrap();
+        drop(store);
+        let mut store = Storage::open(root.path()).unwrap();
+        assert_eq!(integer(&store.conn, "PRAGMA user_version").unwrap(), 6);
+        assert_eq!(store.load().unwrap().library, vec![entry()]);
+        assert!(store.catalog_cache().unwrap().is_none());
+        let cache = Cache {
+            catalog: Some(
+                Catalog::read(br#"{"schemaVersion":1,"catalogRevision":"1","mods":[]}"#).unwrap(),
+            ),
+            etag: Some("\"one\"".into()),
+            last_success: Some(10),
+            ..Default::default()
+        };
+        store.save_catalog_cache(&cache).unwrap();
+        let backup = store.backup().unwrap();
+        store.conn.execute_batch("CREATE TRIGGER fail_catalog BEFORE UPDATE ON catalog_cache BEGIN SELECT RAISE(ABORT, 'fixture write failure'); END;").unwrap();
+        let mut replacement = cache.clone();
+        replacement.catalog.as_mut().unwrap().catalog_revision = "2".into();
+        replacement.etag = Some("\"two\"".into());
+        assert!(store.save_catalog_cache(&replacement).is_err());
+        assert_eq!(store.catalog_cache().unwrap().unwrap(), cache);
+        store
+            .conn
+            .execute_batch("DROP TRIGGER fail_catalog;")
+            .unwrap();
+        store.save_catalog_cache(&replacement).unwrap();
+        drop(store);
+        let destination = root.path().join("restored");
+        let store = Storage::restore_into(&backup, &destination).unwrap();
+        assert_eq!(store.catalog_cache().unwrap().unwrap(), cache);
+        assert_eq!(store.load().unwrap().library, vec![entry()]);
+    }
+
+    #[test]
     fn game_selection_survives_migration_and_restart() {
         let root = tempfile::tempdir().unwrap();
         let mut store = Storage::open(root.path()).unwrap();
         store.put_library_entry(&entry(), 0).unwrap();
         store
             .conn
-            .execute_batch("DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; PRAGMA user_version = 2;")
+            .execute_batch("DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; PRAGMA user_version = 2;")
             .unwrap();
         drop(store);
         let mut store = Storage::open(root.path()).unwrap();
@@ -843,7 +935,7 @@ mod tests {
         store
             .conn
             .execute_batch(
-                "DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; PRAGMA user_version = 1;",
+                "DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; PRAGMA user_version = 1;",
             )
             .unwrap();
         let backup = store.backup().unwrap();
@@ -982,7 +1074,7 @@ mod tests {
             if mode == "migration" {
                 store
                     .conn
-                    .execute_batch("DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; PRAGMA user_version = 1;")
+                    .execute_batch("DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; PRAGMA user_version = 1;")
                     .unwrap();
                 store.backup().unwrap();
                 store.conn.execute("BEGIN IMMEDIATE", []).unwrap();
