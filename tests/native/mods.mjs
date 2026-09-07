@@ -216,6 +216,19 @@ const deployed = join(
 );
 const activation = async () =>
   JSON.parse(await readFile(join(engine, 'Starframe/activation.json'), 'utf8'));
+const waitForDeployment = (count) =>
+  expect
+    .poll(
+      async () => ({
+        mods: (await activation()).mods.length,
+        payload: await readFile(deployed).then(hash, (error) => {
+          if (error.code === 'ENOENT') return null;
+          throw error;
+        }),
+      }),
+      { timeout: 30000 },
+    )
+    .toEqual({ mods: count, payload: count ? hash(bytes) : null });
 const exists = (path) =>
   access(path).then(
     () => true,
@@ -244,9 +257,7 @@ try {
           exact: true,
         }),
       ).toBeChecked();
-      await expect
-        .poll(async () => (await activation()).mods.length, { timeout: 30000 })
-        .toBe(1);
+      await waitForDeployment(1);
       expect(await readFile(deployed)).toEqual(bytes);
       await page.screenshot({ path: 'test-results/native/my-mods-live.png' });
       await page
@@ -280,17 +291,13 @@ try {
   await withDesktop(
     data,
     async (page) => {
-      await expect
-        .poll(async () => (await activation()).mods.length, { timeout: 30000 })
-        .toBe(0);
+      await waitForDeployment(0);
       expect(await exists(deployed)).toBe(false);
       expect(await exists(join(artifactRoot, 'package/Fixture.dll'))).toBe(
         true,
       );
       await setEnabled(page, true);
-      await expect
-        .poll(async () => (await activation()).mods.length, { timeout: 30000 })
-        .toBe(1);
+      await waitForDeployment(1);
       const settings = join(engine, 'BepInEx/config/fixture.cfg');
       await mkdir(join(engine, 'BepInEx/config'), { recursive: true });
       await writeFile(settings, 'retain user settings');
@@ -311,9 +318,7 @@ try {
         .click();
       await expect(page.getByRole('dialog')).toContainText('Default');
       await page.getByRole('button', { name: 'Confirm uninstall' }).click();
-      await expect
-        .poll(async () => (await activation()).mods.length, { timeout: 30000 })
-        .toBe(0);
+      await waitForDeployment(0);
       expect((await list(page)).library).toHaveLength(0);
       expect(await exists(artifactRoot)).toBe(false);
       expect(await readFile(settings, 'utf8')).toBe('retain user settings');
