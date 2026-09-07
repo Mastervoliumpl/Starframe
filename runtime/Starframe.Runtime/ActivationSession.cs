@@ -19,12 +19,16 @@ public sealed class ActivationSession : IDisposable
     private readonly HashSet<string> trusted;
     private readonly List<IModShutdown> shutdown = new();
     private bool started;
+    private readonly Func<string, ModSettings> settingsFactory;
+    private readonly Dictionary<string, ModSettings> settings = new();
+    public IReadOnlyDictionary<string, ModSettings> Settings => settings;
     public string SessionId { get; } = Guid.NewGuid().ToString("D");
     public JsonElement[] InstalledMods { get; private set; } = System.Array.Empty<JsonElement>();
 
-    public ActivationSession(Action<string> log, IEnumerable<string> gameAssemblies)
+    public ActivationSession(Action<string> log, IEnumerable<string> gameAssemblies, Func<string, ModSettings>? settingsFactory = null)
     {
         this.log = log;
+        this.settingsFactory = settingsFactory ?? (_ => new ModSettings(_ => null, (_, _) => throw new InvalidOperationException("Settings persistence is unavailable.")));
         trusted = new HashSet<string>(AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetName().Name!), StringComparer.OrdinalIgnoreCase);
         trusted.UnionWith(gameAssemblies);
     }
@@ -111,7 +115,9 @@ public sealed class ActivationSession : IDisposable
                     if (type.IsAbstract || !typeof(IMod).IsAssignableFrom(type))
                         throw new NotSupportedException("Entry type must implement Starframe IMod. Conventional BepInEx plugins require a compatibility adapter.");
                     instance = (IMod)Activator.CreateInstance(type)!;
-                    instance.Initialize(new ModContext(id, Path.Combine(root, mod.GetProperty("root").GetString()!), log));
+                    var modSettings = this.settingsFactory(id);
+                    instance.Initialize(new ModContext(id, Path.Combine(root, mod.GetProperty("root").GetString()!), log, modSettings));
+                    settings.Add(id, modSettings);
                     if (instance is IModShutdown stop) shutdown.Add(stop);
                     successful.Add(id);
                 }
@@ -213,10 +219,11 @@ public sealed class ActivationSession : IDisposable
         AppDomain.CurrentDomain.AssemblyResolve -= Resolve;
     }
 
-    private sealed class ModContext(string id, string contentRoot, Action<string> log) : IModContext
+    private sealed class ModContext(string id, string contentRoot, Action<string> log, ModSettings settings) : IModContext
     {
         public string ModId => id;
         public string ContentRoot => contentRoot;
+        public ModSettings Settings => settings;
         public void Log(string message) => log(id + ": " + message);
     }
 }

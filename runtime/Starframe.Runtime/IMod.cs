@@ -10,6 +10,7 @@ public interface IModContext
 {
     string ModId { get; }
     string ContentRoot { get; }
+    ModSettings Settings { get; }
     void Log(string message);
 }
 

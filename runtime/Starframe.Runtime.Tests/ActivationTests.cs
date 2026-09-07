@@ -58,6 +58,8 @@ public sealed class ActivationTests
             Assert.IsTrue(messages.IndexOf("first: first initialized") < messages.IndexOf("second: second initialized"));
             Assert.IsTrue(messages.Contains("failure: failed fixture cleaned up"));
             Assert.AreEqual(5, session.InstalledMods.Length);
+            CollectionAssert.AreEquivalent(new[] { "first", "second" }, session.Settings.Keys.ToArray());
+            Assert.AreEqual(5, session.Settings["first"].Entries.Count);
             Assert.ThrowsExactly<InvalidOperationException>(() => session.Activate(root, manifest));
             string path = Path.Combine(root, "report.json");
             ActivationSession.WriteReport(path, report);
