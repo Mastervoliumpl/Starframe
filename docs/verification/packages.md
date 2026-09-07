@@ -57,3 +57,5 @@ Verified on Windows on 7 September 2026:
 - PASS: 18 Python tests, repository/version/link checks and whitespace validation.
 
 Issue #17 is complete locally. The branch has not been pushed, so remote CI has not run for these changes. No catalog release, app release or installer has been published.
+
+Issue #18 subsequently adds free-space estimates before download/extraction and prevents preparation while the same artifact awaits uninstall cleanup. [Mod lifecycle verification](mods.md) records the combined checks and current schema-8 behavior.

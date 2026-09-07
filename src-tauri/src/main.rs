@@ -83,7 +83,8 @@ fn main() {
             commands::cancel_operation,
             commands::open_external,
             commands::game_action,
-            commands::package_action
+            commands::package_action,
+            commands::mod_action
         ])
         .run(context)
         .expect("Starframe could not start");

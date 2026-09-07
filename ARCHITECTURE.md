@@ -293,6 +293,8 @@ Initial support covers reviewed ZIP layouts and explicit local DLL/folder import
 
 The library is what the user has locally. A collection is what the user wants enabled. The deployment records what is actually prepared for the game. Keep all three separate.
 
+Issue #18 implements internal managed-package lifecycle commands, automatic stopped-game application and schema-8 uninstall cleanup. [Lifecycle verification](docs/verification/mods.md) records the command boundary, streaming recovery files, space estimates and remaining limits. The existing runtime setup remains explicit; management screens are issue #19. Signing and advisory infrastructure stay outside this internal implementation.
+
 ```mermaid
 flowchart LR
     Collection[Active collection: desired setup] --> Plan[Compare desired and observed files]

@@ -131,6 +131,11 @@ pub struct Packages {
 }
 
 impl Packages {
+    pub fn busy_hash(&self, hash: &str) -> bool {
+        self.active
+            .values()
+            .any(|active| active.operation.hash == hash)
+    }
     pub fn open(storage: &mut Storage) -> Result<Self> {
         storage.recover_packages().map_err(|e| e.to_string())?;
         Ok(Self {
@@ -161,6 +166,14 @@ impl Packages {
             .and_then(|cache| cache.catalog)
             .ok_or("No approved catalog is available. Wait for catalog refresh.")?;
         let (entry, artifact) = resolve(&catalog, release_id)?;
+        if storage
+            .pending_removals()
+            .map_err(|e| e.to_string())?
+            .iter()
+            .any(|(hash, _)| hash == &artifact.sha256)
+        {
+            return Err("This artifact still has pending uninstall cleanup. Restart to retry cleanup before downloading it again.".into());
+        }
         if let Some(active) = self
             .active
             .values()
@@ -190,6 +203,14 @@ impl Packages {
         let previous = storage
             .prepared_artifact(&artifact.sha256)
             .map_err(|e| e.to_string())?;
+        if previous.is_none() {
+            let reserved: u64 = self
+                .active
+                .values()
+                .map(|a| a.operation.total_bytes + MAX_EXPANDED_BYTES)
+                .sum();
+            crate::space::require(&root, reserved + artifact.size_bytes + MAX_EXPANDED_BYTES)?;
+        }
         storage
             .save_package(&operation)
             .map_err(|e| e.to_string())?;
@@ -348,12 +369,112 @@ fn resolve(catalog: &Catalog, release_id: &str) -> Result<(LibraryEntry, Artifac
     ))
 }
 
-struct Directory {
+pub(crate) struct Directory {
     root: PathBuf,
     pins: BTreeMap<PathBuf, File>,
 }
+
+pub(crate) fn verify_artifact(store: &Storage, reference: &ModReference) -> Result<Prepared> {
+    let prepared = store
+        .prepared_artifact(&reference.hash)
+        .map_err(|e| e.to_string())?
+        .ok_or("The package has no verified file manifest. Prepare it again.")?;
+    let mut directory = Directory::open(store.package_root())?;
+    verify_existing(
+        &mut directory,
+        &store
+            .artifact_directory(reference)
+            .map_err(|e| e.to_string())?,
+        &prepared,
+        &Cancel::default(),
+    )?;
+    Ok(prepared)
+}
+
+pub(crate) fn remove_artifact(store: &Storage, hash: &str) -> Result<()> {
+    if store
+        .load()
+        .map_err(|e| e.to_string())?
+        .library
+        .iter()
+        .any(|entry| entry.reference.hash == hash)
+    {
+        return Err("This artifact is still in the library. Cleanup retained it.".into());
+    }
+    let reference = ModReference {
+        mod_id: "artifact".into(),
+        hash: hash.into(),
+        origin: Origin::LocalImport,
+        release_id: None,
+    };
+    let root = store
+        .artifact_directory(&reference)
+        .map_err(|e| e.to_string())?;
+    match fs::symlink_metadata(&root) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e.to_string()),
+        Ok(_) => (),
+    }
+    let prepared = store
+        .prepared_artifact(hash)
+        .map_err(|e| e.to_string())?
+        .ok_or("Uninstall inventory is missing. Files were retained.")?;
+    let mut directory = Directory::open(store.package_root())?;
+    directory.directory(&format!("artifacts/{hash}"))?;
+    let mut pending = vec![root.clone()];
+    let mut folders = Vec::new();
+    let mut files = Vec::new();
+    while let Some(folder) = pending.pop() {
+        for entry in fs::read_dir(&folder).map_err(|e| e.to_string())? {
+            if files.len() + folders.len() + pending.len() > MAX_ENTRIES * 32 {
+                return Err("Uninstall cleanup exceeded its file limit.".into());
+            }
+            let path = entry.map_err(|e| e.to_string())?.path();
+            let metadata = fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
+            regular_metadata(&path, metadata.is_dir())?;
+            let relative = path
+                .strip_prefix(&root)
+                .map_err(|e| e.to_string())?
+                .to_string_lossy()
+                .replace('\\', "/");
+            crate::runtime_contract::relative_path(&relative)?;
+            if metadata.is_dir() {
+                directory.directory(&format!("artifacts/{hash}/{relative}"))?;
+                pending.push(path);
+            } else {
+                let expected = prepared
+                    .files
+                    .iter()
+                    .find(|f| f.path == relative)
+                    .ok_or("Uninstall found an unexpected file. It was retained.")?;
+                if digest(
+                    &mut read_file(&path)?,
+                    expected.size_bytes,
+                    &Cancel::default(),
+                )? != (expected.size_bytes, expected.sha256.clone())
+                {
+                    return Err(
+                        "Uninstall found changed content. It was retained for repair.".into(),
+                    );
+                }
+                files.push(path);
+            }
+        }
+        folders.push(folder);
+    }
+    for path in files {
+        fs::remove_file(path).map_err(|e| {
+            format!("Uninstall cleanup failed: {e}. Retry after the file is unlocked.")
+        })?;
+    }
+    for folder in folders.into_iter().rev() {
+        directory.pins.remove(&folder);
+        fs::remove_dir(folder).map_err(|e| format!("Uninstall cleanup failed: {e}"))?;
+    }
+    Ok(())
+}
 impl Directory {
-    fn open(root: &Path) -> Result<Self> {
+    pub(crate) fn open(root: &Path) -> Result<Self> {
         if !root.is_absolute() {
             return Err("Package storage requires an absolute app-data path.".into());
         }
@@ -366,7 +487,7 @@ impl Directory {
             pins,
         })
     }
-    fn directory(&mut self, relative: &str) -> Result<PathBuf> {
+    pub(crate) fn directory(&mut self, relative: &str) -> Result<PathBuf> {
         crate::runtime_contract::relative_path(relative)?;
         let mut path = self.root.clone();
         for part in relative.split('/') {
@@ -609,6 +730,7 @@ fn extract(
             directories.insert(lower, (prefix.clone(), true));
         }
     }
+    crate::space::require(content, total)?;
     let mut directory = Directory::open(content)?;
     let mut files = Vec::new();
     for index in 0..archive.len() {
@@ -685,7 +807,7 @@ fn digest(input: &mut File, limit: u64, cancel: &Cancel) -> Result<(u64, String)
     Ok((size, format!("{:x}", hash.finalize())))
 }
 
-fn read_file(path: &Path) -> Result<File> {
+pub(crate) fn read_file(path: &Path) -> Result<File> {
     regular_metadata(path, false)?;
     let mut options = OpenOptions::new();
     options.read(true);

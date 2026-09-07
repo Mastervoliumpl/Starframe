@@ -6,6 +6,14 @@ use tauri::{State, ipc::Channel};
 use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
+pub async fn mod_action(
+    service: State<'_, crate::game_service::GameService>,
+    action: starframe::mods::Action,
+) -> Result<starframe::mods::View, CommandError> {
+    service.mods(action).await
+}
+
+#[tauri::command]
 pub async fn package_action(
     service: State<'_, crate::game_service::GameService>,
     action: starframe::packages::Action,

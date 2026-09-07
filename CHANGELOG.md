@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added mod enable/disable/uninstall commands, exact dependency preparation, automatic stopped-game deployment and schema-8 uninstall cleanup (#18). The management screens remain #19.
+- Added streamed mod deployment/recovery content, disk-space estimates and lifecycle/lock/interruption fixtures. Ordinary withdrawal preserves verified installed copies and settings.
+- Added separate scheduled/dependency-change audits and a phased security plan. Catalog/advisory signing and Windows release signing remain pre-distribution work.
+
 - Added bounded downloads, exact hash verification, guarded ZIP extraction and immutable package preparation for approved releases (#17).
 - Added schema-7 package history, atomic library completion, cancellation, verified-content reuse and interruption recovery. Package operations have a focused native command; their screens remain issue #19.
 - Added catalog schema 1, stable release validation, exact artifact metadata and withdrawal checks (#16).

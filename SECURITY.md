@@ -8,9 +8,10 @@ Starframe is in internal development. There is no public installer release. Cura
 - Validated catalog cache with retained release identities, revision checks and offline use. HTTPS and hashes currently provide transport/content integrity; the catalog has no independent signature or expiry.
 - Bounded downloads, SHA-256 verification, guarded ZIP extraction and verified library reuse. Failures retain operation history. Abrupt exits can leave private staging for recovery.
 - Bootstrap/runtime deployment ownership, backups, Windows path guards, installation locks and interrupted-operation recovery. Game mutations require an observed stopped process.
+- Saved mod enable/disable intent, streamed deployment, confirmed uninstall and retryable owned-artifact cleanup. Space estimates precede downloads, extraction and deployment; failed writes still require recovery.
 - Runtime manifest and payload verification before managed activation. This is not a mod sandbox.
 
-See [package evidence](docs/verification/packages.md), [bootstrap evidence](docs/verification/bootstrap.md) and [runtime evidence](docs/verification/runtime-activation.md). Tests establish the stated cases, not a complete security audit. General mod lifecycle deployment remains issue #18; management screens remain #19.
+See [package evidence](docs/verification/packages.md), [mod lifecycle evidence](docs/verification/mods.md), [bootstrap evidence](docs/verification/bootstrap.md) and [runtime evidence](docs/verification/runtime-activation.md). Tests establish the stated cases, not a complete security audit. Mod lifecycle issue #18 is implemented locally; management screens remain #19. The status distinctions below include requirements still to be implemented in catalog metadata and screens.
 
 ## Current milestone: 0.3.0
 

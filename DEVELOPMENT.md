@@ -1,8 +1,10 @@
 # Starframe development and checks
 
-Status: development policy adopted on 6 September 2026. Milestones 0.1.0, 0.1.1 and 0.2.0 are complete. Milestone 0.3.0 is active, starting with issue #16; later milestones remain planned.
+Status: development policy adopted on 6 September 2026. Milestones 0.1.0, 0.1.1 and 0.2.0 are complete. Milestone 0.3.0 is active: issues #16–#18 have local implementations, with catalog status additions and screen issue #19 still pending; later milestones remain planned.
 
 Issue #17 adds package preparation through the existing storage worker, with schema-7 operation history and immutable file manifests. [Package checks and recovery](docs/verification/packages.md) record the supported format and limits. Its native fixture runs with the existing native suite; screen integration remains issue #19.
+
+Issue #18 extends that worker with saved mod membership, automatic stopped-game deployment and confirmed uninstall. Schema 8 retains pending cleanup. [Mod lifecycle verification](docs/verification/mods.md) records native restart checks, streamed recovery and space estimates.
 
 Read [DESIGN.md](DESIGN.md) for behavior and presentation, [ARCHITECTURE.md](ARCHITECTURE.md) for structure and recovery rules, and [ROADMAP.md](ROADMAP.md) for the current milestone. GitHub issues hold task scope, dependencies, acceptance criteria and verification evidence.
 

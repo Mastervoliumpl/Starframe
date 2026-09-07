@@ -24,6 +24,10 @@ use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 enum Request {
+    Mod(
+        starframe::mods::Action,
+        tokio::sync::oneshot::Sender<Result<starframe::mods::View, String>>,
+    ),
     Package(
         packages::Action,
         tokio::sync::oneshot::Sender<Result<Vec<packages::Operation>, String>>,
@@ -41,6 +45,26 @@ pub struct GameService {
     writing: Arc<AtomicBool>,
 }
 impl GameService {
+    pub async fn mods(
+        &self,
+        action: starframe::mods::Action,
+    ) -> Result<starframe::mods::View, CommandError> {
+        let (reply, result) = tokio::sync::oneshot::channel();
+        self.sender
+            .try_send(Request::Mod(action, reply))
+            .map_err(|_| {
+                CommandError::new("mods_busy", "The storage worker is busy. Retry shortly.")
+            })?;
+        result
+            .await
+            .map_err(|_| {
+                CommandError::new(
+                    "mods_unavailable",
+                    "Mod management is unavailable. Restart Starframe.",
+                )
+            })?
+            .map_err(|message| CommandError::new("mods_failed", &message))
+    }
     pub async fn package(
         &self,
         action: packages::Action,
@@ -208,7 +232,7 @@ fn prepare(
     }
     let store = std::cell::RefCell::new(store);
     launch::prepare_latest(
-        || launch::requested(&store.borrow().load().map_err(|e| e.to_string())?),
+        || starframe::mods::requested(&store.borrow()),
         |activation| {
             deployment::prepare_desktop(
                 &mut store.borrow_mut(),
@@ -258,6 +282,11 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
             }
         };
         let mut selected = None;
+        if let Some(store) = storage.as_mut()
+            && let Err(error) = starframe::mods::cleanup(store)
+        {
+            view.error = error;
+        }
         let mut packages = storage.as_mut().map(Packages::open).transpose();
         let mut catalog = match storage.as_ref().map(Refresh::load).transpose() {
             Ok(value) => value,
@@ -294,6 +323,7 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
         let mut launch_requested: Option<Instant> = None;
         let mut process_seen = false;
         let mut process_wait: Option<Instant> = None;
+        let mut last_auto_attempt = None;
         loop {
             if core.lock().expect("state lock").stopped {
                 if worker_writing.load(Ordering::SeqCst) {
@@ -479,6 +509,46 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                     );
                 }
             }
+            if let (Some(store), Some(game)) = (storage.as_mut(), view.selected.as_ref()) {
+                let revision = store.load().map(|r| r.revision).ok();
+                let attempt = (game.executable.clone(), revision, view.running.clone());
+                let differs = prepared.as_ref().is_some_and(|activation| {
+                    activation["deploymentRevision"].as_str()
+                        != revision.map(|r| r.to_string()).as_deref()
+                });
+                if differs && view.running != Running::Stopped {
+                    view.launch.details = vec![
+                        "Collection changes are saved. Deployment waits until the game closes."
+                            .into(),
+                    ];
+                }
+                if differs
+                    && view.running == Running::Stopped
+                    && launch_requested.is_none()
+                    && last_auto_attempt.as_ref() != Some(&attempt)
+                {
+                    last_auto_attempt = Some(attempt);
+                    worker_writing.store(true, Ordering::SeqCst);
+                    view.launch =
+                        LaunchView::new(Phase::Preparing, "Applying the saved mod setup…");
+                    core.lock().expect("state lock").game(view.clone());
+                    match prepare(&app, &core, store, game, false) {
+                        Ok(value) => {
+                            prepared = Some(value);
+                            view.launch = LaunchView::new(
+                                Phase::Ready,
+                                "The saved mod setup is ready to launch.",
+                            );
+                        }
+                        Err(error) => view.launch = LaunchView::new(Phase::Failed, &error),
+                    }
+                    worker_writing.store(false, Ordering::SeqCst);
+                    if core.lock().expect("state lock").stopped {
+                        app.exit(0);
+                        break;
+                    }
+                }
+            }
             recovery_observation = observation;
             view.busy = worker_busy.load(Ordering::SeqCst);
             core.lock().expect("state lock").game(view.clone());
@@ -487,6 +557,31 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                 Err(mpsc::RecvTimeoutError::Timeout) => continue,
                 Err(_) => break,
             };
+            if let Request::Mod(action, reply) = request {
+                let result = (|| {
+                    if core.lock().expect("state lock").stopped {
+                        return Err("Starframe is closing.".into());
+                    }
+                    if let starframe::mods::Action::Uninstall { hash, .. } = &action
+                        && packages
+                            .as_ref()
+                            .ok()
+                            .and_then(|q| q.as_ref())
+                            .is_some_and(|q| q.busy_hash(hash))
+                    {
+                        return Err("This package is being prepared. Finish or cancel its download before uninstalling.".into());
+                    }
+                    let store = storage.as_mut().ok_or("Saved data is unavailable.")?;
+                    let result = starframe::mods::action(store, action)?;
+                    core.lock().expect("state lock").saved_data(
+                        saved_status(store)
+                            .unwrap_or_else(|message| SavedData::Unavailable { message }),
+                    );
+                    Ok(result)
+                })();
+                let _ = reply.send(result);
+                continue;
+            }
             if let Request::Package(action, reply) = request {
                 let result = (|| {
                     if core.lock().expect("state lock").stopped {
@@ -586,6 +681,7 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                 Request::Setup
                 | Request::Launch
                 | Request::RemoveRuntime
+                | Request::Mod(..)
                 | Request::Package(..) => unreachable!(),
                 Request::Discover => {
                     discover(&mut view);
