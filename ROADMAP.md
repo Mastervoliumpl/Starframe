@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-No milestone is active. **[0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11)** is complete, including issues #50 through #54. Version `0.4.1` is an internal corrective build; [exit evidence](docs/verification/milestone-0.4.1.md) records its regression tests, native/game acceptance and remaining limits. No app release or installer is published.
+**[0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6)** is active, starting with issue #24, local mod imports. Build watching (#25) and the developer workflow exit checks (#26) follow. Version `0.5.0-dev.1` is an internal development build. Milestone 0.4.1 is complete; [exit evidence](docs/verification/milestone-0.4.1.md) records its checks and remaining limits. No app release or installer is published.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -16,7 +16,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Complete |
 | [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Complete |
 | [0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11) | Exact approval identities, package/runtime limits and maintenance | Complete |
-| [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Planned |
+| [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Active: #24 |
 | [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Planned |
 | [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Native game integration | Blocked on official game API |
 
