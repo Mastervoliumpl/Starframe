@@ -153,7 +153,9 @@ const catalog = {
           withdrawn: true,
           withdrawalReason: 'Author removed this fixture release.',
           requires: [],
-          testedGameBuilds: [],
+          testedGameBuilds: [
+            'Steam 111 · Unity 0123456789abcdef0123456789abcdef',
+          ],
           artifact: {
             url: 'https://example.invalid/fixture.zip',
             sha256: artifactHash,
@@ -303,6 +305,31 @@ try {
       ).toBeChecked();
       await waitForDeployment(1);
       originalCollection = (await list(page)).activeCollection;
+      const nativeRow = page
+        .getByRole('region', { name: 'My mods', exact: true })
+        .getByRole('listitem')
+        .filter({
+          has: page.getByRole('button', {
+            name: 'Native fixture',
+            exact: true,
+          }),
+        });
+      await expect(
+        nativeRow.getByText('Tested with this version', { exact: true }),
+      ).toBeVisible();
+      await writeFile(
+        join(steam, 'steamapps/appmanifest_4511930.acf'),
+        '"AppState" { "appid" "4511930" "installdir" "Fixture Sanctuary" "buildid" "222" "StateFlags" "4" }',
+      );
+      await expect(
+        nativeRow.getByText('Not tested with this version', { exact: true }),
+      ).toBeVisible({ timeout: 40000 });
+      await expect(
+        page.getByRole('button', {
+          name: 'Launch Sanctuary Shattered Sun',
+          exact: true,
+        }),
+      ).toBeEnabled();
       const created = await collectionAction(page, {
         kind: 'create_collection',
         name: 'Spare fixture',

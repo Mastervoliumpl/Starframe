@@ -2,7 +2,14 @@
 
 ## Unreleased
 
-Development version: `0.4.0-dev.1`. Started ordered collections with issue #20. No app release or installer is published.
+No changes yet.
+
+## 0.4.0 - 2026-09-08
+
+Internal ordered-collection milestone; no published installer or app release.
+
+- Verified mixed cached/missing sharing across two libraries, actual game order, compatibility warnings, game-exit application and per-mod settings retention (#23). See [exit evidence and the four known 0.4.1 limits](docs/verification/milestone-0.4.0.md).
+- Added ordering limits and recovery guidance to Help & logs.
 
 - Added version-1 collection JSON import/export, review before one acceptance, verified local reuse, queued exact approved packages and persistent unresolved references (#22).
 - Added schema-9 import progress, restart recovery and retry; incomplete imports cannot apply. Collection dialogs use the existing management dialog styles.
