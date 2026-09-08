@@ -23,7 +23,7 @@ pub struct Adjustment {
 }
 
 pub fn resolve(catalog: &Catalog, requested: &[ModReference]) -> Result<Resolution, String> {
-    if requested.len() > 256 {
+    if requested.len() > crate::runtime_contract::MAX_MODS {
         return Err("This runtime supports at most 256 active mods.".into());
     }
     let mut positions = HashMap::new();

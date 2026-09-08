@@ -41,7 +41,7 @@ impl Portable {
                 "Collection names need 1–200 characters without control characters.".into(),
             );
         }
-        if self.entries.len() > 256 {
+        if self.entries.len() > crate::runtime_contract::MAX_MODS {
             return Err("This runtime supports at most 256 active mods.".into());
         }
         let mut ids = HashSet::new();
