@@ -136,7 +136,7 @@ impl Directory {
         Ok(path)
     }
 
-    fn remove_stage(&mut self, id: &str) -> Result<()> {
+    pub(super) fn remove_stage(&mut self, id: &str) -> Result<()> {
         Uuid::parse_str(id).map_err(|_| "Invalid staging operation ID.")?;
         let stage = self.root.join("package-staging").join(id);
         if !stage.starts_with(&self.root) {

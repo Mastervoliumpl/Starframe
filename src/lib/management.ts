@@ -30,6 +30,7 @@ export type CollectionEdit =
   | { kind: 'rename_collection'; id: string; name: string }
   | { kind: 'delete_collection' | 'select_collection'; id: string };
 export interface ManagementTransport {
+  pickLocalSource(folder: boolean): Promise<string | null>;
   saveCollection(text: string): Promise<boolean>;
   sharing(action: SharingAction): Promise<SharingReply>;
   mods(action: ModAction): Promise<ModView>;
@@ -124,6 +125,25 @@ export function createManagement(transport: ManagementTransport | null) {
     },
     refresh,
     dismissError: () => update({ error: '' }),
+    async pickLocalSource(folder: boolean) {
+      let path: string | null = null;
+      await run('local-picker', async () => {
+        path = await transport!.pickLocalSource(folder);
+      });
+      return path as string | null;
+    },
+    importLocal(path: string) {
+      return run('local-import', async () => {
+        const operations = await confirmed(
+          transport!.packages({
+            kind: 'import_local',
+            path,
+            requestId: crypto.randomUUID(),
+          }),
+        );
+        if (!stopped) update({ operations });
+      });
+    },
     async saveCollection(text: string) {
       let saved = false;
       await run('sharing', async () => {

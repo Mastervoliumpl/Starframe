@@ -15,6 +15,7 @@ struct Worker {
     writing: Arc<AtomicBool>,
     storage: Option<Storage>,
     packages: Result<Option<Packages>, String>,
+    local_watcher: Option<packages::watch::Watcher>,
     catalog: Option<Refresh>,
     view: GameView,
     selected: Option<(String, String)>,
@@ -57,6 +58,7 @@ pub(super) fn run(
         view.error = error;
     }
     let packages = storage.as_mut().map(Packages::open).transpose();
+    let local_watcher = storage.as_ref().map(packages::watch::Watcher::new);
     let catalog = match storage.as_ref().map(Refresh::load).transpose() {
         Ok(value) => value,
         Err(error) => {
@@ -92,6 +94,7 @@ pub(super) fn run(
         writing,
         storage,
         packages,
+        local_watcher,
         catalog,
         view,
         selected,
@@ -128,6 +131,22 @@ pub(super) fn run(
 impl Worker {
     fn tick(&mut self) -> bool {
         let now = SystemTime::now();
+        if let (Some(watcher), Some(store)) = (&mut self.local_watcher, &mut self.storage) {
+            let paused = self
+                .packages
+                .as_ref()
+                .ok()
+                .and_then(|q| q.as_ref())
+                .is_none_or(|q| q.busy());
+            match watcher.poll(store, paused, game::observation_expired(self.observed, now)) {
+                Ok(true) => self.core.lock().expect("state lock").saved_data(
+                    saved_status(store)
+                        .unwrap_or_else(|message| SavedData::Unavailable { message }),
+                ),
+                Ok(false) => {}
+                Err(message) => self.view.error = message,
+            }
+        }
         if let (Ok(Some(queue)), Some(store)) = (&mut self.packages, &mut self.storage) {
             match queue.poll(store).and_then(|changed| {
                 starframe::sharing::poll(store, queue)

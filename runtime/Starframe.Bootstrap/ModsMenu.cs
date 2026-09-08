@@ -188,9 +188,6 @@ internal sealed class ModsMenu : IDisposable
         settingControls.Clear();
     }
 
-    private string Status(string id) => !outcomes.TryGetValue(id, out var outcome) ? "Disabled"
-        : "Enabled · " + (outcome.GetProperty("outcome").GetString() == "loaded" ? "Loaded" : "Failed to load");
-
     private void ShowList()
     {
         string? previous = selected;
@@ -198,17 +195,26 @@ internal sealed class ModsMenu : IDisposable
         GameObject? restore = null;
         Clear();
         reset.gameObject.SetActive(false);
-        Text("Installed mods", heading: true);
-        Text("This game session. Change enabled mods in Starframe, then restart the game.");
-        if (session.OmittedDisabledMods > 0) Text(session.OmittedDisabledMods + " more disabled mods are in your desktop library. Their saved settings are retained.");
-        if (session.InstalledMods.Length == 0) Text("No installed mods in this session.");
-        foreach (var mod in session.InstalledMods)
+        Text("Mods", heading: true);
+        Text("The current game session. Change mods in Starframe, then restart the game.");
+        var active = session.InstalledMods.Where(m => outcomes.ContainsKey(m.GetProperty("modId").GetString()!)).ToArray();
+        bool Loaded(JsonElement mod) => outcomes[mod.GetProperty("modId").GetString()!].GetProperty("outcome").GetString() == "loaded";
+        if (!active.Any(Loaded)) Text("No mods are running in this session.");
+        foreach (var mod in active.Where(Loaded)) AddMod(mod);
+        if (active.Any(m => !Loaded(m)))
         {
-            string id = mod.GetProperty("modId").GetString()!;
-            var row = AddButton(mod.GetProperty("name").GetString() + " · " + mod.GetProperty("version").GetString() + " · " + Status(id), () => ShowMod(id));
-            if (id == previous) restore = row.gameObject;
+            Text("Could not load", heading: true);
+            Text("Open a mod for details. Fix the setup in Starframe, then restart the game.");
+            foreach (var mod in active.Where(m => !Loaded(m))) AddMod(mod);
         }
         FinishPage(restore, previous == null ? 1 : listScroll);
+
+        void AddMod(JsonElement mod)
+        {
+            string id = mod.GetProperty("modId").GetString()!;
+            var row = AddButton(mod.GetProperty("name").GetString()!, () => ShowMod(id));
+            if (id == previous) restore = row.gameObject;
+        }
     }
 
     private void ShowMod(string id)
@@ -217,12 +223,11 @@ internal sealed class ModsMenu : IDisposable
         selected = id;
         Clear();
         var mod = session.InstalledMods.First(m => m.GetProperty("modId").GetString() == id);
-        Text(mod.GetProperty("name").GetString() + " · " + Status(id), heading: true);
+        Text(mod.GetProperty("name").GetString()!, heading: true);
         bool loaded = session.Settings.TryGetValue(id, out var settings);
         reset.gameObject.SetActive(loaded && settings!.Entries.Count > 0);
-        if (!outcomes.ContainsKey(id)) Text("Enable this mod in Starframe and restart the game to register its settings.");
-        else if (!loaded) Text(outcomes[id].GetProperty("message").GetString()!);
-        else if (settings!.Entries.Count == 0) Text("This mod has not registered any settings.");
+        if (outcomes[id].GetProperty("outcome").GetString() != "loaded") Text(outcomes[id].GetProperty("message").GetString()!);
+        else if (!loaded || settings!.Entries.Count == 0) Text("This mod has not registered any settings.");
         else foreach (var setting in settings.Entries) AddSetting(setting);
         FinishPage();
     }
@@ -269,6 +274,7 @@ internal sealed class ModsMenu : IDisposable
     {
         var row = Object.Instantiate(button, list);
         var control = row.GetComponent<ButtonManager>();
+        control.enableIcon = false;
         Configure(control, label, action);
         control.autoFitContent = false;
         var fit = row.GetComponent<ContentSizeFitter>();
@@ -354,7 +360,7 @@ internal sealed class ModsMenu : IDisposable
             focus.Add(field.gameObject);
         }
         settingControls.Add(enable);
-        Text(setting.Description + " Default: " + setting.DefaultText + ". " + (setting.Live ? "Applies while the game is running." : "Takes effect after restart."));
+        Text(setting.Description + " Default: " + setting.DefaultText + ". " + setting.ApplyDescription);
         status = Text(setting.Error ?? (setting.RestartRequired ? "Restart required" : ""));
         status.gameObject.name = "Status-" + setting.Key;
     }
@@ -383,14 +389,15 @@ internal sealed class ModsMenu : IDisposable
         enable(false);
         reset.Interactable(false);
         if (status != null) status.text = "Saving…";
-        var task = Task.Run(() => setting.SaveText(value));
+        yield return null;
+        var task = SettingsTask(setting.RequiresMainThread, () => setting.SaveText(value));
         while (!task.IsCompleted) yield return null;
         if (task.IsFaulted) _ = task.Exception;
         saves--;
         enable(true);
         refresh();
         if (reset != null) reset.Interactable(saves == 0);
-        if (status != null) status.text = task.IsFaulted ? setting.Error : setting.RestartRequired ? "Saved · Restart required" : "Saved";
+        if (status != null) status.text = task.IsFaulted ? setting.Error : setting.RestartRequired ? "Saved. Restart required." : "Saved";
     }
 
     private void Reset()
@@ -405,13 +412,22 @@ internal sealed class ModsMenu : IDisposable
         reset.Interactable(false);
         var controls = settingControls.ToArray();
         foreach (var control in controls) control(false);
-        var task = Task.Run(() => { foreach (var setting in settings.Entries) setting.Reset(); });
+        yield return null;
+        var task = SettingsTask(settings.Entries.Any(s => s.RequiresMainThread), () => { foreach (var setting in settings.Entries) setting.Reset(); });
         while (!task.IsCompleted) yield return null;
         if (task.IsFaulted) _ = task.Exception;
         saves--;
         foreach (var control in controls) control(true);
         if (reset != null) reset.Interactable(saves == 0);
         if (page != null && page.activeSelf && selected == id) ShowMod(id);
+    }
+
+    private static Task SettingsTask(bool mainThread, Action action)
+    {
+        // BepInEx setting events can call Unity APIs, so their setters must stay on the game thread.
+        if (!mainThread) return Task.Run(action);
+        try { action(); return Task.CompletedTask; }
+        catch (Exception error) { return Task.FromException(error); }
     }
 
     private static Sprite LoadIcon()

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
+  import LocalImport from './LocalImport.svelte';
   import {
     bytes,
     compatibility,
@@ -67,9 +68,10 @@
         })),
       );
     return data.library.map((installed) => {
-      const mod = data.catalog?.mods.find(
-        (m) => m.id === installed.reference.modId,
-      );
+      const mod =
+        installed.reference.origin === 'catalog'
+          ? data.catalog?.mods.find((m) => m.id === installed.reference.modId)
+          : undefined;
       return {
         id: key(installed.reference),
         name: installed.name,
@@ -101,6 +103,20 @@
   );
   const chosen = $derived(rows.filter((r) => selected.includes(r.id)));
   const opened = $derived(rows.find((r) => r.id === detail));
+  const local = $derived(
+    $manager.data?.localSources.find(
+      (source) =>
+        opened?.installed &&
+        key(source.reference) === key(opened.installed.reference),
+    ),
+  );
+  let copyStatus = $state('');
+  const watch = (row: Row) =>
+    $manager.data?.localWatches.find(
+      (w) =>
+        row.installed &&
+        key(w.source.reference) === key(row.installed.reference),
+    );
   const busy = $derived(unavailable || $manager.pending.includes('membership'));
   const enabled = (row: Row) =>
     !!row.installed &&
@@ -127,6 +143,7 @@
   }
   async function show(row: Row, event: MouseEvent) {
     savedScroll = list.closest('section')?.scrollTop ?? 0;
+    copyStatus = '';
     detail = row.id;
     trigger = event.currentTarget as HTMLButtonElement;
     await tick();
@@ -165,6 +182,7 @@
 
 <div class="mod-workspace" class:details-open={!!opened}>
   <div class="mod-browse" bind:this={list} tabindex="-1">
+    {#if mode === 'mods'}<LocalImport {manager} {unavailable} />{/if}
     <label class="field-label" for={`${mode}-search`}
       >Search {mode === 'mods' ? 'installed mods' : 'catalog releases'}</label
     >
@@ -231,7 +249,7 @@
         </h2>
         <p>
           {mode === 'mods'
-            ? 'Install a release from Catalog, then enable it here.'
+            ? 'Import a local mod or install a release from Catalog, then enable it here.'
             : 'Approved releases appear after the maintainer updates the catalog. Starframe checks automatically while open.'}
         </p>
       </div>
@@ -262,9 +280,24 @@
                   ? 'Local import'
                   : 'Catalog release'}
               </p>
-              <p class="compatibility">
-                {compatibility(row.release, game?.selected?.build)}
-              </p>
+              {#if row.installed?.reference.origin === 'local_import'}
+                <p class="technical">
+                  Build {row.installed.reference.hash.slice(0, 8)} · {watch(row)
+                    ? 'Following source'
+                    : 'Saved build'}
+                </p>
+                {#if watch(row)}<p
+                    aria-live="polite"
+                    class:error={watch(row)?.state === 'error'}
+                  >
+                    {watch(row)?.message}
+                  </p>{/if}
+              {/if}
+              {#if row.installed?.reference.origin !== 'local_import'}<p
+                  class="compatibility"
+                >
+                  {compatibility(row.release, game?.selected?.build)}
+                </p>{/if}
               {#if row.mod?.unmaintained}<p>Unmaintained</p>{/if}
               {#if row.release?.withdrawn}<p>
                   Withdrawn · {row.release.withdrawalReason ??
@@ -342,37 +375,88 @@
       <button onclick={back}>Back to list</button>
       <h2 bind:this={detailHeading} tabindex="-1">{opened.name}</h2>
       <p>{opened.author} · {opened.version}</p>
-      <p>{opened.mod?.description || 'No description supplied.'}</p>
-      {#if opened.mod}<button onclick={() => onsource(opened.mod!.id)}
-          >View author/source</button
-        >{/if}
-      <h3>Compatibility</h3>
-      <p>{compatibility(opened.release, game?.selected?.build)}</p>
-      <p>Selected game: {game?.selected?.build ?? 'Not selected'}</p>
-      <p>
-        Tested builds: {opened.release?.testedGameBuilds.join(', ') ||
-          'No test evidence recorded'}
-      </p>
-      {#each opened.release?.compatibilityProblems ?? [] as problem, index (index)}<p
-        >
-          {problem.gameBuild}: {problem.note}
+      {#if opened.installed?.reference.origin === 'local_import'}
+        <h3>Local source</h3>
+        <p class="technical">
+          {local?.path ??
+            'Source metadata is unavailable. Import the exact build again.'}
         </p>
-        <p class="technical">Evidence: {problem.sourceUrl}</p>{/each}
-      <p>
-        Compatibility warnings allow you to enable and try the mod. Mods run at
-        your own risk.
-      </p>
-      {#if opened.mod?.unmaintained}<p>
-          Unmaintained. Installed copies remain usable.
-        </p>{/if}
-      {#if opened.release?.withdrawn}<p>
-          Withdrawn: {opened.release.withdrawalReason ??
-            'Reason not supplied in the catalog.'} Installed copies and settings are
-          retained.
-        </p>{/if}
-      <h3>Required releases</h3>
-      <p>{opened.release?.requires.join(', ') || 'None declared'}</p>
-      <p>Install required releases from Catalog before enabling this mod.</p>
+        {#if local}
+          <div class="dialog-actions">
+            <button
+              onclick={async () => {
+                try {
+                  await navigator.clipboard.writeText(local.path);
+                  copyStatus = 'Source path copied.';
+                } catch {
+                  copyStatus =
+                    'Could not copy. Select and copy the path above.';
+                }
+              }}>Copy source path</button
+            >
+            <button
+              onclick={() =>
+                onsource(
+                  `local:${local.reference.modId}:${local.reference.hash}`,
+                )}>Open source folder</button
+            >
+          </div>
+          {#if copyStatus}<p role="status">{copyStatus}</p>{/if}
+        {/if}
+        <p>
+          Local imports use a managed copy. Starframe does not check them for
+          catalog updates or game-version compatibility.
+        </p>
+        <p>
+          {watch(opened)?.message ??
+            'This is a saved build. Import it again to follow this source.'}
+        </p>
+        <p>
+          Only the latest explicitly imported source for each mod is watched.
+          Rebuilds advance the matching active local collection entry; shared
+          and inactive collections keep their exact builds. Older copies remain
+          available.
+        </p>
+        <h3>Required builds</h3>
+        <p>
+          {local?.manifest.requires
+            .map((r) => `${r.modId} (${r.releaseId ?? r.hash})`)
+            .join(', ') || 'None declared'}
+        </p>
+      {:else}
+        <p>{opened.mod?.description || 'No description supplied.'}</p>
+        {#if opened.mod}<button
+            onclick={() => onsource(`mod:${opened.mod!.id}`)}
+            >View author/source</button
+          >{/if}
+        <h3>Compatibility</h3>
+        <p>{compatibility(opened.release, game?.selected?.build)}</p>
+        <p>Selected game: {game?.selected?.build ?? 'Not selected'}</p>
+        <p>
+          Tested builds: {opened.release?.testedGameBuilds.join(', ') ||
+            'No test evidence recorded'}
+        </p>
+        {#each opened.release?.compatibilityProblems ?? [] as problem, index (index)}<p
+          >
+            {problem.gameBuild}: {problem.note}
+          </p>
+          <p class="technical">Evidence: {problem.sourceUrl}</p>{/each}
+        <p>
+          Compatibility warnings allow you to enable and try the mod. Mods run
+          at your own risk.
+        </p>
+        {#if opened.mod?.unmaintained}<p>
+            Unmaintained. Installed copies remain usable.
+          </p>{/if}
+        {#if opened.release?.withdrawn}<p>
+            Withdrawn: {opened.release.withdrawalReason ??
+              'Reason not supplied in the catalog.'} Installed copies and settings
+            are retained.
+          </p>{/if}
+        <h3>Required releases</h3>
+        <p>{opened.release?.requires.join(', ') || 'None declared'}</p>
+        <p>Install required releases from Catalog before enabling this mod.</p>
+      {/if}
       <h3>Installation</h3>
       <p>
         {opened.installed
@@ -388,10 +472,10 @@
           >{opened.installed ? 'Installed' : 'Install release'}</button
         >
         <p>{reason(opened)}</p>{/if}
-      <p>
-        Approval applies to the reviewed archive bytes. It does not guarantee
-        that a mod is free of malware.
-      </p>
+      {#if opened.installed?.reference.origin !== 'local_import'}<p>
+          Approval applies to the reviewed archive bytes. It does not guarantee
+          that a mod is free of malware.
+        </p>{/if}
       <details>
         <summary>Package details</summary>
         <p class="technical">
@@ -400,11 +484,11 @@
             'Local import'}<br />SHA-256: {opened.release?.artifact.sha256 ??
             opened.installed?.reference.hash}
         </p>
-        <p>
-          Download: {bytes(opened.release?.artifact.sizeBytes ?? 0)}. Space
-          checks also budget up to 2 GiB for extraction per active transfer and
-          a 64 MiB margin. Deployment checks space for recovery copies.
-        </p>
+        {#if opened.release}<p>
+            Download: {bytes(opened.release?.artifact.sizeBytes ?? 0)}. Space
+            checks also budget up to 2 GiB for extraction per active transfer
+            and a 64 MiB margin. Deployment checks space for recovery copies.
+          </p>{/if}
       </details>
     </aside>{/if}
 </div>
@@ -418,6 +502,9 @@
     Remove version {removing?.version} from your library. Settings are kept. Game
     files change only after the game closes.
   </p>
+  {#if removing?.reference.origin === 'local_import'}<p>
+      Your source DLL, source folder and local metadata are kept.
+    </p>{/if}
   <p>
     Affected collections: {removeCollections.join(', ') || 'None'}. Other
     collections retain an unresolved reference.

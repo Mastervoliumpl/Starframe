@@ -67,6 +67,8 @@ pub struct View {
     pub catalog: Option<Catalog>,
     pub revision: String,
     pub library: Vec<LibraryEntry>,
+    pub local_sources: Vec<crate::local_import::LocalSource>,
+    pub local_watches: Vec<crate::local_import::LocalWatch>,
     pub enabled: Vec<ModReference>,
     pub order: Option<crate::ordering::Resolution>,
     pub order_error: Option<String>,
@@ -97,6 +99,7 @@ pub fn view(store: &Storage) -> Result<View> {
         .catalog_cache()
         .map_err(|e| e.to_string())?
         .and_then(|c| c.catalog);
+    let locals = store.local_sources().map_err(|e| e.to_string())?;
     let order = if let Some(error) = crate::sharing::active_error(store, &records)? {
         Err(error)
     } else if let Some(missing) = enabled
@@ -113,20 +116,17 @@ pub fn view(store: &Storage) -> Result<View> {
             adjustments: vec![],
         })
     } else {
-        catalog
-            .as_ref()
-            .ok_or_else(|| "Catalog metadata is unavailable.".to_string())
-            .and_then(|catalog| crate::ordering::resolve(catalog, &enabled))
+        crate::ordering::resolve_with_locals(catalog.as_ref(), &locals, &enabled)
     };
     let (order, order_error) = match order {
         Ok(order) => (Some(order), None),
         Err(error) => (None, Some(error)),
     };
     let mut overlays = std::collections::BTreeMap::<String, Vec<String>>::new();
-    if let (Some(order), Some(catalog)) = (&order, &catalog) {
+    if let Some(order) = &order {
         for reference in &order.effective {
             if matches!(
-                release(catalog, reference)?.artifact.layout,
+                metadata(catalog.as_ref(), &locals, reference)?.layout,
                 Layout::StarframeLuaZip {}
             ) {
                 let prepared = store
@@ -160,6 +160,8 @@ pub fn view(store: &Storage) -> Result<View> {
         collisions,
         revision: records.revision.to_string(),
         library: records.library,
+        local_sources: locals,
+        local_watches: store.local_watches().map_err(|e| e.to_string())?,
         enabled,
         collections: records.collections,
         active_collection: records.active_collection,
@@ -251,7 +253,7 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
                         })
                 })
                 .collect::<Result<Vec<_>>>()?;
-            crate::ordering::resolve(&catalog(store)?, &reordered)?;
+            resolve_order(store, &reordered)?;
             store
                 .set_mod_membership(&reordered, expected)
                 .map_err(|e| e.to_string())?;
@@ -278,9 +280,11 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
             let mut entries = collection.map_or(vec![], |c| c.entries.clone());
             if enabled {
                 let catalog = catalog(store)?;
+                let locals = store.local_sources().map_err(|e| e.to_string())?;
                 let mut needed = Vec::new();
                 dependency_entries(
-                    &catalog,
+                    catalog.as_ref(),
+                    &locals,
                     &records,
                     &entry.reference,
                     &mut needed,
@@ -293,7 +297,7 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
                         .ok_or("Prepared package inventory is missing.")?;
                     packages::layout(
                         &prepared.files,
-                        &release(&catalog, &reference)?.artifact.layout,
+                        &metadata(catalog.as_ref(), &locals, &reference)?.layout,
                     )?;
                     if entries.contains(&reference) {
                         continue;
@@ -301,6 +305,7 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
                     entries.retain(|r| r.mod_id != reference.mod_id);
                     entries.push(reference);
                 }
+                crate::ordering::resolve_with_locals(catalog.as_ref(), &locals, &entries)?;
             } else {
                 entries.retain(|r| r != &reference);
             }
@@ -354,12 +359,78 @@ fn current_records(store: &Storage, expected: &str) -> Result<Records> {
     Ok(records)
 }
 
-fn catalog(store: &Storage) -> Result<Catalog> {
+fn catalog(store: &Storage) -> Result<Option<Catalog>> {
     store
         .catalog_cache()
-        .map_err(|e| e.to_string())?
-        .and_then(|c| c.catalog)
-        .ok_or("Catalog metadata is unavailable. Existing game files were retained.".into())
+        .map_err(|e| e.to_string())
+        .map(|cache| cache.and_then(|c| c.catalog))
+}
+
+pub(crate) fn resolve_order(
+    store: &Storage,
+    entries: &[ModReference],
+) -> Result<crate::ordering::Resolution> {
+    crate::ordering::resolve_with_locals(
+        catalog(store)?.as_ref(),
+        &store.local_sources().map_err(|e| e.to_string())?,
+        entries,
+    )
+}
+
+pub(crate) fn metadata(
+    catalog: Option<&Catalog>,
+    locals: &[crate::local_import::LocalSource],
+    reference: &ModReference,
+) -> Result<crate::local_import::Manifest> {
+    if reference.origin == Origin::LocalImport {
+        return locals
+            .iter()
+            .find(|source| &source.reference == reference)
+            .map(|source| source.manifest.clone())
+            .ok_or_else(|| {
+                format!(
+                    "Local metadata for {} is unavailable. Import the exact build again.",
+                    reference.mod_id
+                )
+            });
+    }
+    let catalog =
+        catalog.ok_or("Catalog metadata is unavailable. Existing game files were retained.")?;
+    let release = release(catalog, reference)?;
+    let owner = catalog
+        .mods
+        .iter()
+        .find(|m| m.id == reference.mod_id)
+        .ok_or("Mod metadata is missing.")?;
+    let requires = release
+        .requires
+        .iter()
+        .map(|id| {
+            let (owner, release) = catalog
+                .releases()
+                .find(|(_, r)| &r.id == id)
+                .ok_or("Required release metadata is missing.")?;
+            Ok(ModReference {
+                mod_id: owner.id.clone(),
+                hash: release.artifact.sha256.clone(),
+                origin: Origin::Catalog,
+                release_id: Some(release.id.clone()),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(crate::local_import::Manifest {
+        schema_version: 1,
+        mod_id: owner.id.clone(),
+        name: owner.name.clone(),
+        author: owner.author.clone(),
+        version: release.version.clone(),
+        layout: release.artifact.layout.clone(),
+        requires,
+        load_before: release.load_before.clone(),
+        load_after: release.load_after.clone(),
+        prefer_before: release.prefer_before.clone(),
+        prefer_after: release.prefer_after.clone(),
+    })
 }
 
 fn release<'a>(
@@ -380,7 +451,8 @@ fn release<'a>(
 }
 
 fn dependency_entries(
-    catalog: &Catalog,
+    catalog: Option<&Catalog>,
+    locals: &[crate::local_import::LocalSource],
     records: &Records,
     reference: &ModReference,
     result: &mut Vec<ModReference>,
@@ -392,14 +464,19 @@ fn dependency_entries(
     if !visiting.insert(reference.mod_id.clone()) {
         return Err("Conflicting or cyclic mod dependencies.".into());
     }
-    let release = release(catalog, reference)?;
+    let release = metadata(catalog, locals, reference)?;
     for id in &release.requires {
         let entry = records
             .library
             .iter()
-            .find(|e| e.reference.release_id.as_ref() == Some(id))
-            .ok_or_else(|| format!("Prepare required release {id} before enabling this mod."))?;
-        dependency_entries(catalog, records, &entry.reference, result, visiting)?;
+            .find(|e| &e.reference == id)
+            .ok_or_else(|| {
+                format!(
+                    "Prepare the exact required build of {} before enabling this mod.",
+                    id.mod_id
+                )
+            })?;
+        dependency_entries(catalog, locals, records, &entry.reference, result, visiting)?;
     }
     visiting.remove(&reference.mod_id);
     if result
@@ -434,6 +511,7 @@ pub fn requested(store: &Storage) -> Result<Value> {
         );
     }
     let catalog = catalog(store)?;
+    let locals = store.local_sources().map_err(|e| e.to_string())?;
     for reference in entries {
         if !records.library.iter().any(|e| &e.reference == reference) {
             return Err(format!(
@@ -442,21 +520,22 @@ pub fn requested(store: &Storage) -> Result<Value> {
             ));
         }
     }
-    let ordered = crate::ordering::resolve(&catalog, entries)?.effective;
+    let ordered =
+        crate::ordering::resolve_with_locals(catalog.as_ref(), &locals, entries)?.effective;
     let mut mods = Vec::new();
     let mut total_bytes = 0;
     for reference in &ordered {
-        let release = release(&catalog, reference)?;
+        let release = metadata(catalog.as_ref(), &locals, reference)?;
         let prepared = store
             .prepared_artifact(&reference.hash)
             .map_err(|e| e.to_string())?
             .ok_or("Prepared package inventory is missing.")?;
-        packages::layout(&prepared.files, &release.artifact.layout)?;
+        packages::layout(&prepared.files, &release.layout)?;
         total_bytes += prepared.files.iter().map(|f| f.size_bytes).sum::<u64>();
         if total_bytes > runtime_contract::MAX_ACTIVATION_BYTES {
             return Err("The selected mods exceed the runtime's combined 256 MiB limit. Disable some mods or choose a smaller collection; the current deployment was retained.".into());
         }
-        let (entry_path, entry_type) = match &release.artifact.layout {
+        let (entry_path, entry_type) = match &release.layout {
             Layout::StarframeManagedZip {
                 root,
                 entry_assembly,
@@ -471,22 +550,25 @@ pub fn requested(store: &Storage) -> Result<Value> {
             ),
             Layout::StarframeLuaZip {} => (None, None),
         };
-        let requires: Vec<_> = release
-            .requires
-            .iter()
-            .map(|id| {
-                catalog
-                    .releases()
-                    .find(|(_, r)| &r.id == id)
-                    .map(|(m, _)| m.id.clone())
-                    .ok_or("Required release metadata is missing.")
-            })
-            .collect::<std::result::Result<_, _>>()?;
+        let requires: Vec<_> = release.requires.iter().map(|r| r.mod_id.clone()).collect();
         let root = format!(
             "mods/{:x}",
             Sha256::digest(format!("{}\0{}", reference.mod_id, reference.hash).as_bytes())
         );
-        mods.push(json!({"modId": reference.mod_id, "source": {"kind":"catalog", "releaseId": release.id}, "root": root, "entryAssembly": entry_path, "entryType": entry_type, "requires":requires, "files":prepared.files.iter().map(|f| json!({"path":f.path,"sha256":f.sha256})).collect::<Vec<_>>() }));
+        let files = json!(
+            prepared
+                .files
+                .iter()
+                .map(|f| json!({"path":f.path,"sha256":f.sha256}))
+                .collect::<Vec<_>>()
+        );
+        let source = match reference.origin {
+            Origin::Catalog => json!({"kind":"catalog", "releaseId":reference.release_id}),
+            Origin::LocalImport => {
+                json!({"kind":"local", "contentId":runtime_contract::content_id(&files)?})
+            }
+        };
+        mods.push(json!({"modId": reference.mod_id, "source": source, "root": root, "entryAssembly": entry_path, "entryType": entry_type, "requires":requires, "files":files }));
     }
     let value = json!({"schemaVersion":3, "runtimeContractVersion":1, "integrationId":"starframe.bepinex", "deploymentRevision":records.revision.to_string(), "installedMods":inventory,"omittedDisabledMods":omitted,"mods":mods});
     runtime_contract::read(
@@ -524,12 +606,16 @@ pub(crate) fn payload(store: &Storage, activation: &Value) -> Result<Vec<(String
     let records = store.load().map_err(|e| e.to_string())?;
     let mut sources = Vec::new();
     for item in activation["mods"].as_array().ok_or("Invalid activation.")? {
-        let reference = &records
-            .library
+        let reference = records
+            .collections
             .iter()
-            .find(|e| e.reference.release_id.as_deref() == item["source"]["releaseId"].as_str())
-            .ok_or("An active release is missing from the library.")?
-            .reference;
+            .find(|c| Some(&c.id) == records.active_collection.as_ref())
+            .and_then(|c| {
+                c.entries
+                    .iter()
+                    .find(|r| Some(r.mod_id.as_str()) == item["modId"].as_str())
+            })
+            .ok_or("An active reference is missing from the collection.")?;
         let prepared = packages::verify_artifact(store, reference)?;
         let base = store
             .artifact_directory(reference)

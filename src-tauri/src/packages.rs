@@ -17,14 +17,16 @@ use std::{
     },
     time::Duration,
 };
-use tokio::{io::AsyncWriteExt, sync::watch};
+use tokio::{io::AsyncWriteExt, sync::watch as cancellation};
 use uuid::Uuid;
 
 mod archive;
 mod artifacts;
+mod local;
 #[cfg(test)]
 mod tests;
 mod transfer;
+pub mod watch;
 use archive::*;
 pub(crate) use archive::{layout, supported_files};
 use artifacts::*;
@@ -53,6 +55,11 @@ pub enum Status {
 #[cfg_attr(test, derive(ts_rs::TS))]
 #[cfg_attr(test, ts(rename = "PackageAction"))]
 pub enum Action {
+    #[serde(rename_all = "camelCase")]
+    ImportLocal {
+        request_id: String,
+        path: String,
+    },
     #[serde(rename_all = "camelCase")]
     Prepare {
         request_id: String,
@@ -100,13 +107,13 @@ pub struct Prepared {
 #[derive(Clone)]
 struct Cancel {
     flag: Arc<AtomicBool>,
-    signal: watch::Sender<bool>,
+    signal: cancellation::Sender<bool>,
 }
 impl Default for Cancel {
     fn default() -> Self {
         Self {
             flag: Arc::new(AtomicBool::new(false)),
-            signal: watch::channel(false).0,
+            signal: cancellation::channel(false).0,
         }
     }
 }
@@ -130,11 +137,18 @@ impl Cancel {
 
 struct Active {
     operation: Operation,
-    entry: LibraryEntry,
+    entry: Option<LibraryEntry>,
+    source: Option<String>,
     cancel: Cancel,
     progress: Arc<AtomicU64>,
-    result: mpsc::Receiver<Result<Prepared>>,
-    ready: Option<Result<Prepared>>,
+    result: mpsc::Receiver<Result<PreparedImport>>,
+    ready: Option<Result<PreparedImport>>,
+}
+
+#[derive(Clone)]
+struct PreparedImport {
+    prepared: Prepared,
+    local: Option<crate::local_import::LocalSource>,
 }
 
 /// The existing storage worker owns this queue and calls `poll` to commit results.
@@ -145,13 +159,16 @@ pub struct Packages {
 }
 
 impl Packages {
+    pub fn busy(&self) -> bool {
+        !self.active.is_empty()
+    }
     pub(crate) fn can_start(&self, hash: &str) -> bool {
         self.active.len() < 3 && !self.busy_hash(hash)
     }
     pub fn busy_hash(&self, hash: &str) -> bool {
         self.active
             .values()
-            .any(|active| active.operation.hash == hash)
+            .any(|active| active.source.is_some() || active.operation.hash == hash)
     }
     pub fn open(storage: &mut Storage) -> Result<Self> {
         storage.recover_packages().map_err(|e| e.to_string())?;
@@ -250,13 +267,17 @@ impl Packages {
                 worker_progress,
             )
             .await;
-            let _ = sender.send(outcome);
+            let _ = sender.send(outcome.map(|prepared| PreparedImport {
+                prepared,
+                local: None,
+            }));
         });
         self.active.insert(
             operation.id.clone(),
             Active {
                 operation: operation.clone(),
-                entry,
+                entry: Some(entry),
+                source: None,
                 cancel,
                 progress,
                 result,
@@ -294,7 +315,12 @@ impl Packages {
             .into_iter()
             .find(|e| &e.reference == reference)
             .ok_or("The exact local content is missing.")?;
-        let prepared = storage.prepared_artifact(&reference.hash).map_err(|e| e.to_string())?.ok_or("This local content has no verified file manifest. Import the exact build again when local imports are supported.")?;
+        let prepared = storage
+            .prepared_artifact(&reference.hash)
+            .map_err(|e| e.to_string())?
+            .ok_or(
+                "This local content has no verified file manifest. Import the exact build again.",
+            )?;
         let total_bytes = prepared
             .files
             .iter()
@@ -331,13 +357,17 @@ impl Packages {
                 )?;
                 Ok(prepared)
             })();
-            let _ = sender.send(outcome);
+            let _ = sender.send(outcome.map(|prepared| PreparedImport {
+                prepared,
+                local: None,
+            }));
         });
         self.active.insert(
             operation.id.clone(),
             Active {
                 operation: operation.clone(),
-                entry,
+                entry: Some(entry),
+                source: None,
                 cancel,
                 progress: Arc::new(AtomicU64::new(0)),
                 result,
@@ -356,47 +386,81 @@ impl Packages {
                 active.ready = Some(match active.result.try_recv() {
                     Ok(outcome) => outcome,
                     Err(mpsc::TryRecvError::Empty) => continue,
-                    Err(_) => Err("Package worker stopped unexpectedly. Retry the release.".into()),
+                    Err(_) => Err(
+                        "Package worker stopped unexpectedly. Retry package preparation.".into(),
+                    ),
                 });
             }
             // Completion is committed here, so cancellation can still win after extraction.
-            let outcome = active.ready.as_ref().unwrap().clone().and_then(|prepared| {
+            let outcome = active.ready.as_ref().unwrap().clone().and_then(|result| {
                 active.cancel.check()?;
-                if active.entry.reference.origin == Origin::LocalImport {
+                if result.local.is_some() {
+                    return Ok(result);
+                }
+                let entry = active
+                    .entry
+                    .as_ref()
+                    .ok_or("Package metadata is missing.")?;
+                if entry.reference.origin == Origin::LocalImport {
                     if !storage
                         .load()
                         .map_err(|e| e.to_string())?
                         .library
                         .iter()
-                        .any(|e| e.reference == active.entry.reference)
+                        .any(|e| e.reference == entry.reference)
                     {
                         return Err("The local reference changed during verification.".into());
                     }
-                    return Ok(prepared);
+                    return Ok(result);
                 }
                 let catalog = storage
                     .catalog_cache()
                     .map_err(|e| e.to_string())?
                     .and_then(|cache| cache.catalog)
                     .ok_or("Approved catalog is unavailable. Retry after refresh.")?;
-                if catalog.downloadable(&active.operation.release_id)?.sha256 != prepared.hash {
+                if catalog.downloadable(&active.operation.release_id)?.sha256
+                    != result.prepared.hash
+                {
                     return Err("Release identity changed during package preparation.".into());
                 }
-                Ok(prepared)
+                Ok(result)
             });
             match outcome {
-                Ok(prepared) => {
+                Ok(result) => {
+                    let prepared = result.prepared;
+                    if result.local.is_some() {
+                        active.operation.total_bytes = prepared
+                            .files
+                            .iter()
+                            .map(|f| f.size_bytes)
+                            .sum::<u64>()
+                            .max(1);
+                    }
+                    let entry = result
+                        .local
+                        .as_ref()
+                        .map(|local| local.entry())
+                        .or_else(|| active.entry.clone())
+                        .ok_or("Package metadata is missing.")?;
+                    active.operation.hash = prepared.hash.clone();
                     active.operation.status = Status::Completed;
                     active.operation.received_bytes = active.operation.total_bytes;
                     active.operation.message = "Verified package saved in the library.".into();
-                    if let Err(error) = if active.entry.reference.origin == Origin::LocalImport {
+                    if let Err(error) = if result.local.is_some() {
+                        storage.complete_import(
+                            &active.operation,
+                            &entry,
+                            &prepared,
+                            result.local.as_ref(),
+                        )
+                    } else if entry.reference.origin == Origin::LocalImport {
                         storage.save_package(&active.operation)
                     } else {
-                        storage.complete_package(&active.operation, &active.entry, &prepared)
+                        storage.complete_package(&active.operation, &entry, &prepared)
                     } {
                         active.operation.status = Status::Failed;
                         active.operation.message = format!(
-                            "Could not save the prepared package: {error}. Retry the release; verified content was retained."
+                            "Could not save the prepared package: {error}. Retry preparation; verified content was retained."
                         );
                         storage
                             .save_package(&active.operation)

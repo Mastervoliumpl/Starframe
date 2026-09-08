@@ -641,7 +641,8 @@ fn cancellation_preserves_cleanup_failures_in_operation_history() {
         op.id.clone(),
         Active {
             operation: op.clone(),
-            entry,
+            entry: Some(entry),
+            source: None,
             cancel: Cancel::default(),
             progress: Arc::new(AtomicU64::new(0)),
             result,

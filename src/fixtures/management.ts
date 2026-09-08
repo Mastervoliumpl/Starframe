@@ -61,6 +61,8 @@ export function fixtureManagement(
       }))
     : [];
   const data: ModView = {
+    localSources: [],
+    localWatches: [],
     imports: [],
     revision: '0',
     activeCollection: null,
@@ -92,6 +94,9 @@ export function fixtureManagement(
     changed(data);
   };
   return {
+    async pickLocalSource(folder) {
+      return folder ? 'C:\\fixture\\local-build' : 'C:\\fixture\\Local.dll';
+    },
     async saveCollection(text) {
       const url = URL.createObjectURL(
         new Blob([text], { type: 'application/json' }),
@@ -311,8 +316,15 @@ export function fixtureManagement(
         );
         if (action.kind === 'set_enabled' && action.enabled)
           data.enabled.push(entry.reference);
-        if (action.kind === 'uninstall')
+        if (action.kind === 'uninstall') {
           data.library = data.library.filter((e) => e !== entry);
+          data.localSources = data.localSources.filter(
+            (s) => key(s.reference) !== key(action.reference),
+          );
+          data.localWatches = data.localWatches.filter(
+            (w) => key(w.source.reference) !== key(action.reference),
+          );
+        }
         if (!data.activeCollection) {
           data.activeCollection = crypto.randomUUID();
           data.collections.push({
@@ -327,6 +339,65 @@ export function fixtureManagement(
       return structuredClone(data);
     },
     async packages(action) {
+      if (action.kind === 'import_local') {
+        if (!action.path.includes('fixture'))
+          throw new Error(
+            'The browser fixture accepts only fixture source paths.',
+          );
+        const reference: Reference = {
+          modId: 'fixture.local',
+          hash: 'b'.repeat(64),
+          origin: 'local_import',
+          releaseId: null,
+        };
+        operations.unshift({
+          id: crypto.randomUUID(),
+          requestId: action.requestId,
+          releaseId: 'local-import',
+          hash: reference.hash,
+          status: 'completed',
+          message: 'Local fixture copied into the library.',
+          receivedBytes: 100,
+          totalBytes: 100,
+        });
+        if (!data.library.some((e) => key(e.reference) === key(reference))) {
+          data.library.push({
+            reference,
+            name: 'Local build fixture',
+            author: 'Test fixture',
+            version: 'dev.1',
+          });
+          data.localSources.push({
+            reference,
+            path: action.path,
+            manifest: {
+              schemaVersion: 1,
+              modId: reference.modId,
+              name: 'Local build fixture',
+              author: 'Test fixture',
+              version: 'dev.1',
+              layout: {
+                kind: 'starframe_managed_zip',
+                root: '',
+                entryAssembly: 'Local.dll',
+                entryType: 'Fixture.Local',
+              },
+              requires: [],
+              loadBefore: [],
+              loadAfter: [],
+              preferBefore: [],
+              preferAfter: [],
+            },
+          });
+          data.localWatches.push({
+            source: data.localSources.at(-1)!,
+            state: 'watching',
+            message:
+              'Watching the source while Starframe is open. The verified copy is current.',
+          });
+          commit();
+        }
+      }
       if (action.kind === 'prepare') {
         const mod = mods.find((m) =>
           m.releases.some((r) => r.id === action.releaseId),

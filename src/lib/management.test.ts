@@ -19,6 +19,8 @@ const entry: LibraryEntry = {
   },
 };
 const data = (revision = '0'): ModView => ({
+  localSources: [],
+  localWatches: [],
   revision,
   activeCollection: null,
   catalog: null,
@@ -49,6 +51,7 @@ test('an old refresh cannot overwrite an acknowledged edit; repeated input is ig
       .mockResolvedValue(data('1')),
     sharing: vi.fn(),
     saveCollection: vi.fn(),
+    pickLocalSource: vi.fn(),
     packages: vi.fn().mockResolvedValue([]),
   };
   const manager = createManagement(transport);
@@ -76,6 +79,7 @@ test('bulk edits use each confirmed revision and retain partial success on failu
       .mockResolvedValue(data('1')),
     sharing: vi.fn(),
     saveCollection: vi.fn(),
+    pickLocalSource: vi.fn(),
     packages: vi.fn().mockResolvedValue([]),
   };
   const manager = createManagement(transport);
@@ -98,6 +102,7 @@ test('silent operation replies time out without claiming installation', async ()
     mods: vi.fn().mockResolvedValue(data()),
     sharing: vi.fn(),
     saveCollection: vi.fn(),
+    pickLocalSource: vi.fn(),
     packages: vi.fn().mockImplementation(() => new Promise(() => {})),
   });
   const install = manager.install('fixture.1');

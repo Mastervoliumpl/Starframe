@@ -1,6 +1,6 @@
 # Curated release catalog
 
-`releases.json` contains metadata only. The initial revision is empty because no external release has been approved for this catalog. Test releases use `example.invalid` and exist only in automated tests.
+`releases.json` contains metadata only. Revision 2 approves Remmy's Ladder Reporter 0.3.0 as the first catalog mod. It requires the BepInEx plugin support added in Starframe 0.5.0. See the [release review](../docs/verification/ladder-reporter-catalog.md). Test releases use `example.invalid` and exist only in automated tests.
 
 After a maintainer merges catalog changes to `main`, clients read [the catalog endpoint](https://raw.githubusercontent.com/Mastervoliumpl/Starframe/main/catalog/releases.json). GitHub/CDN caching can delay visibility. Catalog edits increase `catalogRevision` without changing VERSION or publishing an app release. Mod archives stay at author-controlled download locations.
 
@@ -28,13 +28,15 @@ The Rust [catalog validator](../src-tauri/src/catalog.rs) defines the accepted s
 | Release `loadBefore`, `loadAfter` | Schema 2 optional arrays of up to 64 distinct other mod IDs each. Mandatory ordering applies when the target mod is enabled; these fields do not install or enable it. Combined cycles block deployment with the involved IDs. |
 | Release `preferBefore`, `preferAfter` | Schema 2 optional arrays with the same bounds. These are warnings when the effective order differs. User priority and mandatory constraints take precedence; absent targets and optional cycles never block deployment. |
 | Release `testedGameBuilds` | Up to 64 distinct observed build labels, each at most 128 bytes. An empty list means no recorded test evidence. These labels do not impose enable/launch restrictions. |
-| Layout `kind` | `starframe_managed_zip`, or schema 2 `starframe_lua_zip`. Conventional BepInEx plugins and maps are unsupported. |
+| Layout `kind` | `starframe_managed_zip`, or schema 2 `starframe_lua_zip`. Starframe 0.5.0 adds supported BepInEx 5 plugins; maps remain unsupported. |
 | Layout `root` | Relative archive folder, or an empty string for the archive root. |
-| Layout `entryAssembly`, `entryType` | Relative `.dll` path within that root and a dotted managed type name implementing the supported runtime lifecycle. |
+| Layout `entryAssembly`, `entryType` | Relative `.dll` path within that root and a dotted managed type name implementing the internal runtime lifecycle or a supported BepInEx 5 `BaseUnityPlugin`. |
 
 `starframe_lua_zip` has no extra layout fields. Its archive contains only `.lua` files under `LJ/lua/`; every file retains that path in the managed payload. The runtime serves verified bytes through the game's cache after cache construction. Target directories must already exist in the game. Paths containing an `ai` component, map content, binaries and other file types are rejected. Managed DLL companion files are not automatically overlaid. Later effective order wins a case-insensitive path collision; Collections lists the participants and expected winner. See [ordering verification](../docs/verification/ordering.md) for the tested game build and remaining limits.
 
-Ordering arrays default to empty for older caches. Changing ordering metadata on an existing release requires a new release ID, like changing its required dependencies. The published development catalog remains empty at schema 1 until a schema 2 release is approved.
+Ordering arrays default to empty for older caches. Changing ordering metadata on an existing release requires a new release ID, like changing its required dependencies. Revision 2 uses schema 1 because Ladder Reporter does not require schema 2 fields.
+
+Managed archives retain all files. `root` locates the entry assembly; it does not filter the archive. Approve the author's mod-only archive when a standalone bundle includes BepInEx or another loader. Those bundled assemblies can conflict with Starframe's runtime even inside private package storage. Catalog metadata supplies the import identity, so authors do not need to include `starframe.local.json`. See [BepInEx plugin support and limits](../docs/bepinex-mods.md).
 
 Paths reuse the runtime's Windows alias/device/path checks. Artifact URLs have the same HTTPS and length rules as source URLs. This issue validates declarations only; archive inspection, hash verification and extraction belong to #17. Catalog validation never loads DLLs or runs installation scripts.
 

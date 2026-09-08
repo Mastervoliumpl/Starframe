@@ -3,6 +3,7 @@ import type { Snapshot } from './generated/model';
 import type { Transport } from './state';
 
 const native: Transport = {
+  pickLocalSource: (folder) => invoke('pick_local_source', { folder }),
   saveCollection: (text) => invoke('save_collection_file', { text }),
   sharing: (action) => invoke('sharing_action', { action }),
   mods: (action) => invoke('mod_action', { action }),

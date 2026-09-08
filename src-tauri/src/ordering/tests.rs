@@ -1,4 +1,5 @@
 use super::*;
+use crate::storage::Origin;
 use serde_json::json;
 
 fn fixture() -> (Catalog, Vec<ModReference>) {

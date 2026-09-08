@@ -1,5 +1,33 @@
 {
   "schemaVersion": 1,
-  "catalogRevision": "1",
-  "mods": []
+  "catalogRevision": "2",
+  "mods": [
+    {
+      "id": "com.sanctuarydb.ladderreporter",
+      "name": "Ladder Reporter",
+      "author": "Remmy",
+      "sourceUrl": "https://github.com/Remmyboy/sanctuary-mods/releases/tag/LadderReporter-0.3.0",
+      "description": "Reports ranked 1v1 results to the SanctuaryDB ladder and connects the site's matchmaking to the game. Requires Starframe 0.5.0 with BepInEx plugin support. Connect through the SanctuaryDB Play page while the game is running.",
+      "releases": [
+        {
+          "id": "com.sanctuarydb.ladderreporter.0.3.0",
+          "version": "0.3.0",
+          "withdrawn": false,
+          "requires": [],
+          "testedGameBuilds": ["25135612"],
+          "artifact": {
+            "url": "https://github.com/Remmyboy/sanctuary-mods/releases/download/LadderReporter-0.3.0/LadderReporter-0.3.0-ModManager.zip",
+            "sha256": "b04adaf8a80ad86966fb4809188f3827f356799af4b089cee80a4174a6a115f2",
+            "sizeBytes": 41596,
+            "layout": {
+              "kind": "starframe_managed_zip",
+              "root": "SanctuaryMods/LadderReporter",
+              "entryAssembly": "LadderReporter.dll",
+              "entryType": "SanctuaryHud.LadderReporterPlugin"
+            }
+          }
+        }
+      ]
+    }
+  ]
 }

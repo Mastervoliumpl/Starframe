@@ -1,7 +1,4 @@
-use crate::{
-    catalog::Catalog,
-    storage::{ModReference, Origin},
-};
+use crate::{catalog::Catalog, storage::ModReference};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap};
 
@@ -23,6 +20,14 @@ pub struct Adjustment {
 }
 
 pub fn resolve(catalog: &Catalog, requested: &[ModReference]) -> Result<Resolution, String> {
+    resolve_with_locals(Some(catalog), &[], requested)
+}
+
+pub fn resolve_with_locals(
+    catalog: Option<&Catalog>,
+    locals: &[crate::local_import::LocalSource],
+    requested: &[ModReference],
+) -> Result<Resolution, String> {
     if requested.len() > crate::runtime_contract::MAX_MODS {
         return Err("This runtime supports at most 256 active mods.".into());
     }
@@ -36,18 +41,22 @@ pub fn resolve(catalog: &Catalog, requested: &[ModReference]) -> Result<Resoluti
                 reference.mod_id
             ));
         }
-        let (owner, release) = catalog.releases().find(|(m, r)| {
-            reference.origin == Origin::Catalog && m.id == reference.mod_id
-                && Some(&r.id) == reference.release_id.as_ref() && r.artifact.sha256 == reference.hash
-        }).ok_or_else(|| format!("Exact release metadata for {} is unavailable. Restore its catalog metadata or disable it.", reference.mod_id))?;
+        let release = crate::mods::metadata(catalog, locals, reference).map_err(|e| {
+            format!(
+                "Exact release metadata for {} is unavailable: {e}",
+                reference.mod_id
+            )
+        })?;
+        names.push(release.name.clone());
         releases.push(release);
-        names.push(owner.name.as_str());
     }
     let mut edges = vec![BTreeSet::new(); requested.len()];
     for (index, release) in releases.iter().enumerate() {
         for required in &release.requires {
-            let dependency = releases.iter().position(|r| &r.id == required)
-                .ok_or_else(|| format!("{} requires release {required}. Enable the missing or disabled dependency, or disable {}.", requested[index].mod_id, requested[index].mod_id))?;
+            let dependency = requested.iter().position(|r| r == required).ok_or_else(|| {
+                let build = required.release_id.as_ref().map(|id| format!("release {id}")).unwrap_or_else(|| format!("local build {} ({})", required.mod_id, required.hash));
+                format!("{} requires {build}. Enable the missing or disabled dependency, or disable {}.", requested[index].mod_id, requested[index].mod_id)
+            })?;
             edges[dependency].insert(index);
         }
         for (targets, before) in [(&release.load_before, true), (&release.load_after, false)] {

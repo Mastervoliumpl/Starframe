@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-No milestone is active. **[0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11)** is complete, including issues #50 through #54. Version `0.4.1` is an internal corrective build; [exit evidence](docs/verification/milestone-0.4.1.md) records its regression tests, native/game acceptance and remaining limits. No app release or installer is published.
+**[0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6)** completes local imports (#24), watched rebuilds (#25), developer workflow verification (#26), BepInEx compatibility and Ladder Reporter (#57), and the current-session game menu (#58) through PR #56. See [exit evidence](docs/verification/milestone-0.5.0.md). Version `0.5.0` is an internal development build. Milestone 0.6.0 is next and has not started. No app release or installer is published.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -16,7 +16,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Complete |
 | [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Complete |
 | [0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11) | Exact approval identities, package/runtime limits and maintenance | Complete |
-| [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Planned |
+| [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Complete: #24–#26, #57–#58 verified |
 | [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Planned |
 | [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Native game integration | Blocked on official game API |
 
@@ -108,11 +108,15 @@ These fixes do not establish general compatibility with conventional BepInEx plu
 
 ### 0.5.0: Local mod development
 
-Planned; starts after 0.4.1 closes. Deliver local DLL/folder imports, normal management controls and stable watched build copies. Exit: local rebuilds apply after game exit, incomplete builds retain usable content, and source files survive uninstall.
+The owner added [#57: BepInEx plugin compatibility and Ladder Reporter verification](https://github.com/Mastervoliumpl/Starframe/issues/57) to this milestone and PR #56. The [compatibility and session-list checks](docs/verification/bepinex-plugins.md) record completed game, settings and guarded cleanup acceptance for #57 and #58. [Ladder Reporter 0.3.0](docs/verification/ladder-reporter-catalog.md) is the first approved catalog mod. This remains an internal milestone, with public alpha distribution gates in 0.6.0.
+
+Complete through PR #56. Issue #24 adds local DLL/folder imports with normal management controls; [local import guidance](docs/verification/local-imports.md) defines the supported inputs and checks. Issue #25 adds [stable watched copies](docs/verification/local-watching.md), and #26 verifies the [developer/game workflow](docs/verification/milestone-0.5.0.md). Exit: local rebuilds apply after game exit, incomplete builds retain usable content, and source files survive uninstall.
 
 - [#24: Import local mods with normal management controls](https://github.com/Mastervoliumpl/Starframe/issues/24)
 - [#25: Follow local builds and apply stable copies after game exit](https://github.com/Mastervoliumpl/Starframe/issues/25)
 - [#26: Verify the local developer workflow and document its limits](https://github.com/Mastervoliumpl/Starframe/issues/26)
+- [#57: Support existing BepInEx plugins and verify Ladder Reporter](https://github.com/Mastervoliumpl/Starframe/issues/57)
+- [#58: Show current-session mods clearly in the game menu](https://github.com/Mastervoliumpl/Starframe/issues/58)
 
 ### 0.6.0: Windows alpha distribution
 
@@ -133,6 +137,8 @@ Blocked on the game's official mod API and completion of 0.6.0. Replace the curr
 - [#32: Integrate native mod loading with recoverable migration](https://github.com/Mastervoliumpl/Starframe/issues/32)
 
 ## Working boundaries
+
+[Mod submissions and hosting](docs/planning/mod-hosting.md) records the owner's future interest in an upload/submission website, richer mod pages, download counts and ratings. No implementation milestone is assigned; 0.5.0 remains focused on the verified local development workflow.
 
 Tests accompany each feature. Installer and game acceptance checks at the end of a milestone add evidence across modules; they do not postpone unit or integration tests.
 

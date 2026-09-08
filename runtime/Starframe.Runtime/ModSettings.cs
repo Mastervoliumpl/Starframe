@@ -21,15 +21,26 @@ public sealed class ModSettings
 
     public ModSetting<T> Bind<T>(string key, string label, string description, T defaultValue, bool live = false)
     {
+        ValidateRegistration(key, label, description);
+        var setting = new ModSetting<T>(key, label, description, defaultValue, live, read(key), value => write(key, value));
+        entries.Add(setting);
+        return setting;
+    }
+
+    public void Register(ModSetting setting)
+    {
+        ValidateRegistration(setting.Key, setting.Label, setting.Description);
+        entries.Add(setting);
+    }
+
+    private void ValidateRegistration(string key, string label, string description)
+    {
         if (!Regex.IsMatch(key, @"\A[a-z][a-z0-9_.-]{0,127}\z", RegexOptions.CultureInvariant))
             throw new ArgumentException("Use a stable lowercase setting key.", nameof(key));
         if (entries.Any(e => e.Key == key)) throw new ArgumentException("Setting key is already registered.", nameof(key));
         if (entries.Count >= 128) throw new InvalidOperationException("A mod can register at most 128 settings.");
         if (string.IsNullOrWhiteSpace(label) || label.Length > 160 || description.Length > 2000)
             throw new ArgumentException("Settings need a label of 1–160 characters and a description of at most 2000 characters.");
-        var setting = new ModSetting<T>(key, label, description, defaultValue, live, read(key), value => write(key, value));
-        entries.Add(setting);
-        return setting;
     }
 }
 
@@ -41,6 +52,8 @@ public abstract class ModSetting
     public string Label { get; }
     public string Description { get; }
     public bool Live { get; }
+    public virtual bool RequiresMainThread => false;
+    public virtual string ApplyDescription => Live ? "Applies while the game is running." : "Takes effect after restart.";
     public string? Error { get; protected set; }
     public abstract Type ValueType { get; }
     public abstract string Text { get; }

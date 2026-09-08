@@ -52,6 +52,7 @@ test('a successful reconnect clears its connection error', async () => {
     mods: vi.fn(),
     sharing: vi.fn(),
     saveCollection: vi.fn(),
+    pickLocalSource: vi.fn(),
     packages: vi.fn(),
     start: vi.fn(),
     cancel: vi.fn(),
@@ -76,6 +77,7 @@ test('stale revisions, sessions and retired subscriptions cannot overwrite curre
     mods: vi.fn(),
     sharing: vi.fn(),
     saveCollection: vi.fn(),
+    pickLocalSource: vi.fn(),
     packages: vi.fn(),
     start: vi.fn(),
     cancel: vi.fn(),
@@ -109,6 +111,7 @@ test('a lost acknowledgement can be retried with the same request ID', async () 
     mods: vi.fn(),
     sharing: vi.fn(),
     saveCollection: vi.fn(),
+    pickLocalSource: vi.fn(),
     packages: vi.fn(),
     start: vi
       .fn()
@@ -155,6 +158,7 @@ test('cancellation acknowledgement does not mark an operation cancelled and repe
     mods: vi.fn(),
     sharing: vi.fn(),
     saveCollection: vi.fn(),
+    pickLocalSource: vi.fn(),
     packages: vi.fn(),
     start: vi.fn(),
     cancel: vi.fn(
@@ -192,6 +196,7 @@ test('silent channels reconnect and pending actions do not duplicate or claim su
     mods: vi.fn(),
     sharing: vi.fn(),
     saveCollection: vi.fn(),
+    pickLocalSource: vi.fn(),
     packages: vi.fn(),
     start: vi.fn(
       () =>

@@ -22,16 +22,18 @@ public sealed class ActivationSession : IDisposable
     private readonly Func<string, ModSettings> settingsFactory;
     private readonly Dictionary<string, ModSettings> settings = new();
     private readonly Action<string, IReadOnlyDictionary<string, byte[]>>? applyLua;
+    private readonly Func<string, Type, string, IMod>? adaptPlugin;
     public IReadOnlyDictionary<string, ModSettings> Settings => settings;
     public string SessionId { get; } = Guid.NewGuid().ToString("D");
     public int OmittedDisabledMods { get; private set; }
     public JsonElement[] InstalledMods { get; private set; } = System.Array.Empty<JsonElement>();
 
     public ActivationSession(Action<string> log, IEnumerable<string> gameAssemblies, Func<string, ModSettings>? settingsFactory = null,
-        Action<string, IReadOnlyDictionary<string, byte[]>>? applyLua = null)
+        Action<string, IReadOnlyDictionary<string, byte[]>>? applyLua = null, Func<string, Type, string, IMod>? adaptPlugin = null)
     {
         this.log = log;
         this.applyLua = applyLua;
+        this.adaptPlugin = adaptPlugin;
         this.settingsFactory = settingsFactory ?? (_ => new ModSettings(_ => null, (_, _) => throw new InvalidOperationException("Settings persistence is unavailable.")));
         trusted = new HashSet<string>(AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetName().Name!), StringComparer.OrdinalIgnoreCase);
         trusted.UnionWith(gameAssemblies);
@@ -93,6 +95,25 @@ public sealed class ActivationSession : IDisposable
             catch (Exception error) { errors[id] = Message(error); }
         }
         AppDomain.CurrentDomain.AssemblyResolve += Resolve;
+        var types = new Dictionary<string, Type>();
+        var plugins = new Dictionary<string, IMod>();
+        var entryErrors = new Dictionary<string, Exception>();
+        foreach (var mod in activation.GetProperty("mods").EnumerateArray())
+        {
+            string id = mod.GetProperty("modId").GetString()!;
+            if (errors.ContainsKey(id) || mod.GetProperty("entryAssembly").ValueKind == JsonValueKind.Null) continue;
+            try
+            {
+                var assembly = Load(Path.GetFileNameWithoutExtension(mod.GetProperty("entryAssembly").GetString()!));
+                var type = assembly.GetType(mod.GetProperty("entryType").GetString()!, true)!;
+                if (type.IsAbstract) throw new NotSupportedException("The entry type must be concrete.");
+                if (typeof(IMod).IsAssignableFrom(type)) types.Add(id, type);
+                else if (adaptPlugin != null) plugins.Add(id, adaptPlugin(id, type,
+                    Path.Combine(root, mod.GetProperty("root").GetString()!, mod.GetProperty("entryAssembly").GetString()!)));
+                else throw new NotSupportedException("This runtime does not support the plugin entry type.");
+            }
+            catch (Exception error) { entryErrors[id] = error; }
+        }
         var results = new List<object>();
         var successful = new HashSet<string>();
         foreach (var mod in activation.GetProperty("mods").EnumerateArray())
@@ -128,12 +149,8 @@ public sealed class ActivationSession : IDisposable
                 }
                 else
                 {
-                    string name = Path.GetFileNameWithoutExtension(mod.GetProperty("entryAssembly").GetString()!);
-                    var assembly = Load(name);
-                    var type = assembly.GetType(mod.GetProperty("entryType").GetString()!, true)!;
-                    if (type.IsAbstract || !typeof(IMod).IsAssignableFrom(type))
-                        throw new NotSupportedException("Entry type must implement Starframe IMod. Conventional BepInEx plugins require a compatibility adapter.");
-                    instance = (IMod)Activator.CreateInstance(type)!;
+                    if (entryErrors.TryGetValue(id, out var entryError)) throw entryError;
+                    instance = plugins.TryGetValue(id, out var plugin) ? plugin : (IMod)Activator.CreateInstance(types[id])!;
                     var modSettings = this.settingsFactory(id);
                     instance.Initialize(new ModContext(id, Path.Combine(root, mod.GetProperty("root").GetString()!), log, modSettings));
                     settings.Add(id, modSettings);

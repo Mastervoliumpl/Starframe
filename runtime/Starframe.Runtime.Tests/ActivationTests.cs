@@ -24,7 +24,11 @@ public sealed class ActivationTests
                 ("first", "First", System.Array.Empty<string>()),
                 ("second", "Second", new[]{"first"}),
                 ("failure", "Failing", System.Array.Empty<string>()),
-                ("dependent", "Second", new[]{"failure"})
+                ("dependent", "Second", new[]{"failure"}),
+                ("external", "ExternalEntry", System.Array.Empty<string>()),
+                ("external-failure", "ExternalEntry", new[]{"external"}),
+                ("external-dependent", "ExternalEntry", new[]{"external-failure"}),
+                ("external-invalid", "ExternalEntry", System.Array.Empty<string>())
             };
             foreach (var (id, _, _) in specs)
             {
@@ -50,15 +54,25 @@ public sealed class ActivationTests
                 })
             });
             var messages = new List<string>();
-            using var session = new ActivationSession(messages.Add, new[] { "netstandard", "System.Runtime" });
+            var prepared = new List<string>();
+            using var session = new ActivationSession(messages.Add, new[] { "netstandard", "System.Runtime" }, adaptPlugin: (id, type, path) =>
+            {
+                Assert.AreEqual("Starframe.FixtureMods.ExternalEntry", type.FullName);
+                Assert.AreEqual(Path.Combine(root, id, "Starframe.FixtureMods.dll"), path);
+                prepared.Add(id);
+                if (id == "external-invalid") throw new NotSupportedException("Unsupported fixture entry.");
+                return new ExternalMod(id, prepared, messages);
+            });
             byte[] report = session.Activate(root, manifest);
             using var result = Contracts.Read(report, "report");
-            CollectionAssert.AreEqual(new[] { "loaded", "loaded", "failed", "skipped_dependency" },
+            CollectionAssert.AreEqual(new[] { "loaded", "loaded", "failed", "skipped_dependency", "loaded", "failed", "skipped_dependency", "failed" },
                 result.RootElement.GetProperty("mods").EnumerateArray().Select(m => m.GetProperty("outcome").GetString()).ToArray());
             Assert.IsTrue(messages.IndexOf("first: first initialized") < messages.IndexOf("second: second initialized"));
             Assert.IsTrue(messages.Contains("failure: failed fixture cleaned up"));
-            Assert.AreEqual(5, session.InstalledMods.Length);
-            CollectionAssert.AreEquivalent(new[] { "first", "second" }, session.Settings.Keys.ToArray());
+            Assert.AreEqual(9, session.InstalledMods.Length);
+            CollectionAssert.AreEquivalent(new[] { "first", "second", "external" }, session.Settings.Keys.ToArray());
+            Assert.IsTrue(messages.Contains("external-failure: external stopped"));
+            Assert.IsFalse(messages.Contains("external-dependent: external initialized"));
             Assert.AreEqual(5, session.Settings["first"].Entries.Count);
             Assert.ThrowsExactly<InvalidOperationException>(() => session.Activate(root, manifest));
             string path = Path.Combine(root, "report.json");
@@ -69,6 +83,17 @@ public sealed class ActivationTests
             Assert.AreEqual("first: first stopped", messages.Last());
         }
         finally { Directory.Delete(root, true); }
+    }
+
+    private sealed class ExternalMod(string id, List<string> prepared, List<string> messages) : IMod, IModShutdown
+    {
+        public void Initialize(IModContext context)
+        {
+            Assert.AreEqual(4, prepared.Count, "All external entries must be prepared before the first plugin starts.");
+            context.Log("external initialized");
+            if (id == "external-failure") throw new InvalidOperationException("External startup failure.");
+        }
+        public void Shutdown() => messages.Add(id + ": external stopped");
     }
 
     [TestMethod]
