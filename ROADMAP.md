@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-No milestone is active. **[0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5)** is complete, including issues #20 through #23. Version `0.4.0` is an internal build; [exit evidence](docs/verification/milestone-0.4.0.md) records the delivered workflow and known limits. **[0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11)** is next and remains planned. No app release or installer is published.
+**0.4.1 is active**, covering correctness fixes #50–#53 and maintenance #54. **[0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5)** is complete, including issues #20 through #23. Version `0.4.0` is an internal build; [exit evidence](docs/verification/milestone-0.4.0.md) records the delivered workflow and known limits. **[0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11)** is in development. No app release or installer is published.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -15,7 +15,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | [0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3) | Starframe in-game runtime | Complete |
 | [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Complete |
 | [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Complete |
-| [0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11) | Exact approval identities and package/runtime limits | Planned |
+| [0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11) | Exact approval identities, package/runtime limits and maintenance | In progress |
 | [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Planned |
 | [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Planned |
 | [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Native game integration | Blocked on official game API |
