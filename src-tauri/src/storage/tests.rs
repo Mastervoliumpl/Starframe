@@ -30,7 +30,7 @@ fn catalog_migration_and_failed_replacement_retain_records() {
     store.put_library_entry(&entry(), 0).unwrap();
     store
         .conn
-        .execute_batch("DROP TABLE local_sources; DROP TABLE collection_imports; DROP TABLE pending_removals; DROP TABLE package_operations; DROP TABLE prepared_artifacts; DROP TABLE catalog_cache; PRAGMA user_version=5;")
+        .execute_batch("DROP TABLE local_watches; DROP TABLE local_sources; DROP TABLE collection_imports; DROP TABLE pending_removals; DROP TABLE package_operations; DROP TABLE prepared_artifacts; DROP TABLE catalog_cache; PRAGMA user_version=5;")
         .unwrap();
     drop(store);
     let mut store = Storage::open(root.path()).unwrap();
@@ -72,7 +72,7 @@ fn game_selection_survives_migration_and_restart() {
     store.put_library_entry(&entry(), 0).unwrap();
     store
         .conn
-        .execute_batch("DROP TABLE local_sources; DROP TABLE collection_imports; DROP TABLE pending_removals; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 2;")
+        .execute_batch("DROP TABLE local_watches; DROP TABLE local_sources; DROP TABLE collection_imports; DROP TABLE pending_removals; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 2;")
         .unwrap();
     drop(store);
     let mut store = Storage::open(root.path()).unwrap();
@@ -167,7 +167,7 @@ fn migrations_back_up_and_failed_migrations_roll_back() {
     store
         .conn
         .execute_batch(
-            "DROP TABLE local_sources; DROP TABLE collection_imports; DROP TABLE pending_removals; DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 1;",
+            "DROP TABLE local_watches; DROP TABLE local_sources; DROP TABLE collection_imports; DROP TABLE pending_removals; DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 1;",
         )
         .unwrap();
     let backup = store.backup().unwrap();
@@ -347,7 +347,7 @@ fn crash_worker() {
         if mode == "migration" {
             store
                 .conn
-                .execute_batch("DROP TABLE local_sources; DROP TABLE collection_imports; DROP TABLE pending_removals; DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 1;")
+                .execute_batch("DROP TABLE local_watches; DROP TABLE local_sources; DROP TABLE collection_imports; DROP TABLE pending_removals; DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 1;")
                 .unwrap();
             store.backup().unwrap();
             store.conn.execute("BEGIN IMMEDIATE", []).unwrap();

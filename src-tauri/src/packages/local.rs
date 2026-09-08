@@ -117,6 +117,23 @@ fn prepare_local(
     cancel: &Cancel,
     progress: &AtomicU64,
 ) -> Result<PreparedImport> {
+    prepare_source(root, id, source, cancel, progress, Mode::Import)
+}
+
+pub(super) enum Mode<'a> {
+    Import,
+    Inspect,
+    Copy(&'a str),
+}
+
+pub(super) fn prepare_source(
+    root: &Path,
+    id: &str,
+    source: &Path,
+    cancel: &Cancel,
+    progress: &AtomicU64,
+    mode: Mode<'_>,
+) -> Result<PreparedImport> {
     let mut directory = Directory::open(root)?;
     directory.directory("artifacts")?;
     let stage = directory.directory(&format!("package-staging/{id}/content"))?;
@@ -193,6 +210,9 @@ fn prepare_local(
                 return Err("The local build exceeds 256 MiB.".into());
             }
             let (size, hash) = digest(&mut input, 64 * 1024 * 1024, cancel)?;
+            if !matches!(mode, Mode::Import) && relative.to_ascii_lowercase().ends_with(".dll") {
+                super::watch::assembly::check(&mut input)?;
+            }
             files.push(PreparedFile {
                 path: relative,
                 sha256: hash,
@@ -201,6 +221,44 @@ fn prepare_local(
             handles.push(input);
         }
         layout(&files, &manifest.layout)?;
+        let mut sorted = files.clone();
+        sorted.sort_by(|a, b| a.path.cmp(&b.path));
+        let mut hash = Sha256::new();
+        hash.update(b"starframe-local-v1\0");
+        hash.update(serde_json::to_vec(&(&manifest, &sorted)).map_err(|e| e.to_string())?);
+        let hash = format!("{:x}", hash.finalize());
+        let prepared = Prepared {
+            hash: hash.clone(),
+            files: sorted,
+        };
+        let local = LocalSource {
+            reference: ModReference {
+                mod_id: manifest.mod_id.clone(),
+                hash: hash.clone(),
+                origin: Origin::LocalImport,
+                release_id: None,
+            },
+            path: source
+                .to_str()
+                .ok_or("Source path must use Unicode names.")?
+                .into(),
+            manifest,
+        };
+        local.validate()?;
+        if matches!(mode, Mode::Inspect) {
+            if paths != source_paths(base, source, is_folder, &manifest_path, &mut pins, cancel)? {
+                return Err("The local file list changed. Waiting for the build to finish.".into());
+            }
+            return Ok(PreparedImport {
+                prepared,
+                local: Some(local),
+            });
+        }
+        if let Mode::Copy(expected) = mode
+            && expected != hash
+        {
+            return Err("The local build changed again. Waiting for writes to settle.".into());
+        }
         crate::space::require(root, files.iter().map(|f| f.size_bytes).sum())?;
         for (file, input) in files.iter().zip(&mut handles) {
             input.rewind().map_err(|e| e.to_string())?;
@@ -245,15 +303,6 @@ fn prepare_local(
                 "The local file list changed during import. Finish the build and retry.".into(),
             );
         }
-        files.sort_by(|a, b| a.path.cmp(&b.path));
-        let mut hash = Sha256::new();
-        hash.update(b"starframe-local-v1\0");
-        hash.update(serde_json::to_vec(&(&manifest, &files)).map_err(|e| e.to_string())?);
-        let hash = format!("{:x}", hash.finalize());
-        let prepared = Prepared {
-            hash: hash.clone(),
-            files,
-        };
         cancel.check()?;
         let target = root.join("artifacts").join(&hash);
         match fs::symlink_metadata(&target) {
@@ -265,20 +314,6 @@ fn prepare_local(
             }
             Err(e) => return Err(e.to_string()),
         }
-        let local = LocalSource {
-            reference: ModReference {
-                mod_id: manifest.mod_id.clone(),
-                hash,
-                origin: Origin::LocalImport,
-                release_id: None,
-            },
-            path: source
-                .to_str()
-                .ok_or("Source path must use Unicode names.")?
-                .into(),
-            manifest,
-        };
-        local.validate()?;
         Ok(PreparedImport {
             prepared,
             local: Some(local),

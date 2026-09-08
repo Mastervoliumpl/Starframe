@@ -137,6 +137,10 @@ impl Storage {
             }
             if reference.origin == Origin::LocalImport {
                 tx.execute(
+                    "DELETE FROM local_watches WHERE mod_id=? AND hash=?",
+                    rusqlite::params![reference.mod_id, reference.hash],
+                )?;
+                tx.execute(
                     "DELETE FROM local_sources WHERE mod_id=? AND hash=?",
                     rusqlite::params![reference.mod_id, reference.hash],
                 )?;

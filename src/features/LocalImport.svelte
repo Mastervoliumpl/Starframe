@@ -75,8 +75,9 @@
       aria-describedby="local-manifest-help"
     />
     <p>
-      Import the finished build. Automatic rebuild watching is not available in
-      this development build.
+      Starframe watches this source while open. Verified rebuilds update the
+      active local collection; game files change after the game closes. Shared
+      collections keep their exact builds. DLL hot reload is not supported.
     </p>
     {#if $manager.error}<p class="error" role="alert">{$manager.error}</p>{/if}
     {#if busy}<p role="status">

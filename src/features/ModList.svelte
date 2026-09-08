@@ -111,6 +111,12 @@
     ),
   );
   let copyStatus = $state('');
+  const watch = (row: Row) =>
+    $manager.data?.localWatches.find(
+      (w) =>
+        row.installed &&
+        key(w.source.reference) === key(row.installed.reference),
+    );
   const busy = $derived(unavailable || $manager.pending.includes('membership'));
   const enabled = (row: Row) =>
     !!row.installed &&
@@ -274,6 +280,19 @@
                   ? 'Local import'
                   : 'Catalog release'}
               </p>
+              {#if row.installed?.reference.origin === 'local_import'}
+                <p class="technical">
+                  Build {row.installed.reference.hash.slice(0, 8)} · {watch(row)
+                    ? 'Following source'
+                    : 'Saved build'}
+                </p>
+                {#if watch(row)}<p
+                    aria-live="polite"
+                    class:error={watch(row)?.state === 'error'}
+                  >
+                    {watch(row)?.message}
+                  </p>{/if}
+              {/if}
               {#if row.installed?.reference.origin !== 'local_import'}<p
                   class="compatibility"
                 >
@@ -387,6 +406,16 @@
         <p>
           Local imports use a managed copy. Starframe does not check them for
           catalog updates or game-version compatibility.
+        </p>
+        <p>
+          {watch(opened)?.message ??
+            'This is a saved build. Import it again to follow this source.'}
+        </p>
+        <p>
+          Only the latest explicitly imported source for each mod is watched.
+          Rebuilds advance the matching active local collection entry; shared
+          and inactive collections keep their exact builds. Older copies remain
+          available.
         </p>
         <h3>Required builds</h3>
         <p>

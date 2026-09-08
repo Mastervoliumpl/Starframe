@@ -20,6 +20,7 @@ const entry: LibraryEntry = {
 };
 const data = (revision = '0'): ModView => ({
   localSources: [],
+  localWatches: [],
   revision,
   activeCollection: null,
   catalog: null,

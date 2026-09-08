@@ -17,7 +17,7 @@ use std::{
     },
     time::Duration,
 };
-use tokio::{io::AsyncWriteExt, sync::watch};
+use tokio::{io::AsyncWriteExt, sync::watch as cancellation};
 use uuid::Uuid;
 
 mod archive;
@@ -26,6 +26,7 @@ mod local;
 #[cfg(test)]
 mod tests;
 mod transfer;
+pub mod watch;
 use archive::*;
 pub(crate) use archive::{layout, supported_files};
 use artifacts::*;
@@ -106,13 +107,13 @@ pub struct Prepared {
 #[derive(Clone)]
 struct Cancel {
     flag: Arc<AtomicBool>,
-    signal: watch::Sender<bool>,
+    signal: cancellation::Sender<bool>,
 }
 impl Default for Cancel {
     fn default() -> Self {
         Self {
             flag: Arc::new(AtomicBool::new(false)),
-            signal: watch::channel(false).0,
+            signal: cancellation::channel(false).0,
         }
     }
 }
@@ -158,6 +159,9 @@ pub struct Packages {
 }
 
 impl Packages {
+    pub fn busy(&self) -> bool {
+        !self.active.is_empty()
+    }
     pub(crate) fn can_start(&self, hash: &str) -> bool {
         self.active.len() < 3 && !self.busy_hash(hash)
     }

@@ -147,6 +147,17 @@ impl Storage {
         prepared: &Prepared,
         local: Option<&crate::local_import::LocalSource>,
     ) -> Result<()> {
+        self.commit_import(operation, entry, prepared, local, None)
+    }
+
+    pub(super) fn commit_import(
+        &mut self,
+        operation: &Operation,
+        entry: &LibraryEntry,
+        prepared: &Prepared,
+        local: Option<&crate::local_import::LocalSource>,
+        advance: Option<(&str, &ModReference)>,
+    ) -> Result<()> {
         let record = operation_record(operation)?;
         let manifest = prepared_record(prepared)?;
         crate::packages::supported_files(&prepared.files).map_err(Error::Invalid)?;
@@ -193,6 +204,16 @@ impl Storage {
             let record =
                 serde_json::to_string(source).map_err(|e| Error::Invalid(e.to_string()))?;
             tx.execute("INSERT INTO local_sources (mod_id,hash,record) VALUES (?,?,?) ON CONFLICT(mod_id,hash) DO UPDATE SET record=excluded.record", rusqlite::params![entry.reference.mod_id, prepared.hash, record])?;
+            tx.execute("INSERT INTO local_watches(mod_id,hash) VALUES (?,?) ON CONFLICT(mod_id) DO UPDATE SET hash=excluded.hash,state='watching',message='Verified build saved. Active local collections apply when the game is closed.'", rusqlite::params![entry.reference.mod_id, prepared.hash])?;
+        }
+        if let Some((collection, previous)) = advance {
+            if tx.execute("UPDATE collection_entries SET hash=? WHERE collection_id=? AND mod_id=? AND hash=? AND origin='local_import' AND release_id IS NULL", rusqlite::params![prepared.hash, collection, previous.mod_id, previous.hash])? != 1 {
+                return Err(Error::Invalid("The active local build changed before it could be saved.".into()));
+            }
+            tx.execute(
+                "UPDATE collections SET revision=revision+1 WHERE id=?",
+                [collection],
+            )?;
         }
         if tx.execute(
             "UPDATE package_operations SET record=? WHERE id=? AND request_id=?",

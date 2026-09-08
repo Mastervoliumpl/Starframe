@@ -117,7 +117,6 @@ await withDesktop(
   },
   offline,
 );
-await writeFile(content, 'author next build\n');
 await withDesktop(
   data,
   async (page) => {
@@ -130,6 +129,7 @@ await withDesktop(
         join(data, 'artifacts', reference.hash, 'LJ', 'lua', 'fixture.lua'),
       ),
     ).toEqual(original);
+    await writeFile(content, 'author next build\n');
     await page
       .getByRole('button', {
         name: 'Uninstall Native local import fixture dev.1',

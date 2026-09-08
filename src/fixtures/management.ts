@@ -62,6 +62,7 @@ export function fixtureManagement(
     : [];
   const data: ModView = {
     localSources: [],
+    localWatches: [],
     imports: [],
     revision: '0',
     activeCollection: null,
@@ -315,8 +316,15 @@ export function fixtureManagement(
         );
         if (action.kind === 'set_enabled' && action.enabled)
           data.enabled.push(entry.reference);
-        if (action.kind === 'uninstall')
+        if (action.kind === 'uninstall') {
           data.library = data.library.filter((e) => e !== entry);
+          data.localSources = data.localSources.filter(
+            (s) => key(s.reference) !== key(action.reference),
+          );
+          data.localWatches = data.localWatches.filter(
+            (w) => key(w.source.reference) !== key(action.reference),
+          );
+        }
         if (!data.activeCollection) {
           data.activeCollection = crypto.randomUUID();
           data.collections.push({
@@ -380,6 +388,12 @@ export function fixtureManagement(
               preferBefore: [],
               preferAfter: [],
             },
+          });
+          data.localWatches.push({
+            source: data.localSources.at(-1)!,
+            state: 'watching',
+            message:
+              'Watching the source while Starframe is open. The verified copy is current.',
           });
           commit();
         }

@@ -34,6 +34,7 @@ test('local imports use normal controls and retain keyboard focus without catalo
     name: 'Enable Local build fixture dev.1',
   });
   await expect(enabled).not.toBeChecked();
+  await expect(region.getByText(/Build .* · Following source/)).toBeVisible();
   await enabled.check();
   await expect(enabled).toBeChecked();
   await region
@@ -41,6 +42,9 @@ test('local imports use normal controls and retain keyboard focus without catalo
     .click();
   const details = region.getByRole('complementary', { name: 'Mod details' });
   await expect(details).toContainText('C:\\fixture\\local-build');
+  await expect(details).toContainText(
+    'inactive collections keep their exact builds',
+  );
   await expect(
     details.getByRole('heading', { name: 'Compatibility', exact: true }),
   ).toHaveCount(0);
