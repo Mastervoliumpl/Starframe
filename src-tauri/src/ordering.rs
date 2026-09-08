@@ -7,6 +7,7 @@ use std::collections::{BTreeSet, HashMap};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Resolution {
     pub effective: Vec<ModReference>,
     pub adjustments: Vec<Adjustment>,
@@ -14,6 +15,7 @@ pub struct Resolution {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Adjustment {
     pub before: String,
     pub after: String,
@@ -21,7 +23,7 @@ pub struct Adjustment {
 }
 
 pub fn resolve(catalog: &Catalog, requested: &[ModReference]) -> Result<Resolution, String> {
-    if requested.len() > 256 {
+    if requested.len() > crate::runtime_contract::MAX_MODS {
         return Err("This runtime supports at most 256 active mods.".into());
     }
     let mut positions = HashMap::new();

@@ -139,6 +139,7 @@ impl Storage {
     ) -> Result<()> {
         let record = operation_record(operation)?;
         let manifest = prepared_record(prepared)?;
+        crate::packages::supported_files(&prepared.files).map_err(Error::Invalid)?;
         validate_reference(&entry.reference)?;
         validate_text(&entry.name, "Mod name")?;
         validate_text(&entry.version, "Version label")?;
@@ -169,7 +170,7 @@ impl Storage {
             ));
         }
         tx.execute("INSERT INTO prepared_artifacts (hash, record) VALUES (?, ?) ON CONFLICT(hash) DO NOTHING", rusqlite::params![prepared.hash, manifest])?;
-        tx.execute("INSERT INTO library (mod_id, hash, origin, release_id, name, author, version) VALUES (?, ?, 'catalog', ?, ?, ?, ?) ON CONFLICT(mod_id, hash) DO NOTHING", rusqlite::params![entry.reference.mod_id, prepared.hash, operation.release_id, entry.name, entry.author, entry.version])?;
+        tx.execute("INSERT INTO library (mod_id, hash, origin, release_id, name, author, version) VALUES (?, ?, 'catalog', ?, ?, ?, ?) ON CONFLICT DO NOTHING", rusqlite::params![entry.reference.mod_id, prepared.hash, operation.release_id, entry.name, entry.author, entry.version])?;
         if tx.execute(
             "UPDATE package_operations SET record=? WHERE id=? AND request_id=?",
             rusqlite::params![record, operation.id, operation.request_id],

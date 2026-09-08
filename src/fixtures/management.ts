@@ -6,6 +6,7 @@ import type {
   Reference,
   SharingReply,
 } from '../lib/management';
+import { key } from '../lib/management';
 export function fixtureManagement(
   changed: (data: ModView) => void,
 ): ManagementTransport {
@@ -300,12 +301,14 @@ export function fixtureManagement(
             'The library changed. Retry with its current revision.',
           );
         const entry = data.library.find(
-          (e) =>
-            e.reference.modId === action.modId &&
-            e.reference.hash === action.hash,
+          (e) => key(e.reference) === key(action.reference),
         );
         if (!entry) throw new Error('Exact release is not installed.');
-        data.enabled = data.enabled.filter((r) => r.modId !== action.modId);
+        data.enabled = data.enabled.filter((r) =>
+          action.kind === 'set_enabled' && action.enabled
+            ? r.modId !== action.reference.modId
+            : key(r) !== key(action.reference),
+        );
         if (action.kind === 'set_enabled' && action.enabled)
           data.enabled.push(entry.reference);
         if (action.kind === 'uninstall')

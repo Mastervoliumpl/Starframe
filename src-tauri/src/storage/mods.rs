@@ -20,7 +20,7 @@ impl Storage {
     }
 
     pub fn set_mod_membership(&mut self, entries: &[ModReference], expected: i64) -> Result<i64> {
-        if entries.len() > 256 {
+        if entries.len() > crate::runtime_contract::MAX_MODS {
             return Err(Error::Invalid(
                 "This runtime supports at most 256 active mods.".into(),
             ));
@@ -64,8 +64,7 @@ impl Storage {
 
     pub fn uninstall_mod(
         &mut self,
-        mod_id: &str,
-        hash: &str,
+        reference: &ModReference,
         expected: i64,
         confirmed: bool,
     ) -> Result<i64> {
@@ -78,17 +77,13 @@ impl Storage {
         let entry = records
             .library
             .iter()
-            .find(|e| e.reference.mod_id == mod_id && e.reference.hash == hash)
+            .find(|e| &e.reference == reference)
             .ok_or_else(|| Error::Invalid("This exact package is not in the library.".into()))?;
         validate_reference(&entry.reference)?;
         let affected: Vec<_> = records
             .collections
             .iter()
-            .filter(|c| {
-                c.entries
-                    .iter()
-                    .any(|r| r.mod_id == mod_id && r.hash == hash)
-            })
+            .filter(|c| c.entries.iter().any(|r| r == reference))
             .map(|c| c.name.as_str())
             .collect();
         if !affected.is_empty() && !confirmed {
@@ -107,11 +102,7 @@ impl Storage {
                 .iter()
                 .find(|c| Some(&c.id) == records.active_collection.as_ref())
             {
-                let remaining: Vec<_> = active
-                    .entries
-                    .iter()
-                    .filter(|r| !(r.mod_id == mod_id && r.hash == hash))
-                    .collect();
+                let remaining: Vec<_> = active.entries.iter().filter(|r| *r != reference).collect();
                 tx.execute(
                     "DELETE FROM collection_entries WHERE collection_id=?",
                     [&active.id],
@@ -125,16 +116,23 @@ impl Storage {
                 )?;
             }
             tx.execute(
-                "DELETE FROM library WHERE mod_id=? AND hash=?",
-                [mod_id, hash],
+                "DELETE FROM library WHERE mod_id=? AND hash=? AND origin=? AND release_id IS ?",
+                rusqlite::params![
+                    reference.mod_id,
+                    reference.hash,
+                    reference.origin.as_str(),
+                    reference.release_id
+                ],
             )?;
-            if tx.query_row("SELECT count(*) FROM library WHERE hash=?", [hash], |r| {
-                r.get::<_, i64>(0)
-            })? == 0
+            if tx.query_row(
+                "SELECT count(*) FROM library WHERE hash=?",
+                [&reference.hash],
+                |r| r.get::<_, i64>(0),
+            )? == 0
             {
                 tx.execute(
                     "INSERT OR IGNORE INTO pending_removals(hash) VALUES (?)",
-                    [hash],
+                    [&reference.hash],
                 )?;
             }
             bump(&tx)

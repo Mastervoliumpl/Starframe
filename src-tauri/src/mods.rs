@@ -6,6 +6,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 #[cfg(test)]
@@ -20,6 +21,8 @@ type Result<T> = std::result::Result<T, String>;
     rename_all_fields = "camelCase",
     deny_unknown_fields
 )]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ModAction"))]
 pub enum Action {
     List,
     RetryCleanup,
@@ -45,14 +48,12 @@ pub enum Action {
         expected_revision: String,
     },
     SetEnabled {
-        mod_id: String,
-        hash: String,
+        reference: ModReference,
         enabled: bool,
         expected_revision: String,
     },
     Uninstall {
-        mod_id: String,
-        hash: String,
+        reference: ModReference,
         expected_revision: String,
         confirm_references: bool,
     },
@@ -60,6 +61,8 @@ pub enum Action {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ModView"))]
 pub struct View {
     pub catalog: Option<Catalog>,
     pub revision: String,
@@ -76,6 +79,7 @@ pub struct View {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Collision {
     pub path: String,
     pub mods: Vec<String>,
@@ -253,8 +257,7 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
                 .map_err(|e| e.to_string())?;
         }
         Action::SetEnabled {
-            mod_id,
-            hash,
+            reference,
             enabled,
             expected_revision,
         } => {
@@ -266,7 +269,7 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
             let entry = records
                 .library
                 .iter()
-                .find(|e| e.reference.mod_id == mod_id && e.reference.hash == hash)
+                .find(|e| e.reference == reference)
                 .ok_or("This exact package is not in the library.")?;
             let collection = records
                 .collections
@@ -284,6 +287,14 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
                     &mut BTreeSet::new(),
                 )?;
                 for reference in needed {
+                    let prepared = store
+                        .prepared_artifact(&reference.hash)
+                        .map_err(|e| e.to_string())?
+                        .ok_or("Prepared package inventory is missing.")?;
+                    packages::layout(
+                        &prepared.files,
+                        &release(&catalog, &reference)?.artifact.layout,
+                    )?;
                     if entries.contains(&reference) {
                         continue;
                     }
@@ -291,22 +302,20 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
                     entries.push(reference);
                 }
             } else {
-                entries.retain(|r| !(r.mod_id == mod_id && r.hash == hash));
+                entries.retain(|r| r != &reference);
             }
             store
                 .set_mod_membership(&entries, expected)
                 .map_err(|e| e.to_string())?;
         }
         Action::Uninstall {
-            mod_id,
-            hash,
+            reference,
             expected_revision,
             confirm_references,
         } => {
             store
                 .uninstall_mod(
-                    &mod_id,
-                    &hash,
+                    &reference,
                     revision(&expected_revision)?,
                     confirm_references,
                 )
@@ -413,9 +422,12 @@ pub fn requested(store: &Storage) -> Result<Value> {
         .iter()
         .find(|c| Some(&c.id) == records.active_collection.as_ref())
         .map_or(&[][..], |c| c.entries.as_slice());
+    let (inventory, omitted) = inventory(&records, entries);
     if entries.is_empty() {
         let mut value = crate::launch::requested(&records)?;
-        value["installedMods"] = inventory(&records, entries);
+        value["schemaVersion"] = json!(3);
+        value["installedMods"] = inventory;
+        value["omittedDisabledMods"] = json!(omitted);
         return runtime_contract::read(
             &serde_json::to_vec(&value).map_err(|e| e.to_string())?,
             "activation",
@@ -432,12 +444,18 @@ pub fn requested(store: &Storage) -> Result<Value> {
     }
     let ordered = crate::ordering::resolve(&catalog, entries)?.effective;
     let mut mods = Vec::new();
+    let mut total_bytes = 0;
     for reference in &ordered {
         let release = release(&catalog, reference)?;
         let prepared = store
             .prepared_artifact(&reference.hash)
             .map_err(|e| e.to_string())?
             .ok_or("Prepared package inventory is missing.")?;
+        packages::layout(&prepared.files, &release.artifact.layout)?;
+        total_bytes += prepared.files.iter().map(|f| f.size_bytes).sum::<u64>();
+        if total_bytes > runtime_contract::MAX_ACTIVATION_BYTES {
+            return Err("The selected mods exceed the runtime's combined 256 MiB limit. Disable some mods or choose a smaller collection; the current deployment was retained.".into());
+        }
         let (entry_path, entry_type) = match &release.artifact.layout {
             Layout::StarframeManagedZip {
                 root,
@@ -464,26 +482,38 @@ pub fn requested(store: &Storage) -> Result<Value> {
                     .ok_or("Required release metadata is missing.")
             })
             .collect::<std::result::Result<_, _>>()?;
-        mods.push(json!({"modId": reference.mod_id, "source": {"kind":"catalog", "releaseId": release.id}, "root": format!("mods/{}", reference.hash), "entryAssembly": entry_path, "entryType": entry_type, "requires":requires, "files":prepared.files.iter().map(|f| json!({"path":f.path,"sha256":f.sha256})).collect::<Vec<_>>() }));
+        let root = format!(
+            "mods/{:x}",
+            Sha256::digest(format!("{}\0{}", reference.mod_id, reference.hash).as_bytes())
+        );
+        mods.push(json!({"modId": reference.mod_id, "source": {"kind":"catalog", "releaseId": release.id}, "root": root, "entryAssembly": entry_path, "entryType": entry_type, "requires":requires, "files":prepared.files.iter().map(|f| json!({"path":f.path,"sha256":f.sha256})).collect::<Vec<_>>() }));
     }
-    let value = json!({"schemaVersion":2, "runtimeContractVersion":1, "integrationId":"starframe.bepinex", "deploymentRevision":records.revision.to_string(), "installedMods":inventory(&records, entries),"mods":mods});
+    let value = json!({"schemaVersion":3, "runtimeContractVersion":1, "integrationId":"starframe.bepinex", "deploymentRevision":records.revision.to_string(), "installedMods":inventory,"omittedDisabledMods":omitted,"mods":mods});
     runtime_contract::read(
         &serde_json::to_vec(&value).map_err(|e| e.to_string())?,
         "activation",
     )
 }
 
-fn inventory(records: &Records, enabled: &[ModReference]) -> Value {
+fn inventory(records: &Records, enabled: &[ModReference]) -> (Value, usize) {
     let mut seen = BTreeSet::new();
     let entries = enabled
         .iter()
         .filter_map(|r| records.library.iter().find(|e| &e.reference == r))
         .chain(records.library.iter());
-    json!(
-        entries
-            .filter(|e| seen.insert(&e.reference.mod_id))
-            .map(|e| json!({"modId":e.reference.mod_id,"name":e.name,"version":e.version}))
-            .collect::<Vec<_>>()
+    let entries: Vec<_> = entries
+        .filter(|e| seen.insert(&e.reference.mod_id))
+        .collect();
+    let omitted = entries.len().saturating_sub(runtime_contract::MAX_MODS);
+    (
+        json!(
+            entries
+                .into_iter()
+                .take(runtime_contract::MAX_MODS)
+                .map(|e| json!({"modId":e.reference.mod_id,"name":e.name,"version":e.version}))
+                .collect::<Vec<_>>()
+        ),
+        omitted,
     )
 }
 

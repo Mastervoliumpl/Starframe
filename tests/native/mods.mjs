@@ -258,24 +258,27 @@ db.prepare(
   }),
 );
 db.close();
-const deployed = join(
-  engine,
-  'Starframe/mods',
-  artifactHash,
-  'package/Fixture.dll',
-);
+let deployed;
 const activation = async () =>
   JSON.parse(await readFile(join(engine, 'Starframe/activation.json'), 'utf8'));
 const waitForDeployment = (count) =>
   expect
     .poll(
-      async () => ({
-        mods: (await activation()).mods.length,
-        payload: await readFile(deployed).then(hash, (error) => {
-          if (error.code === 'ENOENT') return null;
-          throw error;
-        }),
-      }),
+      async () => {
+        const current = await activation();
+        const mod = current.mods.find((m) => m.modId === reference.modId);
+        if (mod)
+          deployed = join(engine, 'Starframe', mod.root, mod.entryAssembly);
+        return {
+          mods: current.mods.length,
+          payload: deployed
+            ? await readFile(deployed).then(hash, (error) => {
+                if (error.code === 'ENOENT') return null;
+                throw error;
+              })
+            : null,
+        };
+      },
       { timeout: 30000 },
     )
     .toEqual({ mods: count, payload: count ? hash(bytes) : null });
@@ -390,8 +393,12 @@ try {
       expect(await readFile(deployed)).toEqual(bytes);
       await action(page, {
         kind: 'set_enabled',
-        modId: luaId,
-        hash: luaHash,
+        reference: {
+          modId: luaId,
+          hash: luaHash,
+          origin: 'catalog',
+          releaseId: 'fixture.lua.1',
+        },
         enabled: true,
         expectedRevision: (await list(page)).revision,
       });
@@ -482,8 +489,12 @@ try {
       });
       await action(page, {
         kind: 'set_enabled',
-        modId: luaId,
-        hash: luaHash,
+        reference: {
+          modId: luaId,
+          hash: luaHash,
+          origin: 'catalog',
+          releaseId: 'fixture.lua.1',
+        },
         enabled: false,
         expectedRevision: (await list(page)).revision,
       });
@@ -564,8 +575,7 @@ try {
       const expectedRevision = (await list(page)).revision;
       const error = await action(page, {
         kind: 'uninstall',
-        modId: reference.modId,
-        hash: artifactHash,
+        reference,
         expectedRevision,
         confirmReferences: false,
       }).catch((error) => error);

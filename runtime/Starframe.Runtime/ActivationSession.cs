@@ -24,6 +24,7 @@ public sealed class ActivationSession : IDisposable
     private readonly Action<string, IReadOnlyDictionary<string, byte[]>>? applyLua;
     public IReadOnlyDictionary<string, ModSettings> Settings => settings;
     public string SessionId { get; } = Guid.NewGuid().ToString("D");
+    public int OmittedDisabledMods { get; private set; }
     public JsonElement[] InstalledMods { get; private set; } = System.Array.Empty<JsonElement>();
 
     public ActivationSession(Action<string> log, IEnumerable<string> gameAssemblies, Func<string, ModSettings>? settingsFactory = null,
@@ -42,6 +43,7 @@ public sealed class ActivationSession : IDisposable
         started = true;
         using var document = Contracts.Read(manifest, "activation");
         var activation = document.RootElement;
+        OmittedDisabledMods = activation.TryGetProperty("omittedDisabledMods", out var omitted) ? omitted.GetInt32() : 0;
         InstalledMods = activation.GetProperty("installedMods").EnumerateArray().Select(m => m.Clone()).ToArray();
         root = Path.GetFullPath(root);
         var errors = new Dictionary<string, string>();

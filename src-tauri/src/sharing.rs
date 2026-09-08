@@ -41,7 +41,7 @@ impl Portable {
                 "Collection names need 1–200 characters without control characters.".into(),
             );
         }
-        if self.entries.len() > 256 {
+        if self.entries.len() > crate::runtime_contract::MAX_MODS {
             return Err("This runtime supports at most 256 active mods.".into());
         }
         let mut ids = HashSet::new();
@@ -68,6 +68,8 @@ impl Portable {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ImportStatus"))]
 pub enum Status {
     Pending,
     Preparing,
@@ -77,6 +79,8 @@ pub enum Status {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ImportEntry"))]
 pub struct Entry {
     pub reference: ModReference,
     pub status: Status,
@@ -86,6 +90,8 @@ pub struct Entry {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "CollectionImport"))]
 pub struct Import {
     pub collection_id: String,
     pub entries: Vec<Entry>,
@@ -98,6 +104,8 @@ pub struct Import {
     rename_all_fields = "camelCase",
     deny_unknown_fields
 )]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "SharingAction"))]
 pub enum Action {
     Review {
         text: String,
@@ -117,6 +125,8 @@ pub enum Action {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "SharingReply"))]
 pub struct Reply {
     pub text: Option<String>,
     pub name: String,
@@ -162,14 +172,6 @@ fn assess(
                 "Required release {dependency} is missing from this collection. Ask the sender to include its exact reference."
             ));
         }
-    }
-    if !exact
-        && records
-            .library
-            .iter()
-            .any(|e| e.reference.mod_id == reference.mod_id && e.reference.hash == reference.hash)
-    {
-        return Err("These bytes are saved under another approval identity. This approval cannot be added alongside it yet. Keep this reference for a future Starframe update.".into());
     }
     Ok(if exact {
         "Already downloaded; verify local files before reuse."

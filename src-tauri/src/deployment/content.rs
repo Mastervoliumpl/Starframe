@@ -1,5 +1,5 @@
 use super::*;
-use crate::packages::{Directory, read_file};
+use crate::{filesystem::read_file, packages::Directory};
 use std::io::{Cursor, Seek};
 
 pub(super) const FILE_LIMIT: u64 = 512 * 1024 * 1024;

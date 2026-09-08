@@ -2,9 +2,11 @@
 
 Issue [#11](https://github.com/Mastervoliumpl/Starframe/issues/11) implements the file boundary in [HANDOFF.md](../docs/HANDOFF.md). The runtime reads prepared files independently of the desktop database. These are internal formats; a public SDK has not been released.
 
-[Activation](fixtures/activation.json), [capabilities](fixtures/capabilities.json) and [report](fixtures/report.json) are executable examples. Both readers consume every case in [cases.json](fixtures/cases.json). Activation uses `schemaVersion: 2`; capabilities/reports use `schemaVersion: 1`. All use `runtimeContractVersion: 1`; `integrationId` is `starframe.bepinex`. Unsupported versions, duplicate JSON properties, unknown/missing fields, unexpected null values, comments and trailing data are rejected. Product version is separate.
+[Activation](fixtures/activation.json), [capabilities](fixtures/capabilities.json) and [report](fixtures/report.json) are executable examples. Both readers consume every case in [cases.json](fixtures/cases.json). Activation readers support `schemaVersion: 2` and `3`; capabilities/reports use `schemaVersion: 1`. All use `runtimeContractVersion: 1`; `integrationId` is `starframe.bepinex`. Unsupported versions, duplicate JSON properties, unknown/missing fields, unexpected null values, comments and trailing data are rejected. Product version is separate.
 
 ## Bounds and activation
+
+Desktop 0.4.1 writes activation schema 3. It adds the required nonnegative integer `omittedDisabledMods` (at most 2,147,483,647). Readers also accept schema 2 with an implicit zero count. The bounded inventory includes all active mods first, then disabled mods in saved library order, with one entry per mod ID and at most 256 entries. A nonzero omitted count requires a full 256-entry inventory. The in-game menu reports the omitted disabled count; their files and settings remain in the desktop library. Library size does not limit an otherwise valid launch. Active mods remain limited to 256.
 
 Issue #20's game adapter supports content-only Lua entries whose complete file paths are under `LJ/lua`, subject to the limits in [ordering verification](../docs/verification/ordering.md). The wire format is unchanged: other content-only entries remain representable but fail activation as unsupported. Effective manifest order controls both managed initialization and supported Lua overlay precedence.
 

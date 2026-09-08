@@ -60,7 +60,9 @@
           installed: data.library.find(
             (e) =>
               e.reference.modId === mod.id &&
-              e.reference.hash === release.artifact.sha256,
+              e.reference.hash === release.artifact.sha256 &&
+              e.reference.origin === 'catalog' &&
+              e.reference.releaseId === release.id,
           ),
         })),
       );

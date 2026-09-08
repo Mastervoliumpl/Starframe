@@ -119,9 +119,7 @@ fn shared_references_keep_missing_withdrawn_changed_local_and_reapproved_identit
     local.origin = Origin::LocalImport;
     local.release_id = None;
     cases.push(local);
-    let mut reapproved = entries[1].reference.clone();
-    reapproved.release_id = Some("fixture.addon.2".into());
-    cases.push(reapproved);
+
     for reference in cases {
         let before = store.load().unwrap();
         let text = shared("Unresolved", std::slice::from_ref(&reference));
@@ -435,13 +433,372 @@ fn enable(store: &mut Storage, entry: &LibraryEntry, enabled: bool) -> View {
     action(
         store,
         Action::SetEnabled {
-            mod_id: entry.reference.mod_id.clone(),
-            hash: entry.reference.hash.clone(),
+            reference: entry.reference.clone(),
             enabled,
             expected_revision,
         },
     )
     .unwrap()
+}
+
+#[test]
+fn reapproved_bytes_preserve_both_release_references_and_satisfy_new_dependencies() {
+    let (root, mut store, entries) = fixture();
+    let old = entries[0].clone();
+    let mut new = old.clone();
+    new.reference.release_id = Some("fixture.core.2".into());
+    let pinned = Uuid::new_v4().to_string();
+    store
+        .save_collection(
+            &pinned,
+            "Old approval",
+            std::slice::from_ref(&old.reference),
+            0,
+        )
+        .unwrap();
+    let mut cache = store.catalog_cache().unwrap().unwrap();
+    let catalog = cache.catalog.as_mut().unwrap();
+    let mut release = catalog.mods[0].releases[0].clone();
+    catalog.catalog_revision = "2".into();
+    release.id = new.reference.release_id.clone().unwrap();
+    catalog.mods[0].releases[0].withdrawn = true;
+    catalog.mods[0].releases.push(release);
+    let mut addon_release = catalog.mods[1].releases[0].clone();
+    addon_release.id = "fixture.addon.2".into();
+    addon_release.requires = vec!["fixture.core.2".into()];
+    catalog.mods[1].releases.push(addon_release);
+    store.save_catalog_cache(&cache).unwrap();
+    let operation = Operation {
+        id: Uuid::new_v4().to_string(),
+        request_id: Uuid::new_v4().to_string(),
+        release_id: "fixture.core.2".into(),
+        hash: new.reference.hash.clone(),
+        status: Status::Completed,
+        message: "Reapproved".into(),
+        received_bytes: 10,
+        total_bytes: 10,
+    };
+    store.save_package(&operation).unwrap();
+    let prepared = store
+        .prepared_artifact(&new.reference.hash)
+        .unwrap()
+        .unwrap();
+    store.complete_package(&operation, &new, &prepared).unwrap();
+    assert_eq!(store.load().unwrap().library.len(), 3);
+    let mut addon = entries[1].clone();
+    addon.reference.release_id = Some("fixture.addon.2".into());
+    store
+        .put_library_entry(&addon, store.load().unwrap().revision)
+        .unwrap();
+    let view = enable(&mut store, &addon, true);
+    assert!(view.enabled.contains(&new.reference));
+    assert!(!view.enabled.contains(&old.reference));
+    requested(&store).unwrap();
+    drop(store);
+    let mut store = Storage::open(root.path()).unwrap();
+    assert!(store.load().unwrap().library.contains(&old));
+    assert!(store.load().unwrap().library.contains(&new));
+    let exported =
+        crate::sharing::action(&mut store, crate::sharing::Action::Export { id: pinned })
+            .unwrap()
+            .text
+            .unwrap();
+    let document: crate::sharing::Portable = serde_json::from_str(&exported).unwrap();
+    assert_eq!(document.entries, vec![old.reference.clone()]);
+    store
+        .uninstall_mod(&old.reference, store.load().unwrap().revision, true)
+        .unwrap();
+    cleanup(&mut store).unwrap();
+    assert!(store.artifact_directory(&new.reference).unwrap().exists());
+    assert!(store.load().unwrap().library.contains(&new));
+    assert!(
+        super::view(&store)
+            .unwrap()
+            .enabled
+            .contains(&new.reference)
+    );
+    assert_eq!(
+        store
+            .prepared_artifact(&new.reference.hash)
+            .unwrap()
+            .unwrap(),
+        prepared
+    );
+}
+
+#[test]
+fn large_disabled_libraries_keep_bounded_inventory_and_active_mods_across_restart() {
+    for count in [255, 256, 257] {
+        let (root, mut store, entries) = fixture();
+        for i in 2..count {
+            let mut entry = entries[0].clone();
+            entry.reference.mod_id = format!("aaa.disabled{i}");
+            entry.reference.origin = Origin::LocalImport;
+            entry.reference.release_id = None;
+            store
+                .put_library_entry(&entry, store.load().unwrap().revision)
+                .unwrap();
+        }
+        fs::write(root.path().join("settings.cfg"), b"retain").unwrap();
+        for active in [false, true] {
+            if active {
+                enable(&mut store, &entries[1], true);
+            }
+            let activation = requested(&store).unwrap();
+            assert_eq!(
+                activation["installedMods"].as_array().unwrap().len(),
+                count.min(256)
+            );
+            assert_eq!(activation["omittedDisabledMods"], count.saturating_sub(256));
+            assert_eq!(
+                activation["mods"].as_array().unwrap().len(),
+                if active { 2 } else { 0 }
+            );
+            if active {
+                assert_eq!(
+                    activation["installedMods"][0]["modId"],
+                    entries[0].reference.mod_id
+                );
+                payload(&store, &activation).unwrap();
+            }
+            drop(store);
+            store = Storage::open(root.path()).unwrap();
+            assert_eq!(requested(&store).unwrap(), activation);
+            assert_eq!(store.load().unwrap().library.len(), count);
+            assert_eq!(
+                fs::read(root.path().join("settings.cfg")).unwrap(),
+                b"retain"
+            );
+        }
+        if count == 257 {
+            let records = store.load().unwrap();
+            let all: Vec<_> = records
+                .library
+                .iter()
+                .map(|e| e.reference.clone())
+                .collect();
+            assert!(store.set_mod_membership(&all, records.revision).is_err());
+            assert_eq!(store.load().unwrap(), records);
+        }
+        store
+            .set_mod_membership(&[], store.load().unwrap().revision)
+            .unwrap();
+        assert_eq!(requested(&store).unwrap()["mods"], json!([]));
+    }
+}
+
+#[test]
+fn runtime_file_boundaries_hold_from_commit_through_membership_and_activation() {
+    for lua in [false, true] {
+        for count in [1024, 1025] {
+            let (root, mut store, entries) = fixture_with_lua(lua);
+            let entry = &entries[0];
+            let mut prepared = store
+                .prepared_artifact(&entry.reference.hash)
+                .unwrap()
+                .unwrap();
+            for i in 1..count {
+                let path = if lua {
+                    format!("LJ/lua/extra{i}.lua")
+                } else {
+                    format!("package/extra{i}.txt")
+                };
+                fs::write(
+                    store
+                        .artifact_directory(&entry.reference)
+                        .unwrap()
+                        .join(&path),
+                    b"fixture",
+                )
+                .unwrap();
+                prepared.files.push(PreparedFile {
+                    path,
+                    sha256: format!("{:x}", Sha256::digest(b"fixture")),
+                    size_bytes: 7,
+                });
+            }
+            let connection =
+                rusqlite::Connection::open(root.path().join("sqlite/state.db")).unwrap();
+            connection
+                .execute(
+                    "UPDATE prepared_artifacts SET record=? WHERE hash=?",
+                    rusqlite::params![serde_json::to_string(&prepared).unwrap(), prepared.hash],
+                )
+                .unwrap();
+            drop(connection);
+            let before = store.load().unwrap();
+            let result = action(
+                &mut store,
+                Action::SetEnabled {
+                    reference: entry.reference.clone(),
+                    enabled: true,
+                    expected_revision: before.revision.to_string(),
+                },
+            );
+            if count == 1024 {
+                result.unwrap();
+                let activation = requested(&store).unwrap();
+                assert_eq!(
+                    activation["mods"][0]["files"].as_array().unwrap().len(),
+                    count
+                );
+                assert_eq!(payload(&store, &activation).unwrap().len(), count);
+            } else {
+                assert!(result.err().unwrap().contains("1,024"));
+                assert_eq!(store.load().unwrap(), before);
+                assert!(
+                    packages::verify_artifact(&store, &entry.reference)
+                        .unwrap_err()
+                        .contains("1,024")
+                );
+                let operation = Operation {
+                    id: Uuid::new_v4().to_string(),
+                    request_id: Uuid::new_v4().to_string(),
+                    release_id: entry.reference.release_id.clone().unwrap(),
+                    hash: entry.reference.hash.clone(),
+                    status: Status::Completed,
+                    message: "Fixture".into(),
+                    received_bytes: 10,
+                    total_bytes: 10,
+                };
+                store.save_package(&operation).unwrap();
+                assert!(
+                    store
+                        .complete_package(&operation, entry, &prepared)
+                        .unwrap_err()
+                        .to_string()
+                        .contains("1,024")
+                );
+                assert_eq!(store.load().unwrap(), before);
+                store
+                    .set_mod_membership(std::slice::from_ref(&entry.reference), before.revision)
+                    .unwrap();
+                assert!(requested(&store).unwrap_err().contains("1,024"));
+            }
+            drop(store);
+            let store = Storage::open(root.path()).unwrap();
+            assert!(super::view(&store).unwrap().library.contains(entry));
+            assert_eq!(
+                store
+                    .prepared_artifact(&entry.reference.hash)
+                    .unwrap()
+                    .unwrap(),
+                prepared
+            );
+        }
+    }
+}
+
+#[test]
+fn logical_mods_share_verified_bytes_with_distinct_stable_deployment_roots() {
+    for lua in [false, true] {
+        let (root, mut store, entries) = fixture_with_lua(lua);
+        let mut shared_entry = entries[0].clone();
+        shared_entry.reference.mod_id = "fixture.shared".into();
+        shared_entry.reference.release_id = Some("fixture.shared.1".into());
+        let mut cache = store.catalog_cache().unwrap().unwrap();
+        let catalog = cache.catalog.as_mut().unwrap();
+        catalog.catalog_revision = "2".into();
+        let mut owner = catalog.mods[0].clone();
+        owner.id = shared_entry.reference.mod_id.clone();
+        owner.releases[0].id = shared_entry.reference.release_id.clone().unwrap();
+        catalog.mods.push(owner);
+        catalog.validate().unwrap();
+        store.save_catalog_cache(&cache).unwrap();
+        let prepared = store
+            .prepared_artifact(&shared_entry.reference.hash)
+            .unwrap()
+            .unwrap();
+        let op = Operation {
+            id: Uuid::new_v4().to_string(),
+            request_id: Uuid::new_v4().to_string(),
+            release_id: shared_entry.reference.release_id.clone().unwrap(),
+            hash: prepared.hash.clone(),
+            status: Status::Completed,
+            message: "Shared archive".into(),
+            received_bytes: 10,
+            total_bytes: 10,
+        };
+        store.save_package(&op).unwrap();
+        store
+            .complete_package(&op, &shared_entry, &prepared)
+            .unwrap();
+        enable(&mut store, &entries[0], true);
+        let view = enable(&mut store, &shared_entry, true);
+        let activation = requested(&store).unwrap();
+        assert_ne!(activation["mods"][0]["root"], activation["mods"][1]["root"]);
+        assert_eq!(payload(&store, &activation).unwrap().len(), 2);
+        let exported = crate::sharing::action(
+            &mut store,
+            crate::sharing::Action::Export {
+                id: view.active_collection.unwrap(),
+            },
+        )
+        .unwrap()
+        .text
+        .unwrap();
+        let mut queue = packages::Packages::open(&mut store).unwrap();
+        let id = import(&mut store, &exported);
+        finish_imports(&mut store, &mut queue);
+        store
+            .set_active_collection(Some(&id), store.load().unwrap().revision)
+            .unwrap();
+        assert_eq!(requested(&store).unwrap()["mods"], activation["mods"]);
+        drop(queue);
+        drop(store);
+        let mut store = Storage::open(root.path()).unwrap();
+        assert_eq!(requested(&store).unwrap()["mods"], activation["mods"]);
+        store
+            .uninstall_mod(&entries[0].reference, store.load().unwrap().revision, true)
+            .unwrap();
+        cleanup(&mut store).unwrap();
+        let remaining = requested(&store).unwrap();
+        assert_eq!(remaining["mods"][0]["root"], activation["mods"][1]["root"]);
+        assert_eq!(payload(&store, &remaining).unwrap().len(), 1);
+        assert_eq!(
+            store.prepared_artifact(&prepared.hash).unwrap(),
+            Some(prepared)
+        );
+    }
+}
+
+#[test]
+fn combined_runtime_byte_limit_is_checked_before_payload_or_game_mutation() {
+    let (root, mut store, entries) = fixture();
+    enable(&mut store, &entries[1], true);
+    let before = store.load().unwrap();
+    let connection = rusqlite::Connection::open(root.path().join("sqlite/state.db")).unwrap();
+    for extra in [0, 1] {
+        for (i, entry) in entries.iter().enumerate() {
+            let mut prepared = store
+                .prepared_artifact(&entry.reference.hash)
+                .unwrap()
+                .unwrap();
+            prepared.files.truncate(1);
+            prepared.files[0].size_bytes = 16 * 1024 * 1024;
+            for n in 0..2 {
+                prepared.files.push(PreparedFile {
+                    path: format!("package/data{n}.bin"),
+                    sha256: "ab".repeat(32),
+                    size_bytes: 56 * 1024 * 1024 + if i == 1 && n == 1 { extra } else { 0 },
+                });
+            }
+            packages::supported_files(&prepared.files).unwrap();
+            connection
+                .execute(
+                    "UPDATE prepared_artifacts SET record=? WHERE hash=?",
+                    rusqlite::params![serde_json::to_string(&prepared).unwrap(), prepared.hash],
+                )
+                .unwrap();
+        }
+        let result = requested(&store);
+        if extra == 0 {
+            result.unwrap();
+        } else {
+            assert!(result.unwrap_err().contains("combined 256 MiB"));
+        }
+        assert_eq!(store.load().unwrap(), before);
+    }
 }
 
 #[test]
@@ -648,8 +1005,7 @@ fn selecting_collection_with_uninstalled_content_reports_unresolved_membership()
     let removed = action(
         &mut store,
         Action::Uninstall {
-            mod_id: entries[0].reference.mod_id.clone(),
-            hash: entries[0].reference.hash.clone(),
+            reference: entries[0].reference.clone(),
             expected_revision: rev.to_string(),
             confirm_references: true,
         },
@@ -803,8 +1159,7 @@ fn stale_edits_and_changed_library_files_never_authorize_payloads() {
         action(
             &mut store,
             Action::SetEnabled {
-                mod_id: entries[0].reference.mod_id.clone(),
-                hash: entries[0].reference.hash.clone(),
+                reference: entries[0].reference.clone(),
                 enabled: false,
                 expected_revision: old
             }
@@ -836,24 +1191,14 @@ fn uninstall_requires_reference_confirmation_preserves_other_collections_and_set
     let revision = store.load().unwrap().revision;
     assert!(
         store
-            .uninstall_mod(
-                &entries[0].reference.mod_id,
-                &entries[0].reference.hash,
-                revision,
-                false
-            )
+            .uninstall_mod(&entries[0].reference, revision, false)
             .unwrap_err()
             .to_string()
             .contains("Other setup")
     );
     assert_eq!(store.load().unwrap().revision, revision);
     store
-        .uninstall_mod(
-            &entries[0].reference.mod_id,
-            &entries[0].reference.hash,
-            revision,
-            true,
-        )
+        .uninstall_mod(&entries[0].reference, revision, true)
         .unwrap();
     cleanup(&mut store).unwrap();
     assert!(
@@ -890,12 +1235,7 @@ fn uninstall_transaction_failure_preserves_membership_and_library() {
     connection.execute_batch("CREATE TRIGGER fail_uninstall BEFORE DELETE ON library BEGIN SELECT RAISE(ABORT, 'fixture failure'); END;").unwrap();
     assert!(
         store
-            .uninstall_mod(
-                &entries[0].reference.mod_id,
-                &entries[0].reference.hash,
-                before.revision,
-                true
-            )
+            .uninstall_mod(&entries[0].reference, before.revision, true)
             .is_err()
     );
     assert_eq!(store.load().unwrap(), before);
@@ -923,12 +1263,7 @@ fn locked_uninstall_retains_persistent_cleanup_and_retries_after_restart() {
         .open(path)
         .unwrap();
     store
-        .uninstall_mod(
-            &entries[0].reference.mod_id,
-            &entries[0].reference.hash,
-            store.load().unwrap().revision,
-            false,
-        )
+        .uninstall_mod(&entries[0].reference, store.load().unwrap().revision, false)
         .unwrap();
     cleanup(&mut store).unwrap();
     assert!(!super::view(&store).unwrap().cleanup_errors.is_empty());

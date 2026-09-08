@@ -200,6 +200,7 @@ internal sealed class ModsMenu : IDisposable
         reset.gameObject.SetActive(false);
         Text("Installed mods", heading: true);
         Text("This game session. Change enabled mods in Starframe, then restart the game.");
+        if (session.OmittedDisabledMods > 0) Text(session.OmittedDisabledMods + " more disabled mods are in your desktop library. Their saved settings are retained.");
         if (session.InstalledMods.Length == 0) Text("No installed mods in this session.");
         foreach (var mod in session.InstalledMods)
         {

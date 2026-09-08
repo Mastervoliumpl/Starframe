@@ -11,3 +11,8 @@ pub mod space;
 pub mod storage;
 #[cfg(windows)]
 pub mod windows_game;
+
+#[cfg(test)]
+mod desktop_contract;
+
+mod filesystem;

@@ -10,6 +10,7 @@ type Result<T> = std::result::Result<T, String>;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Catalog {
     pub schema_version: u32,
     pub catalog_revision: String,
@@ -18,6 +19,8 @@ pub struct Catalog {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "CatalogMod"))]
 pub struct Mod {
     pub id: String,
     pub name: String,
@@ -32,6 +35,7 @@ pub struct Mod {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Release {
     pub id: String,
     pub version: String,
@@ -43,18 +47,23 @@ pub struct Release {
     pub artifact: Artifact,
     pub requires: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(optional, as = "Option<_>"))]
     pub load_before: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(optional, as = "Option<_>"))]
     pub load_after: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(optional, as = "Option<_>"))]
     pub prefer_before: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(test, ts(optional, as = "Option<_>"))]
     pub prefer_after: Vec<String>,
     pub tested_game_builds: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CompatibilityProblem {
     pub game_build: String,
     pub note: String,
@@ -63,15 +72,18 @@ pub struct CompatibilityProblem {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Artifact {
     pub url: String,
     pub sha256: String,
+    #[cfg_attr(test, ts(type = "number"))]
     pub size_bytes: u64,
     pub layout: Layout,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum Layout {
     StarframeLuaZip {},
     #[serde(rename_all = "camelCase")]
