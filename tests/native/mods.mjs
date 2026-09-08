@@ -258,24 +258,27 @@ db.prepare(
   }),
 );
 db.close();
-const deployed = join(
-  engine,
-  'Starframe/mods',
-  artifactHash,
-  'package/Fixture.dll',
-);
+let deployed;
 const activation = async () =>
   JSON.parse(await readFile(join(engine, 'Starframe/activation.json'), 'utf8'));
 const waitForDeployment = (count) =>
   expect
     .poll(
-      async () => ({
-        mods: (await activation()).mods.length,
-        payload: await readFile(deployed).then(hash, (error) => {
-          if (error.code === 'ENOENT') return null;
-          throw error;
-        }),
-      }),
+      async () => {
+        const current = await activation();
+        const mod = current.mods.find((m) => m.modId === reference.modId);
+        if (mod)
+          deployed = join(engine, 'Starframe', mod.root, mod.entryAssembly);
+        return {
+          mods: current.mods.length,
+          payload: deployed
+            ? await readFile(deployed).then(hash, (error) => {
+                if (error.code === 'ENOENT') return null;
+                throw error;
+              })
+            : null,
+        };
+      },
       { timeout: 30000 },
     )
     .toEqual({ mods: count, payload: count ? hash(bytes) : null });
