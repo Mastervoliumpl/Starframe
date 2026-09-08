@@ -119,9 +119,7 @@ fn shared_references_keep_missing_withdrawn_changed_local_and_reapproved_identit
     local.origin = Origin::LocalImport;
     local.release_id = None;
     cases.push(local);
-    let mut reapproved = entries[1].reference.clone();
-    reapproved.release_id = Some("fixture.addon.2".into());
-    cases.push(reapproved);
+
     for reference in cases {
         let before = store.load().unwrap();
         let text = shared("Unresolved", std::slice::from_ref(&reference));
@@ -435,13 +433,92 @@ fn enable(store: &mut Storage, entry: &LibraryEntry, enabled: bool) -> View {
     action(
         store,
         Action::SetEnabled {
-            mod_id: entry.reference.mod_id.clone(),
-            hash: entry.reference.hash.clone(),
+            reference: entry.reference.clone(),
             enabled,
             expected_revision,
         },
     )
     .unwrap()
+}
+
+#[test]
+fn reapproved_bytes_preserve_both_release_references_and_satisfy_new_dependencies() {
+    let (root, mut store, entries) = fixture();
+    let old = entries[0].clone();
+    let mut new = old.clone();
+    new.reference.release_id = Some("fixture.core.2".into());
+    let pinned = Uuid::new_v4().to_string();
+    store
+        .save_collection(&pinned, "Old approval", &[old.reference.clone()], 0)
+        .unwrap();
+    let mut cache = store.catalog_cache().unwrap().unwrap();
+    let catalog = cache.catalog.as_mut().unwrap();
+    let mut release = catalog.mods[0].releases[0].clone();
+    catalog.catalog_revision = "2".into();
+    release.id = new.reference.release_id.clone().unwrap();
+    catalog.mods[0].releases[0].withdrawn = true;
+    catalog.mods[0].releases.push(release);
+    let mut addon_release = catalog.mods[1].releases[0].clone();
+    addon_release.id = "fixture.addon.2".into();
+    addon_release.requires = vec!["fixture.core.2".into()];
+    catalog.mods[1].releases.push(addon_release);
+    store.save_catalog_cache(&cache).unwrap();
+    let operation = Operation {
+        id: Uuid::new_v4().to_string(),
+        request_id: Uuid::new_v4().to_string(),
+        release_id: "fixture.core.2".into(),
+        hash: new.reference.hash.clone(),
+        status: Status::Completed,
+        message: "Reapproved".into(),
+        received_bytes: 10,
+        total_bytes: 10,
+    };
+    store.save_package(&operation).unwrap();
+    let prepared = store
+        .prepared_artifact(&new.reference.hash)
+        .unwrap()
+        .unwrap();
+    store.complete_package(&operation, &new, &prepared).unwrap();
+    assert_eq!(store.load().unwrap().library.len(), 3);
+    let mut addon = entries[1].clone();
+    addon.reference.release_id = Some("fixture.addon.2".into());
+    store
+        .put_library_entry(&addon, store.load().unwrap().revision)
+        .unwrap();
+    let view = enable(&mut store, &addon, true);
+    assert!(view.enabled.contains(&new.reference));
+    assert!(!view.enabled.contains(&old.reference));
+    requested(&store).unwrap();
+    drop(store);
+    let mut store = Storage::open(root.path()).unwrap();
+    assert!(store.load().unwrap().library.contains(&old));
+    assert!(store.load().unwrap().library.contains(&new));
+    let exported =
+        crate::sharing::action(&mut store, crate::sharing::Action::Export { id: pinned })
+            .unwrap()
+            .text
+            .unwrap();
+    let document: crate::sharing::Portable = serde_json::from_str(&exported).unwrap();
+    assert_eq!(document.entries, vec![old.reference.clone()]);
+    store
+        .uninstall_mod(&old.reference, store.load().unwrap().revision, true)
+        .unwrap();
+    cleanup(&mut store).unwrap();
+    assert!(store.artifact_directory(&new.reference).unwrap().exists());
+    assert!(store.load().unwrap().library.contains(&new));
+    assert!(
+        super::view(&store)
+            .unwrap()
+            .enabled
+            .contains(&new.reference)
+    );
+    assert_eq!(
+        store
+            .prepared_artifact(&new.reference.hash)
+            .unwrap()
+            .unwrap(),
+        prepared
+    );
 }
 
 #[test]
@@ -648,8 +725,7 @@ fn selecting_collection_with_uninstalled_content_reports_unresolved_membership()
     let removed = action(
         &mut store,
         Action::Uninstall {
-            mod_id: entries[0].reference.mod_id.clone(),
-            hash: entries[0].reference.hash.clone(),
+            reference: entries[0].reference.clone(),
             expected_revision: rev.to_string(),
             confirm_references: true,
         },
@@ -803,8 +879,7 @@ fn stale_edits_and_changed_library_files_never_authorize_payloads() {
         action(
             &mut store,
             Action::SetEnabled {
-                mod_id: entries[0].reference.mod_id.clone(),
-                hash: entries[0].reference.hash.clone(),
+                reference: entries[0].reference.clone(),
                 enabled: false,
                 expected_revision: old
             }
@@ -836,24 +911,14 @@ fn uninstall_requires_reference_confirmation_preserves_other_collections_and_set
     let revision = store.load().unwrap().revision;
     assert!(
         store
-            .uninstall_mod(
-                &entries[0].reference.mod_id,
-                &entries[0].reference.hash,
-                revision,
-                false
-            )
+            .uninstall_mod(&entries[0].reference, revision, false)
             .unwrap_err()
             .to_string()
             .contains("Other setup")
     );
     assert_eq!(store.load().unwrap().revision, revision);
     store
-        .uninstall_mod(
-            &entries[0].reference.mod_id,
-            &entries[0].reference.hash,
-            revision,
-            true,
-        )
+        .uninstall_mod(&entries[0].reference, revision, true)
         .unwrap();
     cleanup(&mut store).unwrap();
     assert!(
@@ -890,12 +955,7 @@ fn uninstall_transaction_failure_preserves_membership_and_library() {
     connection.execute_batch("CREATE TRIGGER fail_uninstall BEFORE DELETE ON library BEGIN SELECT RAISE(ABORT, 'fixture failure'); END;").unwrap();
     assert!(
         store
-            .uninstall_mod(
-                &entries[0].reference.mod_id,
-                &entries[0].reference.hash,
-                before.revision,
-                true
-            )
+            .uninstall_mod(&entries[0].reference, before.revision, true)
             .is_err()
     );
     assert_eq!(store.load().unwrap(), before);
@@ -923,12 +983,7 @@ fn locked_uninstall_retains_persistent_cleanup_and_retries_after_restart() {
         .open(path)
         .unwrap();
     store
-        .uninstall_mod(
-            &entries[0].reference.mod_id,
-            &entries[0].reference.hash,
-            store.load().unwrap().revision,
-            false,
-        )
+        .uninstall_mod(&entries[0].reference, store.load().unwrap().revision, false)
         .unwrap();
     cleanup(&mut store).unwrap();
     assert!(!super::view(&store).unwrap().cleanup_errors.is_empty());

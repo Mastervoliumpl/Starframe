@@ -100,15 +100,13 @@ export type ModAction =
   | { kind: 'reorder'; modIds: string[]; expectedRevision: string }
   | {
       kind: 'set_enabled';
-      modId: string;
-      hash: string;
+      reference: Reference;
       enabled: boolean;
       expectedRevision: string;
     }
   | {
       kind: 'uninstall';
-      modId: string;
-      hash: string;
+      reference: Reference;
       expectedRevision: string;
       confirmReferences: boolean;
     };
@@ -149,7 +147,12 @@ export interface ManagementTransport {
   packages(action: PackageAction): Promise<PackageOperation[]>;
 }
 export const key = (reference: Reference) =>
-  `${reference.modId}:${reference.hash}`;
+  JSON.stringify([
+    reference.modId,
+    reference.hash,
+    reference.origin,
+    reference.releaseId,
+  ]);
 export const transferring = (op: PackageOperation) =>
   op.status === 'preparing' || op.status === 'cancelling';
 export const bytes = (value: number) =>
@@ -279,8 +282,7 @@ export function createManagement(transport: ManagementTransport | null) {
           const data = await confirmed(
             transport!.mods({
               kind: 'set_enabled',
-              modId: entry.reference.modId,
-              hash: entry.reference.hash,
+              reference: entry.reference,
               enabled,
               expectedRevision: view.data.revision,
             }),
@@ -294,8 +296,7 @@ export function createManagement(transport: ManagementTransport | null) {
         const data = await confirmed(
           transport!.mods({
             kind: 'uninstall',
-            modId: entry.reference.modId,
-            hash: entry.reference.hash,
+            reference: entry.reference,
             expectedRevision,
             confirmReferences: true,
           }),

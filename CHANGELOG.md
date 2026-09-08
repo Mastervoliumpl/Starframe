@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-No changes yet.
+- Preserve distinct approval references over shared archive bytes, including exact enable/uninstall selection and collection references. Schema 10 retains existing records and deduplicates local content (#50).
 
 ## 0.4.0 - 2026-09-08
 

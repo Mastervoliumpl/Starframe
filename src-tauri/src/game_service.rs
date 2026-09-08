@@ -608,12 +608,12 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                     if core.lock().expect("state lock").stopped {
                         return Err("Starframe is closing.".into());
                     }
-                    if let starframe::mods::Action::Uninstall { hash, .. } = &action
+                    if let starframe::mods::Action::Uninstall { reference, .. } = &action
                         && packages
                             .as_ref()
                             .ok()
                             .and_then(|q| q.as_ref())
-                            .is_some_and(|q| q.busy_hash(hash))
+                            .is_some_and(|q| q.busy_hash(&reference.hash))
                     {
                         return Err("This package is being prepared. Finish or cancel its download before uninstalling.".into());
                     }

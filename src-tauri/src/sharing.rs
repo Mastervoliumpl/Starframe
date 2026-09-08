@@ -163,14 +163,6 @@ fn assess(
             ));
         }
     }
-    if !exact
-        && records
-            .library
-            .iter()
-            .any(|e| e.reference.mod_id == reference.mod_id && e.reference.hash == reference.hash)
-    {
-        return Err("These bytes are saved under another approval identity. This approval cannot be added alongside it yet. Keep this reference for a future Starframe update.".into());
-    }
     Ok(if exact {
         "Already downloaded; verify local files before reuse."
     } else {

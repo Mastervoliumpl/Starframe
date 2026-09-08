@@ -390,8 +390,12 @@ try {
       expect(await readFile(deployed)).toEqual(bytes);
       await action(page, {
         kind: 'set_enabled',
-        modId: luaId,
-        hash: luaHash,
+        reference: {
+          modId: luaId,
+          hash: luaHash,
+          origin: 'catalog',
+          releaseId: 'fixture.lua.1',
+        },
         enabled: true,
         expectedRevision: (await list(page)).revision,
       });
@@ -482,8 +486,12 @@ try {
       });
       await action(page, {
         kind: 'set_enabled',
-        modId: luaId,
-        hash: luaHash,
+        reference: {
+          modId: luaId,
+          hash: luaHash,
+          origin: 'catalog',
+          releaseId: 'fixture.lua.1',
+        },
         enabled: false,
         expectedRevision: (await list(page)).revision,
       });
@@ -564,8 +572,7 @@ try {
       const expectedRevision = (await list(page)).revision;
       const error = await action(page, {
         kind: 'uninstall',
-        modId: reference.modId,
-        hash: artifactHash,
+        reference,
         expectedRevision,
         confirmReferences: false,
       }).catch((error) => error);

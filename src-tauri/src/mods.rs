@@ -45,14 +45,12 @@ pub enum Action {
         expected_revision: String,
     },
     SetEnabled {
-        mod_id: String,
-        hash: String,
+        reference: ModReference,
         enabled: bool,
         expected_revision: String,
     },
     Uninstall {
-        mod_id: String,
-        hash: String,
+        reference: ModReference,
         expected_revision: String,
         confirm_references: bool,
     },
@@ -253,8 +251,7 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
                 .map_err(|e| e.to_string())?;
         }
         Action::SetEnabled {
-            mod_id,
-            hash,
+            reference,
             enabled,
             expected_revision,
         } => {
@@ -266,7 +263,7 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
             let entry = records
                 .library
                 .iter()
-                .find(|e| e.reference.mod_id == mod_id && e.reference.hash == hash)
+                .find(|e| e.reference == reference)
                 .ok_or("This exact package is not in the library.")?;
             let collection = records
                 .collections
@@ -291,22 +288,20 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
                     entries.push(reference);
                 }
             } else {
-                entries.retain(|r| !(r.mod_id == mod_id && r.hash == hash));
+                entries.retain(|r| r != &reference);
             }
             store
                 .set_mod_membership(&entries, expected)
                 .map_err(|e| e.to_string())?;
         }
         Action::Uninstall {
-            mod_id,
-            hash,
+            reference,
             expected_revision,
             confirm_references,
         } => {
             store
                 .uninstall_mod(
-                    &mod_id,
-                    &hash,
+                    &reference,
                     revision(&expected_revision)?,
                     confirm_references,
                 )

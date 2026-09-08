@@ -11,9 +11,9 @@ mod mods;
 mod packages;
 mod sharing;
 
-const SCHEMA: i64 = 9;
+const SCHEMA: i64 = 10;
 const APPLICATION_ID: i64 = 0x53544652;
-const MIGRATIONS: [&str; 9] = [
+const MIGRATIONS: [&str; 10] = [
     "CREATE TABLE metadata (id INTEGER PRIMARY KEY CHECK(id = 1), engine TEXT NOT NULL CHECK(engine = 'sqlite'), revision INTEGER NOT NULL CHECK(revision >= 0));
      INSERT INTO metadata VALUES (1, 'sqlite', 0);
      CREATE TABLE library (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author) <= 200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(mod_id, hash), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL)));
@@ -27,6 +27,7 @@ const MIGRATIONS: [&str; 9] = [
     "CREATE TABLE package_operations (id TEXT PRIMARY KEY NOT NULL, request_id TEXT UNIQUE NOT NULL, record TEXT NOT NULL CHECK(length(record)<=8192 AND json_valid(record))); CREATE TABLE prepared_artifacts (hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash)=64 AND hash NOT GLOB '*[^0-9a-f]*'), record TEXT NOT NULL CHECK(length(record)<=2097152 AND json_valid(record)));",
     "CREATE TABLE pending_removals (hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash)=64 AND hash NOT GLOB '*[^0-9a-f]*'), error TEXT NOT NULL DEFAULT '');",
     "CREATE TABLE collection_imports (collection_id TEXT PRIMARY KEY NOT NULL REFERENCES collections(id) ON DELETE CASCADE, record TEXT NOT NULL CHECK(length(record)<=1048576 AND json_valid(record)));",
+    "CREATE TABLE library_new (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author) <= 200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(mod_id, hash, origin, release_id), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL))); INSERT INTO library_new SELECT * FROM library; DROP TABLE library; ALTER TABLE library_new RENAME TO library; CREATE UNIQUE INDEX local_library_identity ON library(mod_id, hash) WHERE origin = 'local_import';",
 ];
 
 #[derive(Debug)]
@@ -481,7 +482,7 @@ impl Storage {
         }
         let revision = integer(&self.conn, "SELECT revision FROM metadata WHERE id = 1")?;
         let mut library = vec![];
-        let mut statement = self.conn.prepare("SELECT mod_id, hash, origin, release_id, name, author, version FROM library ORDER BY mod_id, hash")?;
+        let mut statement = self.conn.prepare("SELECT mod_id, hash, origin, release_id, name, author, version FROM library ORDER BY mod_id, hash, origin, release_id")?;
         let mut rows = statement.query([])?;
         while let Some(row) = rows.next()? {
             library.push(LibraryEntry {
@@ -547,7 +548,7 @@ impl Storage {
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let result = (|| {
             check_revision(&tx, expected)?;
-            tx.execute("INSERT INTO library (mod_id, hash, origin, release_id, name, author, version) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(mod_id, hash) DO UPDATE SET name=excluded.name, author=excluded.author, version=excluded.version, origin=excluded.origin, release_id=excluded.release_id", rusqlite::params![entry.reference.mod_id.clone(), entry.reference.hash.clone(), entry.reference.origin.as_str(), entry.reference.release_id.clone(), entry.name.clone(), entry.author.clone(), entry.version.clone()])?;
+            tx.execute("INSERT INTO library (mod_id, hash, origin, release_id, name, author, version) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO UPDATE SET name=excluded.name, author=excluded.author, version=excluded.version, origin=excluded.origin, release_id=excluded.release_id", rusqlite::params![entry.reference.mod_id.clone(), entry.reference.hash.clone(), entry.reference.origin.as_str(), entry.reference.release_id.clone(), entry.name.clone(), entry.author.clone(), entry.version.clone()])?;
             bump(&tx)
         })();
         finish(tx, result)

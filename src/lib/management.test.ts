@@ -86,7 +86,7 @@ test('bulk edits use each confirmed revision and retain partial success on failu
   );
   expect(vi.mocked(transport.mods).mock.calls[2][0]).toMatchObject({
     expectedRevision: '1',
-    modId: 'other',
+    reference: { modId: 'other' },
   });
   expect(get(manager).error).toContain('Missing required release');
   expect(get(manager).pending).toEqual([]);
