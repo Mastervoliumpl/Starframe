@@ -90,13 +90,11 @@ test('import rejects an unsupported format and untrusted links without creating 
     '"schemaVersion":1',
     '"schemaVersion":99',
   );
-  await dialog
-    .getByLabel('Choose a collection file')
-    .setInputFiles({
-      name: 'unsupported.starframe-collection.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from(unsupported),
-    });
+  await dialog.getByLabel('Choose a collection file').setInputFiles({
+    name: 'unsupported.starframe-collection.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(unsupported),
+  });
   await expect(input).toHaveValue(unsupported);
   await dialog.getByRole('button', { name: 'Review import' }).click();
   await expect(dialog.getByRole('alert')).toContainText(
