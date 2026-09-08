@@ -1,6 +1,6 @@
 # Starframe: design direction
 
-Status: revision 0.8, 7 September 2026. Product name: Starframe. The user retained the logo and accepted the desktop layout for the first version. This revision supersedes the earlier in-game presentation and plans the revised launch action.
+Status: revision 0.9, 8 September 2026. Product name: Starframe. The user retained the logo and accepted the desktop layout for the first version. This revision simplifies the in-game list to the current session; the approved launch action remains unchanged.
 
 This is the accepted design handoff. The user authorized milestone 0.1.0 on 6 September 2026, including desktop navigation and live state in issue #8. Later feature screens remain planned. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
@@ -210,11 +210,13 @@ First-run setup uses one focused sequence: locate game, explain the loader requi
 
 ### In-game mod settings
 
-Add a **Mods** entry to Sanctuary's main menu using the game's existing menu structure and controls. Open an installed-mod list from that entry, show which mods are enabled and which actually loaded, and let players select a mod to change its settings. Match the game's typography, spacing, panels, selection states, scrolling, transitions, input navigation and back/close behavior. Reuse the game's UI components where its integration permits. Starframe owns the implementation and settings behavior; the desktop navy-and-orange skin does not carry into this menu.
+Add a **Mods** entry to Sanctuary's main menu using the game's existing menu structure and controls. Show the mods running in this session, and let players select a mod to change its settings. Match the game's typography, spacing, panels, selection states, scrolling, transitions, input navigation and back/close behavior. Reuse the game's UI components where its integration permits. Starframe owns the implementation and settings behavior; the desktop navy-and-orange skin does not carry into this menu.
 
 Use the [monochrome Starframe mark](docs/design/starframe-mark-mono.svg) for the Mods entry. Keep the approved frame-and-sun geometry, but render both parts in the same tint as the other menu icons. Match their size, optical weight and hover/selected/disabled treatment. Retain the visible `Mods` label. Do not bake orange or white into the game icon.
 
-The desktop prepares a metadata-only inventory for the game-side list, alongside the enabled activation entries. Disabled entries must not load DLLs to obtain display information. Distinguish disabled, loaded and failed states. A disabled mod without available settings should explain that its settings become available after enabling it and restarting. The list reflects the prepared setup for this game session; pending desktop changes do not pretend to be loaded.
+The list description reads `The current game session. Change mods in Starframe, then restart the game.` Show successful session entries by mod name only. Hide disabled library entries, redundant Enabled/Loaded labels, version metadata and the inherited Apply-button checkmark. Do not use dots or dashes as metadata separators on this page. Versions remain available in the desktop library and catalog. Show failed or dependency-skipped entries separately under `Could not load`, with access to their error details. An empty session says `No mods are running in this session.` Preserve keyboard focus, selection and Back behavior. This follows the owner's 8 September 2026 request in #58.
+
+The desktop still prepares a metadata-only inventory alongside the enabled activation entries. Disabled entries never load DLLs to obtain display information and do not appear in the game menu. The runtime report determines this session's successful and failed entries; pending desktop changes do not pretend to be loaded.
 
 The former browser in-game screen is superseded. Its replacement in the review artifact is a direction note, not a game preview. Inspect the actual game menus before implementation, then verify the Mods entry, focus/input capture, back behavior and UI scaling in-game. Do not claim game-native visual fidelity from a browser mockup.
 

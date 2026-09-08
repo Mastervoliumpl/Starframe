@@ -32,7 +32,7 @@ The existing layout name describes Starframe's managed package storage. It now a
 2. Select the game installation in Settings and finish setup if required.
 3. In My mods, choose **Import local mod**, select `SanctuaryMods/LadderReporter`, and choose **Import copy**.
 4. Enable Ladder Reporter in the collection you want to use. Wait for the saved setup to be ready, then launch from Starframe. Keep Steam online for this playtest.
-5. Confirm that the desktop reports the active mod and that the game's **Mods** page lists Ladder Reporter as loaded. Open its row to inspect the BepInEx settings.
+5. Confirm that the desktop reports the active mod and that the game's **Mods** page lists Ladder Reporter. The main list contains only successful session entries; failures appear separately under **Could not load**. Open the mod's row to inspect the BepInEx settings.
 6. For a dry run, keep **Report / DryRun** on. For a live ladder test, set **Report / Enabled** on, **Report / DryRun** off and **Matchmaking / Enabled** on. Leave **Matchmaking / LocalPort** at `27555`, as expected by Remmy's site, and restart the game before testing.
 7. Use the ladder's normal workflow to test joining and reporting a match. A successful Starframe activation report establishes plugin startup; it does not establish that a remote service accepted a match result.
 

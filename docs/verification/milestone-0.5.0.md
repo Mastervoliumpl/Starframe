@@ -1,8 +1,12 @@
 # Milestone 0.5.0 verification
 
-Milestone [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) covers local imports (#24), watched builds (#25) and the developer workflow (#26), through [PR #56](https://github.com/Mastervoliumpl/Starframe/pull/56). The owner later added BepInEx compatibility and Ladder Reporter acceptance in #57; [its verification record](bepinex-plugins.md) distinguishes completed checks from remaining acceptance. The [first catalog approval](ladder-reporter-catalog.md) is included in the same PR. This is an internal build; no installer or app release is published.
+Milestone [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) covers local imports (#24), watched builds (#25) and the developer workflow (#26), through [PR #56](https://github.com/Mastervoliumpl/Starframe/pull/56). The owner later added BepInEx compatibility and Ladder Reporter acceptance in #57; [its verification record](bepinex-plugins.md) covers the completed plugin, settings restart, final session-list (#58) and guarded cleanup checks. The [first catalog approval](ladder-reporter-catalog.md) is included in the same PR. This is an internal build; no installer or app release is published.
 
 The [local development guide](../local-development.md) gives the import, rebuild, launch, settings, ordering, sharing and uninstall steps. [Import verification](local-imports.md) defines supported metadata and layouts. [Watcher verification](local-watching.md) records stability checks, exact collection behavior, storage migration and recovery limits.
+
+## Final additions
+
+The owner verified Ladder Reporter while playing with Remmy. The final #57/#58 walkthrough passed native configuration persistence, successful/failed/empty session lists, keyboard settings navigation, guarded uninstall and source/configuration retention. All 1,021 original game-file hashes matched again after this cleanup. Catalog revision 2 approves the author's mod-only ZIP, whose DLL matches that tested copy. The menu hides disabled library entries and shows successful entries by name only, with failures kept separately. Product version remains 0.5.0; no later milestone has started.
 
 ## Automated checks
 

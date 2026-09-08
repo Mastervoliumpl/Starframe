@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-**[0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6)** is active. Local imports (#24), watched rebuilds (#25) and developer workflow verification (#26) are complete. Final PR checks remain before merge; see [exit evidence](docs/verification/milestone-0.5.0.md). Version `0.5.0` is an internal development build. Milestone 0.4.1 is complete; [exit evidence](docs/verification/milestone-0.4.1.md) records its checks and remaining limits. No app release or installer is published.
+**[0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6)** completes local imports (#24), watched rebuilds (#25), developer workflow verification (#26), BepInEx compatibility and Ladder Reporter (#57), and the current-session game menu (#58) through PR #56. See [exit evidence](docs/verification/milestone-0.5.0.md). Version `0.5.0` is an internal development build. Milestone 0.6.0 is next and has not started. No app release or installer is published.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -16,7 +16,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Complete |
 | [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Complete |
 | [0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11) | Exact approval identities, package/runtime limits and maintenance | Complete |
-| [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Final PR checks: #24–#26 verified |
+| [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Complete: #24–#26, #57–#58 verified |
 | [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Planned |
 | [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Native game integration | Blocked on official game API |
 
@@ -108,13 +108,15 @@ These fixes do not establish general compatibility with conventional BepInEx plu
 
 ### 0.5.0: Local mod development
 
-The owner added [#57: BepInEx plugin compatibility and Ladder Reporter verification](https://github.com/Mastervoliumpl/Starframe/issues/57) to this milestone and PR #56. The [compatibility checks](docs/verification/bepinex-plugins.md) record remaining acceptance. [Ladder Reporter 0.3.0](docs/verification/ladder-reporter-catalog.md) is the first approved catalog mod; publication follows merge. This remains an internal milestone, with public alpha distribution gates in 0.6.0.
+The owner added [#57: BepInEx plugin compatibility and Ladder Reporter verification](https://github.com/Mastervoliumpl/Starframe/issues/57) to this milestone and PR #56. The [compatibility and session-list checks](docs/verification/bepinex-plugins.md) record completed game, settings and guarded cleanup acceptance for #57 and #58. [Ladder Reporter 0.3.0](docs/verification/ladder-reporter-catalog.md) is the first approved catalog mod. This remains an internal milestone, with public alpha distribution gates in 0.6.0.
 
-Active. Issue #24 adds local DLL/folder imports with normal management controls; [local import guidance](docs/verification/local-imports.md) defines the supported inputs and checks. Issue #25 adds [stable watched copies](docs/verification/local-watching.md), and #26 verifies the [developer/game workflow](docs/verification/milestone-0.5.0.md). Exit: local rebuilds apply after game exit, incomplete builds retain usable content, and source files survive uninstall.
+Complete through PR #56. Issue #24 adds local DLL/folder imports with normal management controls; [local import guidance](docs/verification/local-imports.md) defines the supported inputs and checks. Issue #25 adds [stable watched copies](docs/verification/local-watching.md), and #26 verifies the [developer/game workflow](docs/verification/milestone-0.5.0.md). Exit: local rebuilds apply after game exit, incomplete builds retain usable content, and source files survive uninstall.
 
 - [#24: Import local mods with normal management controls](https://github.com/Mastervoliumpl/Starframe/issues/24)
 - [#25: Follow local builds and apply stable copies after game exit](https://github.com/Mastervoliumpl/Starframe/issues/25)
 - [#26: Verify the local developer workflow and document its limits](https://github.com/Mastervoliumpl/Starframe/issues/26)
+- [#57: Support existing BepInEx plugins and verify Ladder Reporter](https://github.com/Mastervoliumpl/Starframe/issues/57)
+- [#58: Show current-session mods clearly in the game menu](https://github.com/Mastervoliumpl/Starframe/issues/58)
 
 ### 0.6.0: Windows alpha distribution
 
