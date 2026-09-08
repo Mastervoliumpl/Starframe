@@ -134,6 +134,8 @@ Blocked on the game's official mod API and completion of 0.6.0. Replace the curr
 
 ## Working boundaries
 
+[Mod submissions and hosting](docs/planning/mod-hosting.md) records the owner's future interest in an upload/submission website, richer mod pages, download counts and ratings. No implementation milestone is assigned; 0.5.0 continues with local build watching in #25.
+
 Tests accompany each feature. Installer and game acceptance checks at the end of a milestone add evidence across modules; they do not postpone unit or integration tests.
 
 Independent issues in the active milestone can be delegated after their shared contracts are agreed. A dependency in an issue body is a work prerequisite, not a suggestion. Check its current status with `gh` before starting.
