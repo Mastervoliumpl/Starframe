@@ -1,4 +1,4 @@
-param([int]$AppProcessId, [string]$Folder)
+param([int]$AppProcessId, [string]$Folder, [string]$Title = 'Choose the Sanctuary installation folder')
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
@@ -15,7 +15,7 @@ public static class PickerInput {
 $taskRoot = [System.Windows.Automation.AutomationElement]::RootElement
 $taskFilter = [System.Windows.Automation.AndCondition]::new(
     [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $AppProcessId),
-    [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty, 'Choose the Sanctuary installation folder'))
+    [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty, $Title))
 $taskDeadline = [DateTime]::UtcNow.AddSeconds(10)
 do {
     $taskWindow = $taskRoot.FindFirst([System.Windows.Automation.TreeScope]::Children, $taskFilter)

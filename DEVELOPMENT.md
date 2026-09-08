@@ -2,6 +2,8 @@
 
 Status: milestone 0.5.0 is active, starting with issue #24. Version `0.5.0-dev.1` is an internal development build with no published installer or app release. Milestone 0.4.1 is complete; see [0.4.1 exit evidence](docs/verification/milestone-0.4.1.md).
 
+Issue #24 adds local DLL/folder imports through the package worker and SQLite schema 11. [Local import verification](docs/verification/local-imports.md) records the metadata format, source retention, recovery and native checks. Build watching remains in #25.
+
 Issue #17 adds package preparation through the existing storage worker, with schema-7 operation history and immutable file manifests. [Package checks and recovery](docs/verification/packages.md) record the supported format and limits. Its native fixture runs with the existing native suite; [screen integration and checks](docs/verification/management.md) complete issue #19.
 
 Issue #18 extends that worker with saved mod membership, automatic stopped-game deployment and confirmed uninstall. Schema 8 retains pending cleanup. [Mod lifecycle verification](docs/verification/mods.md) records native restart checks, streamed recovery and space estimates.

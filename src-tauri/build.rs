@@ -7,6 +7,7 @@ fn main() {
             "open_external",
             "game_action",
             "package_action",
+            "pick_local_source",
             "mod_action",
             "sharing_action",
             "save_collection_file",

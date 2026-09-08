@@ -109,7 +109,7 @@ fn text(value: &str, limit: usize) -> Result<()> {
     )
 }
 
-fn id(value: &str) -> Result<()> {
+pub(crate) fn id(value: &str) -> Result<()> {
     ensure(
         !value.is_empty()
             && value.len() <= 128
@@ -131,6 +131,35 @@ fn https(value: &str) -> Result<()> {
             && url.fragment().is_none(),
         "URLs require HTTPS without credentials or fragments",
     )
+}
+
+pub(crate) fn validate_layout(layout: &Layout) -> Result<()> {
+    if let Layout::StarframeManagedZip {
+        root,
+        entry_assembly,
+        entry_type,
+    } = layout
+    {
+        if !root.is_empty() {
+            crate::runtime_contract::relative_path(root)?;
+        }
+        crate::runtime_contract::relative_path(entry_assembly)?;
+        ensure(
+            entry_assembly.ends_with(".dll"),
+            "managed entry must be a DLL",
+        )?;
+        text(entry_type, 256)?;
+        ensure(
+            entry_type.split('.').all(|part| {
+                !part.is_empty()
+                    && part.bytes().enumerate().all(|(i, c)| {
+                        c.is_ascii_alphabetic() || c == b'_' || (i > 0 && c.is_ascii_digit())
+                    })
+            }),
+            "invalid managed entry type",
+        )?;
+    }
+    Ok(())
 }
 
 impl Catalog {
@@ -219,33 +248,8 @@ impl Catalog {
                     (1..=2_147_483_648).contains(&r.artifact.size_bytes),
                     "artifact size must be 1 byte to 2 GiB",
                 )?;
-                if let Layout::StarframeManagedZip {
-                    root,
-                    entry_assembly,
-                    entry_type,
-                } = &r.artifact.layout
-                {
-                    if !root.is_empty() {
-                        crate::runtime_contract::relative_path(root)?;
-                    }
-                    crate::runtime_contract::relative_path(entry_assembly)?;
-                    ensure(
-                        entry_assembly.ends_with(".dll"),
-                        "managed entry must be a DLL",
-                    )?;
-                    text(entry_type, 256)?;
-                    ensure(
-                        entry_type.split('.').all(|part| {
-                            !part.is_empty()
-                                && part.bytes().enumerate().all(|(i, c)| {
-                                    c.is_ascii_alphabetic()
-                                        || c == b'_'
-                                        || (i > 0 && c.is_ascii_digit())
-                                })
-                        }),
-                        "invalid managed entry type",
-                    )?;
-                } else {
+                validate_layout(&r.artifact.layout)?;
+                if matches!(r.artifact.layout, Layout::StarframeLuaZip {}) {
                     ensure(self.schema_version == 2, "Lua packages require schema 2")?;
                 }
                 ensure(

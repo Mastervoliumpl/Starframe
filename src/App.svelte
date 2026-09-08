@@ -167,7 +167,7 @@
           {manager}
           game={$desktop.snapshot?.game}
           unavailable={$desktop.connection !== 'connected'}
-          onsource={(id) => desktop.open(`mod:${id}`)}
+          onsource={(id) => desktop.open(id)}
         />
       </section>
       <section class="page" hidden={page !== 'catalog'} aria-label="Catalog">
@@ -214,7 +214,7 @@
           {manager}
           game={$desktop.snapshot?.game}
           unavailable={$desktop.connection !== 'connected'}
-          onsource={(id) => desktop.open(`mod:${id}`)}
+          onsource={(id) => desktop.open(id)}
         />
       </section>
       <section

@@ -207,10 +207,7 @@ fn review(store: &Storage, document: &Portable) -> Result<Reply> {
     let order_error = if document.entries.is_empty() {
         None
     } else {
-        catalog.as_ref().map_or_else(
-            || Some("Catalog metadata is unavailable.".into()),
-            |c| crate::ordering::resolve(c, &document.entries).err(),
-        )
+        crate::mods::resolve_order(store, &document.entries).err()
     };
     Ok(Reply {
         text: None,

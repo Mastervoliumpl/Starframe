@@ -19,6 +19,8 @@ fn generated_management_contract_matches_rust() {
         crate::mods::Action::decl(&config),
         crate::mods::View::decl(&config),
         crate::mods::Collision::decl(&config),
+        crate::local_import::Manifest::decl(&config),
+        crate::local_import::LocalSource::decl(&config),
         crate::packages::Action::decl(&config),
         crate::packages::Operation::decl(&config),
         crate::packages::Status::decl(&config),

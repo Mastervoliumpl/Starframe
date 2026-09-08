@@ -2,9 +2,45 @@ use crate::{
     app::{Shared, start_worker},
     model::{CommandError, Snapshot},
 };
-use tauri::{State, ipc::Channel};
+use tauri::{Manager, State, ipc::Channel};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
+
+#[tauri::command]
+pub async fn pick_local_source(
+    app: tauri::AppHandle,
+    folder: bool,
+) -> Result<Option<String>, CommandError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut dialog = app.dialog().file().set_title("Import local mod");
+        if let Some(window) = app.get_webview_window("main") {
+            dialog = dialog.set_parent(&window);
+        }
+        let selected = if folder {
+            dialog.blocking_pick_folder()
+        } else {
+            dialog
+                .add_filter("Managed DLL", &["dll"])
+                .blocking_pick_file()
+        };
+        selected
+            .map(|file| {
+                file.into_path()
+                    .map_err(|e| CommandError::new("local_source", &e.to_string()))
+                    .and_then(|path| {
+                        path.to_str().map(str::to_owned).ok_or_else(|| {
+                            CommandError::new(
+                                "local_source",
+                                "The source path must use Unicode names.",
+                            )
+                        })
+                    })
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|_| CommandError::new("local_source", "The source picker stopped unexpectedly."))?
+}
 
 #[tauri::command]
 pub async fn save_collection_file(
@@ -120,6 +156,40 @@ pub async fn open_external(
     service: State<'_, crate::game_service::GameService>,
     page: String,
 ) -> Result<(), CommandError> {
+    if let Some(identity) = page.strip_prefix("local:") {
+        let (id, hash) = identity
+            .split_once(':')
+            .ok_or_else(|| CommandError::new("local_source", "Invalid local reference."))?;
+        let source = service
+            .mods(starframe::mods::Action::List)
+            .await?
+            .local_sources
+            .into_iter()
+            .find(|s| s.reference.mod_id == id && s.reference.hash == hash)
+            .ok_or_else(|| {
+                CommandError::new(
+                    "local_source",
+                    "This local source is no longer in the library.",
+                )
+            })?;
+        let path = std::path::PathBuf::from(source.path);
+        let folder = if path.is_dir() {
+            path.as_path()
+        } else {
+            path.parent().ok_or_else(|| {
+                CommandError::new("local_source", "The source has no parent folder.")
+            })?
+        };
+        return app
+            .opener()
+            .open_path(folder.to_string_lossy(), None::<&str>)
+            .map_err(|_| {
+                CommandError::new(
+                    "local_source",
+                    "Could not open the source folder. Check that it still exists.",
+                )
+            });
+    }
     let url = if let Some(id) = page.strip_prefix("mod:") {
         service
             .mods(starframe::mods::Action::List)

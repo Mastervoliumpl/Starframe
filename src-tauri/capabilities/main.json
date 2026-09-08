@@ -2,5 +2,5 @@
   "identifier": "main",
   "description": "Local desktop state and diagnostic commands for the main window.",
   "windows": ["main"],
-  "permissions": ["allow-watch-state", "allow-start-diagnostic", "allow-cancel-operation", "allow-open-external", "allow-game-action", "allow-package-action", "allow-mod-action", "allow-sharing-action", "allow-save-collection-file"]
+  "permissions": ["allow-watch-state", "allow-start-diagnostic", "allow-cancel-operation", "allow-open-external", "allow-game-action", "allow-package-action", "allow-pick-local-source", "allow-mod-action", "allow-sharing-action", "allow-save-collection-file"]
 }

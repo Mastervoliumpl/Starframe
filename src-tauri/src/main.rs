@@ -84,6 +84,7 @@ fn main() {
             commands::open_external,
             commands::game_action,
             commands::package_action,
+            commands::pick_local_source,
             commands::sharing_action,
             commands::save_collection_file,
             commands::mod_action

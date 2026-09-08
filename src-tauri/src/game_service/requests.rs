@@ -57,6 +57,9 @@ impl Worker {
                     .ok_or("Package storage is unavailable.")?;
                 let store = self.storage.as_mut().ok_or("Saved data is unavailable.")?;
                 match action {
+                    packages::Action::ImportLocal { request_id, path } => {
+                        queue.import_local(store, &request_id, &path)?;
+                    }
                     packages::Action::Prepare {
                         request_id,
                         release_id,

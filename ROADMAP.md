@@ -108,7 +108,7 @@ These fixes do not establish general compatibility with conventional BepInEx plu
 
 ### 0.5.0: Local mod development
 
-Planned; starts after 0.4.1 closes. Deliver local DLL/folder imports, normal management controls and stable watched build copies. Exit: local rebuilds apply after game exit, incomplete builds retain usable content, and source files survive uninstall.
+Active. Issue #24 adds local DLL/folder imports with normal management controls; [local import guidance](docs/verification/local-imports.md) defines the supported inputs and checks. Stable watched copies follow in #25. Exit: local rebuilds apply after game exit, incomplete builds retain usable content, and source files survive uninstall.
 
 - [#24: Import local mods with normal management controls](https://github.com/Mastervoliumpl/Starframe/issues/24)
 - [#25: Follow local builds and apply stable copies after game exit](https://github.com/Mastervoliumpl/Starframe/issues/25)

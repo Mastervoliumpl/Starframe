@@ -135,6 +135,12 @@ impl Storage {
                     [&reference.hash],
                 )?;
             }
+            if reference.origin == Origin::LocalImport {
+                tx.execute(
+                    "DELETE FROM local_sources WHERE mod_id=? AND hash=?",
+                    rusqlite::params![reference.mod_id, reference.hash],
+                )?;
+            }
             bump(&tx)
         })();
         finish(tx, result)
