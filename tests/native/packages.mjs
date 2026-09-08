@@ -132,6 +132,59 @@ await withDesktop(
       releaseId: 'fixture.core.1',
     });
     expect(duplicate.filter((op) => op.requestId === request)).toHaveLength(1);
+    await page
+      .getByRole('button', { name: 'Collections', exact: true })
+      .click();
+    await page
+      .getByRole('button', { name: 'Import collection', exact: true })
+      .click();
+    const shared = {
+      format: 'starframe-collection',
+      schemaVersion: 1,
+      name: 'Native shared collection',
+      entries: [
+        {
+          modId: 'fixture.core',
+          hash: archiveHash,
+          origin: 'catalog',
+          releaseId: 'fixture.core.1',
+        },
+      ],
+    };
+    const dialog = page.getByRole('dialog');
+    await dialog
+      .getByRole('textbox', { name: 'Or paste collection JSON' })
+      .fill(JSON.stringify(shared));
+    await dialog.getByRole('button', { name: 'Review import' }).click();
+    await expect(dialog).toContainText(
+      'Already downloaded; verify local files before reuse.',
+    );
+    await dialog.getByRole('button', { name: 'Accept import' }).click();
+    await expect(page.getByText('1 of 1 exact packages ready')).toBeVisible();
+    await page
+      .getByRole('button', {
+        name: 'Export collection Native shared collection',
+      })
+      .click();
+    expect(
+      JSON.parse(
+        await dialog
+          .getByRole('textbox', { name: 'Collection JSON', exact: true })
+          .inputValue(),
+      ),
+    ).toEqual(shared);
+    await page.screenshot({
+      path: 'test-results/native/collection-export-live.png',
+    });
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    const invalidShare = await page.evaluate(async () =>
+      window.__TAURI_INTERNALS__
+        .invoke('sharing_action', {
+          action: { kind: 'review', text: '{"format":"untrusted"}' },
+        })
+        .catch((error) => error),
+    );
+    expect(invalidShare.code).toBe('sharing_failed');
     await page.getByRole('button', { name: 'Catalog', exact: true }).click();
     await expect(page.getByText('Catalog revision 41')).toBeVisible();
     await writeFile(
@@ -152,6 +205,15 @@ await withDesktop(
           )?.status,
       )
       .toBe('failed');
+    await page
+      .getByRole('button', { name: 'Collections', exact: true })
+      .click();
+    await expect(
+      page.getByRole('heading', {
+        name: 'Native shared collection',
+        exact: true,
+      }),
+    ).toBeVisible();
   },
   offline,
 );

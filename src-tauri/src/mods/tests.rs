@@ -325,6 +325,22 @@ fn sharing_queues_missing_approved_content_after_one_acceptance_and_retains_canc
     assert!(requested(&store).is_err());
 }
 
+#[test]
+fn sharing_explains_missing_required_references_without_adding_them_to_the_shared_order() {
+    let (_root, mut store, entries) = fixture();
+    let reply = crate::sharing::action(
+        &mut store,
+        crate::sharing::Action::Review {
+            text: shared("Missing dependency", &[entries[1].reference.clone()]),
+        },
+    )
+    .unwrap();
+    assert_eq!(reply.entries.len(), 1);
+    assert_eq!(reply.entries[0].status, crate::sharing::Status::Unresolved);
+    assert!(reply.entries[0].message.contains("fixture.core.1"));
+    assert!(reply.order_error.is_some());
+}
+
 fn fixture() -> (tempfile::TempDir, Storage, Vec<LibraryEntry>) {
     fixture_with_lua(false)
 }

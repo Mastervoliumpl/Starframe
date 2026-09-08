@@ -2,6 +2,8 @@
   import { tick } from 'svelte';
   import type { Management, ModView } from '../lib/management';
   import LoadOrder from './LoadOrder.svelte';
+  import CollectionSharing from './CollectionSharing.svelte';
+  let sharing: CollectionSharing;
   let {
     manager,
     unavailable,
@@ -76,12 +78,15 @@
       shared.
     </p>
   </div>
-  <button
-    bind:this={newButton}
-    class="primary-action"
-    disabled={busy}
-    onclick={() => open('create')}>New collection</button
-  >
+  <div class="collection-actions">
+    <CollectionSharing bind:this={sharing} {manager} {unavailable} />
+    <button
+      bind:this={newButton}
+      class="primary-action"
+      disabled={busy}
+      onclick={() => open('create')}>New collection</button
+    >
+  </div>
 </div>
 <p role="status">{notice}</p>
 {#if $manager.error && !dialog?.open}<p class="error" role="alert">
@@ -98,6 +103,9 @@
 {:else}
   <ul class="collection-grid" aria-label="Saved collections">
     {#each $manager.data.collections as collection (collection.id)}
+      {@const imported = $manager.data.imports.find(
+        (i) => i.collectionId === collection.id,
+      )}
       <li>
         <h3>{collection.name}</h3>
         <p class="muted">
@@ -138,6 +146,12 @@
         </button>
         <div class="collection-actions">
           <button
+            disabled={unavailable || $manager.pending.includes('sharing')}
+            aria-label={`Export collection ${collection.name}`}
+            onclick={() => sharing.exportCollection(collection.id)}
+            >Export</button
+          >
+          <button
             disabled={busy}
             aria-label={`Rename collection ${collection.name}`}
             onclick={() => open('rename', collection)}>Rename</button
@@ -148,6 +162,33 @@
             onclick={() => open('delete', collection)}>Delete</button
           >
         </div>
+        {#if imported}
+          <p role="status">
+            {imported.entries.filter((e) => e.status === 'ready').length} of {imported
+              .entries.length} exact packages ready
+          </p>
+          <details>
+            <summary>Import details</summary>
+            <ol>
+              {#each imported.entries as entry (entry.reference.modId)}
+                <li>
+                  <strong>{entry.reference.modId}</strong>
+                  <p class:error={entry.status === 'unresolved'}>
+                    {entry.message}
+                  </p>
+                </li>
+              {/each}
+            </ol>
+          </details>
+          {#if !imported.entries.some((e) => e.status === 'pending' || e.status === 'preparing') && imported.entries.some((e) => e.status === 'unresolved')}
+            <button
+              disabled={unavailable || $manager.pending.includes('sharing')}
+              onclick={() =>
+                manager.sharing({ kind: 'retry', id: collection.id })}
+              >Retry import</button
+            >
+          {/if}
+        {/if}
       </li>
     {/each}
   </ul>
@@ -166,6 +207,7 @@
 {:else if $manager.data}<button onclick={onmods}>Open My mods</button>{/if}
 
 <dialog
+  class="collection-dialog"
   bind:this={dialog}
   aria-labelledby="collection-dialog-title"
   onclose={() => {
@@ -236,7 +278,7 @@
     padding: 0;
     list-style: none;
   }
-  .collection-grid li {
+  .collection-grid > li {
     border: 1px solid var(--selected);
     border-radius: 8px;
     padding: 20px;

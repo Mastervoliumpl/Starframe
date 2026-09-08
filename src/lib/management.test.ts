@@ -29,6 +29,7 @@ const data = (revision = '0'): ModView => ({
   collisions: [],
   collections: [],
   cleanupErrors: [],
+  imports: [],
 });
 afterEach(() => vi.useRealTimers());
 
@@ -46,6 +47,8 @@ test('an old refresh cannot overwrite an acknowledged edit; repeated input is ig
         () => new Promise<ModView>((resolve) => (resolveEdit = resolve)),
       )
       .mockResolvedValue(data('1')),
+    sharing: vi.fn(),
+    saveCollection: vi.fn(),
     packages: vi.fn().mockResolvedValue([]),
   };
   const manager = createManagement(transport);
@@ -71,6 +74,8 @@ test('bulk edits use each confirmed revision and retain partial success on failu
       .mockResolvedValueOnce({ ...data('1'), enabled: [entry.reference] })
       .mockRejectedValueOnce(new Error('Missing required release.'))
       .mockResolvedValue(data('1')),
+    sharing: vi.fn(),
+    saveCollection: vi.fn(),
     packages: vi.fn().mockResolvedValue([]),
   };
   const manager = createManagement(transport);
@@ -91,6 +96,8 @@ test('silent operation replies time out without claiming installation', async ()
   vi.useFakeTimers();
   const manager = createManagement({
     mods: vi.fn().mockResolvedValue(data()),
+    sharing: vi.fn(),
+    saveCollection: vi.fn(),
     packages: vi.fn().mockImplementation(() => new Promise(() => {})),
   });
   const install = manager.install('fixture.1');

@@ -436,7 +436,9 @@ Launch through the supported Steam/executable route after final readiness checks
 
 ## 8. Collections and local development
 
-Use a collection name and an ordered list of mod references. Propose a versioned `.starframe-collection.json` file as the first sharing mechanism. Each reference identifies a stable mod ID, the same approved release/artifact hash, or local content identity where applicable. Technical format/version identifiers support reading the file; they are not extra collection settings. Membership means enabled, so a separate enabled flag is unnecessary. Do not include mod settings, binaries, credentials, absolute local paths, or arbitrary installation commands.
+Use a collection name and an ordered list of mod references. Use a versioned `.starframe-collection.json` file as the first sharing mechanism. Each reference identifies a stable mod ID, the same approved release/artifact hash, or local content identity where applicable. Technical format/version identifiers support reading the file; they are not extra collection settings. Membership means enabled, so a separate enabled flag is unnecessary. Do not include mod settings, binaries, credentials, absolute local paths, or arbitrary installation commands.
+
+The version-1 format uses `format`, `schemaVersion`, `name` and `entries`. It rejects unknown fields and files over 1 MiB; entries contain only stable mod ID, content hash, origin and optional release ID. SQLite schema 9 stores import progress separately from the collection. Closing the app interrupts unfinished imports; the next launch retains them for an explicit retry. See [sharing verification](docs/verification/sharing.md).
 
 On import, first match each reference against verified content already in the library. Create the collection with its shared order and show any missing content as pending, then download only missing approved artifacts. The user accepts the import once; there is no need to click Install for every missing mod. Reuse files across collections instead of downloading separate copies. Show progress immediately, and apply the complete valid collection automatically when selected and the game is closed.
 

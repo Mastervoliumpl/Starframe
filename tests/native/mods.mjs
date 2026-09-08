@@ -407,12 +407,58 @@ try {
       await page.screenshot({
         path: 'test-results/native/load-order-live.png',
       });
+      const sharing = (change) =>
+        page.evaluate(
+          (action) =>
+            window.__TAURI_INTERNALS__.invoke('sharing_action', { action }),
+          change,
+        );
+      const exported = await sharing({
+        kind: 'export',
+        id: originalCollection,
+      });
+      const imported = await sharing({
+        kind: 'accept',
+        text: exported.text,
+        requestId: crypto.randomUUID(),
+        expectedRevision: (await list(page)).revision,
+      });
+      await expect
+        .poll(async () =>
+          (await list(page)).imports
+            .find((i) => i.collectionId === imported.collectionId)
+            ?.entries.every((e) => e.status === 'unresolved'),
+        )
+        .toBe(true);
+      const beforeImport = await activation();
+      await collectionAction(page, {
+        kind: 'select_collection',
+        id: imported.collectionId,
+      });
+      await expect
+        .poll(async () => (await list(page)).orderError)
+        .toContain('withdrawn');
+      expect((await activation()).deploymentRevision).toBe(
+        beforeImport.deploymentRevision,
+      );
+      expect((await activation()).mods.map((m) => m.modId)).toEqual([
+        reference.modId,
+        luaId,
+      ]);
+      await collectionAction(page, {
+        kind: 'select_collection',
+        id: originalCollection,
+      });
+      await collectionAction(page, {
+        kind: 'delete_collection',
+        id: imported.collectionId,
+      });
       await action(page, {
         kind: 'set_enabled',
         modId: luaId,
         hash: luaHash,
         enabled: false,
-        expectedRevision: reordered.revision,
+        expectedRevision: (await list(page)).revision,
       });
       await waitForDeployment(1);
       await page.getByRole('button', { name: 'My mods', exact: true }).click();

@@ -371,6 +371,27 @@
         <DiagnosticList />
         <div class="settings-section">
           <h2>Project help</h2>
+          <details>
+            <summary>Share or repair a collection</summary>
+            <p>
+              In Collections, choose Export and save the collection file. On
+              another installation, choose Import collection, select the file or
+              paste its JSON, then review and accept once.
+            </p>
+            <p>
+              Starframe verifies matching files and prepares missing approved
+              releases. Import details keep unavailable references visible.
+              Choose Use collection to enable the complete valid setup after the
+              game closes.
+            </p>
+            <p>
+              If an import stops, use Retry import. For a withdrawn release,
+              changed identity or missing dependency, ask the sender for a
+              repaired collection. You can also export the saved list, edit its
+              exact references, and import it as a new collection. Newer
+              releases are never selected automatically.
+            </p>
+          </details>
           <p>Log export is not available yet.</p>
           <details>
             <summary>Artwork credit</summary>

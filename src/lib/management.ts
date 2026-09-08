@@ -49,6 +49,7 @@ export type CatalogMod = {
   releases: Release[];
 };
 export type ModView = {
+  imports: { collectionId: string; entries: ImportEntry[] }[];
   revision: string;
   activeCollection: string | null;
   catalog: {
@@ -119,7 +120,31 @@ export type CollectionEdit =
   | { kind: 'create_collection'; name: string }
   | { kind: 'rename_collection'; id: string; name: string }
   | { kind: 'delete_collection' | 'select_collection'; id: string };
+export type ImportEntry = {
+  reference: Reference;
+  status: 'pending' | 'preparing' | 'ready' | 'unresolved';
+  message: string;
+  operationId: string | null;
+};
+export type SharingAction =
+  | { kind: 'review'; text: string }
+  | {
+      kind: 'accept';
+      text: string;
+      requestId: string;
+      expectedRevision: string;
+    }
+  | { kind: 'retry' | 'export'; id: string };
+export type SharingReply = {
+  text: string | null;
+  name: string;
+  entries: ImportEntry[];
+  collectionId: string | null;
+  orderError: string | null;
+};
 export interface ManagementTransport {
+  saveCollection(text: string): Promise<boolean>;
+  sharing(action: SharingAction): Promise<SharingReply>;
   mods(action: ModAction): Promise<ModView>;
   packages(action: PackageAction): Promise<PackageOperation[]>;
 }
@@ -207,6 +232,20 @@ export function createManagement(transport: ManagementTransport | null) {
     },
     refresh,
     dismissError: () => update({ error: '' }),
+    async saveCollection(text: string) {
+      let saved = false;
+      await run('sharing', async () => {
+        saved = await transport!.saveCollection(text);
+      });
+      return saved;
+    },
+    async sharing(action: SharingAction) {
+      let reply: SharingReply | null = null;
+      await run('sharing', async () => {
+        reply = await confirmed(transport!.sharing(action));
+      });
+      return reply as SharingReply | null;
+    },
     collection(action: CollectionEdit, expectedRevision?: string) {
       return run('membership', async () => {
         if (!view.data) throw new Error('Collection data is unavailable.');

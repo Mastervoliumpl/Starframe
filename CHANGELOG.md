@@ -4,6 +4,9 @@
 
 Development version: `0.4.0-dev.1`. Started ordered collections with issue #20. No app release or installer is published.
 
+- Added version-1 collection JSON import/export, review before one acceptance, verified local reuse, queued exact approved packages and persistent unresolved references (#22).
+- Added schema-9 import progress, restart recovery and retry; incomplete imports cannot apply. Collection dialogs use the existing management dialog styles.
+
 - Added named collection creation, rename, confirmed deletion and active selection, sharing existing mod files and settings (#21).
 - Added visible pending collection revisions during play, with latest-revision application after exit.
 - Replaced Move up/down buttons with a drag handle and right-aligned order number; the handle retains keyboard and select-then-place operation.

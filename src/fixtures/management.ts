@@ -3,6 +3,8 @@ import type {
   ManagementTransport,
   ModView,
   PackageOperation,
+  Reference,
+  SharingReply,
 } from '../lib/management';
 export function fixtureManagement(
   changed: (data: ModView) => void,
@@ -58,6 +60,7 @@ export function fixtureManagement(
       }))
     : [];
   const data: ModView = {
+    imports: [],
     revision: '0',
     activeCollection: null,
     catalog: { schemaVersion: 1, catalogRevision: '1', mods },
@@ -88,6 +91,149 @@ export function fixtureManagement(
     changed(data);
   };
   return {
+    async saveCollection(text) {
+      const url = URL.createObjectURL(
+        new Blob([text], { type: 'application/json' }),
+      );
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'collection.starframe-collection.json';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return true;
+    },
+    async sharing(action) {
+      const collection =
+        'id' in action
+          ? data.collections.find((c) => c.id === action.id)
+          : null;
+      const document: {
+        format: string;
+        schemaVersion: number;
+        name: string;
+        entries: Reference[];
+      } = collection
+        ? {
+            format: 'starframe-collection',
+            schemaVersion: 1,
+            name: collection.name,
+            entries: collection.entries,
+          }
+        : JSON.parse('text' in action ? action.text : '{}');
+      if (
+        document.format !== 'starframe-collection' ||
+        document.schemaVersion !== 1
+      )
+        throw new Error('Unsupported collection format or version.');
+      if (
+        Object.keys(document).some(
+          (key) =>
+            !['format', 'schemaVersion', 'name', 'entries'].includes(key),
+        )
+      )
+        throw new Error('Invalid collection file: unknown field.');
+      if (
+        !document.name?.trim() ||
+        !Array.isArray(document.entries) ||
+        document.entries.length > 256
+      )
+        throw new Error('Invalid collection name or entries.');
+      const reply: SharingReply = {
+        text: null,
+        name: document.name,
+        collectionId: null,
+        orderError: null,
+        entries: document.entries.map((reference) => {
+          if (
+            Object.keys(reference).some(
+              (key) => !['modId', 'hash', 'origin', 'releaseId'].includes(key),
+            )
+          )
+            throw new Error('Invalid collection reference: unknown field.');
+          const release = mods
+            .find((m) => m.id === reference.modId)
+            ?.releases.find(
+              (r) =>
+                r.id === reference.releaseId &&
+                r.artifact.sha256 === reference.hash,
+            );
+          const local = data.library.some(
+            (e) => JSON.stringify(e.reference) === JSON.stringify(reference),
+          );
+          const available =
+            reference.origin === 'local_import'
+              ? local
+              : release && !release.withdrawn;
+          return {
+            reference,
+            status: available ? 'pending' : 'unresolved',
+            message: !available
+              ? 'Exact release unavailable or withdrawn. No substitute was selected.'
+              : local
+                ? 'Already downloaded; verify local files before reuse.'
+                : 'Download and verify this exact approved release.',
+            operationId: null,
+          };
+        }),
+      };
+      if (action.kind === 'export')
+        return { ...reply, text: JSON.stringify(document, null, 2) };
+      if (action.kind === 'review') return reply;
+      const id = action.kind === 'accept' ? action.requestId : action.id;
+      if (!data.collections.some((c) => c.id === id))
+        data.collections.push({
+          id,
+          name: document.name,
+          entries: document.entries,
+          revision: 1,
+        });
+      const imported = { collectionId: id, entries: reply.entries };
+      data.imports = [
+        ...data.imports.filter((i) => i.collectionId !== id),
+        imported,
+      ];
+      commit();
+      for (const entry of imported.entries) {
+        if (entry.status !== 'pending') continue;
+        entry.status = 'preparing';
+        if (
+          data.library.some(
+            (e) =>
+              e.reference.modId === entry.reference.modId &&
+              e.reference.hash === entry.reference.hash,
+          )
+        ) {
+          setTimeout(() => {
+            entry.status = 'ready';
+            entry.message = 'Exact package verified and available.';
+            commit();
+          }, 600);
+        } else {
+          await this.packages({
+            kind: 'prepare',
+            requestId: crypto.randomUUID(),
+            releaseId: entry.reference.releaseId!,
+          });
+          const operation = operations.find(
+            (o) => o.releaseId === entry.reference.releaseId,
+          )!;
+          entry.operationId = operation.id;
+          const timer = setInterval(() => {
+            if (
+              operation.status === 'preparing' ||
+              operation.status === 'cancelling'
+            )
+              return;
+            entry.status =
+              operation.status === 'completed' ? 'ready' : 'unresolved';
+            entry.message = operation.message;
+            clearInterval(timer);
+            commit();
+          }, 100);
+        }
+      }
+      return { ...reply, collectionId: id };
+    },
     async mods(action) {
       if (
         'expectedRevision' in action &&

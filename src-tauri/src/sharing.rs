@@ -129,6 +129,7 @@ fn assess(
     reference: &ModReference,
     records: &Records,
     catalog: Option<&Catalog>,
+    requested: &[ModReference],
 ) -> Result<String> {
     let exact = records.library.iter().any(|e| &e.reference == reference);
     if reference.origin == Origin::LocalImport {
@@ -147,13 +148,28 @@ fn assess(
         );
     }
     catalog.downloadable(&release.id)?;
+    for dependency in &release.requires {
+        if !requested.iter().any(|r| {
+            r.origin == Origin::Catalog
+                && r.release_id.as_ref() == Some(dependency)
+                && catalog.releases().any(|(m, release)| {
+                    m.id == r.mod_id
+                        && release.id == *dependency
+                        && release.artifact.sha256 == r.hash
+                })
+        }) {
+            return Err(format!(
+                "Required release {dependency} is missing from this collection. Ask the sender to include its exact reference."
+            ));
+        }
+    }
     if !exact
         && records
             .library
             .iter()
             .any(|e| e.reference.mod_id == reference.mod_id && e.reference.hash == reference.hash)
     {
-        return Err("These bytes are saved under another approval identity. Exact-reference support for reapprovals is tracked in 0.4.1 (#50).".into());
+        return Err("These bytes are saved under another approval identity. This approval cannot be added alongside it yet. Keep this reference for a future Starframe update.".into());
     }
     Ok(if exact {
         "Already downloaded; verify local files before reuse."
@@ -173,10 +189,11 @@ fn review(store: &Storage, document: &Portable) -> Result<Reply> {
         .entries
         .iter()
         .map(|reference| {
-            let (status, message) = match assess(reference, &records, catalog.as_ref()) {
-                Ok(message) => (Status::Pending, message),
-                Err(message) => (Status::Unresolved, message),
-            };
+            let (status, message) =
+                match assess(reference, &records, catalog.as_ref(), &document.entries) {
+                    Ok(message) => (Status::Pending, message),
+                    Err(message) => (Status::Unresolved, message),
+                };
             Entry {
                 reference: reference.clone(),
                 status,
@@ -331,6 +348,12 @@ pub fn poll(store: &mut Storage, packages: &mut Packages) -> Result<bool> {
     let mut changed = false;
     for mut import in store.collection_imports().map_err(|e| e.to_string())? {
         let mut dirty = false;
+        let requested = &records
+            .collections
+            .iter()
+            .find(|c| c.id == import.collection_id)
+            .ok_or("Imported collection is missing.")?
+            .entries;
         for entry in &mut import.entries {
             if entry.status == Status::Preparing {
                 let operation = operations
@@ -365,7 +388,7 @@ pub fn poll(store: &mut Storage, packages: &mut Packages) -> Result<bool> {
             if entry.status != Status::Pending {
                 continue;
             }
-            match assess(&entry.reference, &records, catalog.as_ref()) {
+            match assess(&entry.reference, &records, catalog.as_ref(), requested) {
                 Err(message) => {
                     entry.status = Status::Unresolved;
                     entry.message = message;

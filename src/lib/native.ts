@@ -3,6 +3,8 @@ import type { Snapshot } from './generated/model';
 import type { Transport } from './state';
 
 const native: Transport = {
+  saveCollection: (text) => invoke('save_collection_file', { text }),
+  sharing: (action) => invoke('sharing_action', { action }),
   mods: (action) => invoke('mod_action', { action }),
   packages: (action) => invoke('package_action', { action }),
   async watch(receive) {

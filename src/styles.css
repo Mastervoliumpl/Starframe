@@ -347,7 +347,8 @@ main {
   background: var(--accent);
   color: var(--canvas);
 }
-.uninstall-dialog {
+.uninstall-dialog,
+.collection-dialog {
   width: min(560px, calc(100% - 32px));
   max-height: calc(100dvh - 32px);
   overflow: auto;
@@ -357,10 +358,12 @@ main {
   border: 1px solid var(--outline);
   border-radius: 12px;
 }
-.uninstall-dialog p {
+.uninstall-dialog p,
+.collection-dialog p {
   margin-block: 12px;
 }
-.uninstall-dialog::backdrop {
+.uninstall-dialog::backdrop,
+.collection-dialog::backdrop {
   background: #0009;
 }
 .download-title {
