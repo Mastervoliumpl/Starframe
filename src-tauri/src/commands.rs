@@ -3,7 +3,51 @@ use crate::{
     model::{CommandError, Snapshot},
 };
 use tauri::{State, ipc::Channel};
+use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
+
+#[tauri::command]
+pub async fn save_collection_file(
+    app: tauri::AppHandle,
+    text: String,
+) -> Result<bool, CommandError> {
+    let document = starframe::sharing::Portable::read(&text)
+        .map_err(|e| CommandError::new("invalid_collection", &e))?;
+    let bytes = serde_json::to_vec_pretty(&document)
+        .map_err(|e| CommandError::new("invalid_collection", &e.to_string()))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(file) = app
+            .dialog()
+            .file()
+            .set_title("Save collection file")
+            .set_file_name("collection.starframe-collection.json")
+            .add_filter("Starframe collection", &["json"])
+            .blocking_save_file()
+        else {
+            return Ok(false);
+        };
+        let path = file
+            .into_path()
+            .map_err(|e| CommandError::new("save_failed", &e.to_string()))?;
+        std::fs::write(path, bytes).map_err(|e| {
+            CommandError::new(
+                "save_failed",
+                &format!("Could not save the collection file: {e}"),
+            )
+        })?;
+        Ok(true)
+    })
+    .await
+    .map_err(|_| CommandError::new("save_failed", "The save dialog stopped unexpectedly."))?
+}
+
+#[tauri::command]
+pub async fn sharing_action(
+    service: State<'_, crate::game_service::GameService>,
+    action: starframe::sharing::Action,
+) -> Result<starframe::sharing::Reply, CommandError> {
+    service.sharing(action).await
+}
 
 #[tauri::command]
 pub async fn mod_action(

@@ -6,6 +6,7 @@ pub mod mods;
 pub mod ordering;
 pub mod packages;
 pub mod runtime_contract;
+pub mod sharing;
 pub mod space;
 pub mod storage;
 #[cfg(windows)]

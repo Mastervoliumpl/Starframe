@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sharing-action"
+description = "Enables the sharing_action command without any pre-configured scope."
+commands.allow = ["sharing_action"]
+
+[[permission]]
+identifier = "deny-sharing-action"
+description = "Denies the sharing_action command without any pre-configured scope."
+commands.deny = ["sharing_action"]

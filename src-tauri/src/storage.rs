@@ -1,5 +1,5 @@
 use rusqlite::{Connection, Transaction, TransactionBehavior};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File, OpenOptions},
     path::{Path, PathBuf},
@@ -9,10 +9,11 @@ use uuid::Uuid;
 
 mod mods;
 mod packages;
+mod sharing;
 
-const SCHEMA: i64 = 8;
+const SCHEMA: i64 = 9;
 const APPLICATION_ID: i64 = 0x53544652;
-const MIGRATIONS: [&str; 8] = [
+const MIGRATIONS: [&str; 9] = [
     "CREATE TABLE metadata (id INTEGER PRIMARY KEY CHECK(id = 1), engine TEXT NOT NULL CHECK(engine = 'sqlite'), revision INTEGER NOT NULL CHECK(revision >= 0));
      INSERT INTO metadata VALUES (1, 'sqlite', 0);
      CREATE TABLE library (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author) <= 200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(mod_id, hash), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL)));
@@ -25,6 +26,7 @@ const MIGRATIONS: [&str; 8] = [
     "CREATE TABLE catalog_cache (id INTEGER PRIMARY KEY CHECK(id=1), record TEXT NOT NULL CHECK(length(record)<=2105344 AND json_valid(record)));",
     "CREATE TABLE package_operations (id TEXT PRIMARY KEY NOT NULL, request_id TEXT UNIQUE NOT NULL, record TEXT NOT NULL CHECK(length(record)<=8192 AND json_valid(record))); CREATE TABLE prepared_artifacts (hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash)=64 AND hash NOT GLOB '*[^0-9a-f]*'), record TEXT NOT NULL CHECK(length(record)<=2097152 AND json_valid(record)));",
     "CREATE TABLE pending_removals (hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash)=64 AND hash NOT GLOB '*[^0-9a-f]*'), error TEXT NOT NULL DEFAULT '');",
+    "CREATE TABLE collection_imports (collection_id TEXT PRIMARY KEY NOT NULL REFERENCES collections(id) ON DELETE CASCADE, record TEXT NOT NULL CHECK(length(record)<=1048576 AND json_valid(record)));",
 ];
 
 #[derive(Debug)]
@@ -59,7 +61,7 @@ impl From<rusqlite::Error> for Error {
 }
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Origin {
     Catalog,
@@ -81,8 +83,8 @@ impl Origin {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ModReference {
     pub mod_id: String,
     pub hash: String,
@@ -733,7 +735,7 @@ fn validate_text(value: &str, field: &str) -> Result<()> {
     }
     Ok(())
 }
-fn validate_reference(reference: &ModReference) -> Result<()> {
+pub(crate) fn validate_reference(reference: &ModReference) -> Result<()> {
     validate_text(&reference.mod_id, "Mod ID")?;
     if reference.hash.len() != 64
         || !reference
@@ -803,7 +805,7 @@ mod tests {
         store.put_library_entry(&entry(), 0).unwrap();
         store
             .conn
-            .execute_batch("DROP TABLE pending_removals; DROP TABLE package_operations; DROP TABLE prepared_artifacts; DROP TABLE catalog_cache; PRAGMA user_version=5;")
+            .execute_batch("DROP TABLE collection_imports; DROP TABLE pending_removals; DROP TABLE package_operations; DROP TABLE prepared_artifacts; DROP TABLE catalog_cache; PRAGMA user_version=5;")
             .unwrap();
         drop(store);
         let mut store = Storage::open(root.path()).unwrap();
@@ -845,7 +847,7 @@ mod tests {
         store.put_library_entry(&entry(), 0).unwrap();
         store
             .conn
-            .execute_batch("DROP TABLE pending_removals; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 2;")
+            .execute_batch("DROP TABLE collection_imports; DROP TABLE pending_removals; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 2;")
             .unwrap();
         drop(store);
         let mut store = Storage::open(root.path()).unwrap();
@@ -940,7 +942,7 @@ mod tests {
         store
             .conn
             .execute_batch(
-                "DROP TABLE pending_removals; DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 1;",
+                "DROP TABLE collection_imports; DROP TABLE pending_removals; DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 1;",
             )
             .unwrap();
         let backup = store.backup().unwrap();
@@ -1079,7 +1081,7 @@ mod tests {
             if mode == "migration" {
                 store
                     .conn
-                    .execute_batch("DROP TABLE pending_removals; DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 1;")
+                    .execute_batch("DROP TABLE collection_imports; DROP TABLE pending_removals; DROP TABLE preferences; DROP TABLE game_selection; DROP TABLE deployments; DROP TABLE deployment_blobs; DROP TABLE catalog_cache; DROP TABLE package_operations; DROP TABLE prepared_artifacts; PRAGMA user_version = 1;")
                     .unwrap();
                 store.backup().unwrap();
                 store.conn.execute("BEGIN IMMEDIATE", []).unwrap();

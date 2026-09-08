@@ -4,6 +4,327 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use uuid::Uuid;
 
+fn shared(name: &str, entries: &[ModReference]) -> String {
+    serde_json::to_string(&crate::sharing::Portable {
+        format: "starframe-collection".into(),
+        schema_version: 1,
+        name: name.into(),
+        entries: entries.to_vec(),
+    })
+    .unwrap()
+}
+
+fn import(store: &mut Storage, text: &str) -> String {
+    let id = Uuid::new_v4().to_string();
+    crate::sharing::action(
+        store,
+        crate::sharing::Action::Accept {
+            text: text.into(),
+            request_id: id.clone(),
+            expected_revision: store.load().unwrap().revision.to_string(),
+        },
+    )
+    .unwrap();
+    id
+}
+
+fn finish_imports(store: &mut Storage, queue: &mut packages::Packages) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        queue.poll(store).unwrap();
+        crate::sharing::poll(store, queue).unwrap();
+        if store.collection_imports().unwrap().iter().all(|i| {
+            i.entries.iter().all(|e| {
+                matches!(
+                    e.status,
+                    crate::sharing::Status::Ready | crate::sharing::Status::Unresolved
+                )
+            })
+        }) {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "import did not finish"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
+#[test]
+fn sharing_roundtrip_reuses_verified_files_in_a_second_library_and_blocks_partial_application() {
+    let (_source_root, mut source, entries) = fixture();
+    let references: Vec<_> = entries.iter().rev().map(|e| e.reference.clone()).collect();
+    let source_id = Uuid::new_v4().to_string();
+    source
+        .save_collection(&source_id, "Shared order", &references, 0)
+        .unwrap();
+    let exported = crate::sharing::action(
+        &mut source,
+        crate::sharing::Action::Export { id: source_id },
+    )
+    .unwrap()
+    .text
+    .unwrap();
+    let json: Value = serde_json::from_str(&exported).unwrap();
+    assert_eq!(json.as_object().unwrap().len(), 4);
+    assert!(!exported.contains("example.invalid"));
+    assert!(!exported.contains("sourcePath"));
+    let (_target_root, mut target, _) = fixture();
+    let mut queue = packages::Packages::open(&mut target).unwrap();
+    let id = import(&mut target, &exported);
+    assert!(target.load().unwrap().active_collection.is_none());
+    target
+        .set_active_collection(Some(&id), target.load().unwrap().revision)
+        .unwrap();
+    assert!(requested(&target).is_err());
+    finish_imports(&mut target, &mut queue);
+    assert!(
+        target.collection_imports().unwrap()[0]
+            .entries
+            .iter()
+            .all(|e| e.status == crate::sharing::Status::Ready)
+    );
+    assert_eq!(target.load().unwrap().collections[0].entries, references);
+    let activation = requested(&target).unwrap();
+    assert_eq!(activation["mods"][0]["modId"], "fixture.core");
+    assert_eq!(target.load().unwrap().library.len(), 2);
+    let reexported = crate::sharing::action(&mut target, crate::sharing::Action::Export { id })
+        .unwrap()
+        .text
+        .unwrap();
+    assert_eq!(exported, reexported);
+}
+
+#[test]
+fn shared_references_keep_missing_withdrawn_changed_local_and_reapproved_identities_unresolved() {
+    let (_root, mut store, entries) = fixture();
+    let mut cache = store.catalog_cache().unwrap().unwrap();
+    let catalog = cache.catalog.as_mut().unwrap();
+    catalog.catalog_revision = "2".into();
+    catalog.mods[0].releases[0].withdrawn = true;
+    let mut reapproval = catalog.mods[1].releases[0].clone();
+    reapproval.id = "fixture.addon.2".into();
+    reapproval.requires.clear();
+    catalog.mods[1].releases.push(reapproval);
+    store.save_catalog_cache(&cache).unwrap();
+    let mut cases = vec![entries[0].reference.clone()];
+    let mut missing = entries[1].reference.clone();
+    missing.release_id = Some("fixture.deleted.1".into());
+    cases.push(missing);
+    let mut changed = entries[1].reference.clone();
+    changed.hash = "ff".repeat(32);
+    cases.push(changed);
+    let mut local = entries[1].reference.clone();
+    local.origin = Origin::LocalImport;
+    local.release_id = None;
+    cases.push(local);
+    let mut reapproved = entries[1].reference.clone();
+    reapproved.release_id = Some("fixture.addon.2".into());
+    cases.push(reapproved);
+    for reference in cases {
+        let before = store.load().unwrap();
+        let text = shared("Unresolved", std::slice::from_ref(&reference));
+        let reply = crate::sharing::action(
+            &mut store,
+            crate::sharing::Action::Review { text: text.clone() },
+        )
+        .unwrap();
+        assert_eq!(reply.entries[0].status, crate::sharing::Status::Unresolved);
+        assert_eq!(store.load().unwrap(), before);
+        let id = import(&mut store, &text);
+        assert_eq!(
+            store
+                .load()
+                .unwrap()
+                .collections
+                .iter()
+                .find(|c| c.id == id)
+                .unwrap()
+                .entries,
+            vec![reference]
+        );
+    }
+    assert_eq!(store.load().unwrap().library.len(), entries.len());
+    assert!(
+        entries
+            .iter()
+            .all(|e| store.load().unwrap().library.contains(e))
+    );
+}
+
+#[test]
+fn sharing_rejects_untrusted_fields_formats_paths_duplicates_and_oversize_documents_before_writing()
+{
+    let (_root, mut store, entries) = fixture();
+    let valid: Value =
+        serde_json::from_str(&shared("Fixture", &[entries[0].reference.clone()])).unwrap();
+    let before = store.load().unwrap();
+    let mut cases = vec![];
+    for key in ["url", "settings", "sourcePath", "commands", "binary"] {
+        let mut document = valid.clone();
+        document["entries"][0][key] = json!("https://unapproved.invalid/archive.zip");
+        cases.push(document);
+    }
+    let mut document = valid.clone();
+    document["schemaVersion"] = json!(99);
+    cases.push(document);
+    let mut document = valid.clone();
+    document["entries"][0]["modId"] = json!("C:\\private\\mod.dll");
+    cases.push(document);
+    let mut document = valid.clone();
+    document["entries"] = json!([valid["entries"][0], valid["entries"][0]]);
+    cases.push(document);
+    let mut document = valid;
+    document["settings"] = json!({});
+    cases.push(document);
+    for document in cases {
+        assert!(
+            crate::sharing::action(
+                &mut store,
+                crate::sharing::Action::Accept {
+                    text: document.to_string(),
+                    request_id: Uuid::new_v4().to_string(),
+                    expected_revision: before.revision.to_string()
+                }
+            )
+            .is_err()
+        );
+        assert_eq!(store.load().unwrap(), before);
+    }
+    assert!(crate::sharing::Portable::read(&" ".repeat(crate::sharing::MAX_BYTES + 1)).is_err());
+}
+
+#[test]
+fn corrupt_cached_import_stays_unresolved_and_restart_retry_preserves_the_collection() {
+    let (root, mut store, entries) = fixture();
+    let text = shared("Retained", &[entries[0].reference.clone()]);
+    let id = import(&mut store, &text);
+    drop(store);
+    let mut store = Storage::open(root.path()).unwrap();
+    let mut queue = packages::Packages::open(&mut store).unwrap();
+    assert_eq!(
+        store.collection_imports().unwrap()[0].entries[0].status,
+        crate::sharing::Status::Unresolved
+    );
+    crate::sharing::action(&mut store, crate::sharing::Action::Retry { id: id.clone() }).unwrap();
+    fs::write(
+        store
+            .artifact_directory(&entries[0].reference)
+            .unwrap()
+            .join("package/Fixture.dll"),
+        b"changed bytes",
+    )
+    .unwrap();
+    finish_imports(&mut store, &mut queue);
+    let imported = store.collection_imports().unwrap();
+    assert_eq!(
+        imported[0].entries[0].status,
+        crate::sharing::Status::Unresolved
+    );
+    assert!(
+        imported[0].entries[0].message.contains("changed")
+            || imported[0].entries[0].message.contains("size")
+    );
+    assert_eq!(
+        store.load().unwrap().collections[0].entries[0],
+        entries[0].reference
+    );
+    store
+        .delete_collection(&id, store.load().unwrap().revision)
+        .unwrap();
+    assert!(store.collection_imports().unwrap().is_empty());
+    assert_eq!(store.load().unwrap().library.len(), 2);
+}
+
+#[test]
+fn shared_local_content_is_verified_without_a_catalog_download() {
+    let (_root, mut store, mut entries) = fixture();
+    let entry = &mut entries[0];
+    entry.reference.origin = Origin::LocalImport;
+    entry.reference.release_id = None;
+    store
+        .put_library_entry(entry, store.load().unwrap().revision)
+        .unwrap();
+    let mut queue = packages::Packages::open(&mut store).unwrap();
+    import(
+        &mut store,
+        &shared("Local bytes", std::slice::from_ref(&entry.reference)),
+    );
+    finish_imports(&mut store, &mut queue);
+    assert_eq!(
+        store.collection_imports().unwrap()[0].entries[0].status,
+        crate::sharing::Status::Ready
+    );
+    assert!(store.load().unwrap().active_collection.is_none());
+}
+
+#[test]
+fn accepted_import_is_idempotent_and_storage_failure_rolls_back_collection_and_progress() {
+    let (root, mut store, entries) = fixture();
+    let text = shared("Once", &[entries[0].reference.clone()]);
+    let id = Uuid::new_v4().to_string();
+    let expected = store.load().unwrap().revision.to_string();
+    let accept = || crate::sharing::Action::Accept {
+        text: text.clone(),
+        request_id: id.clone(),
+        expected_revision: expected.clone(),
+    };
+    crate::sharing::action(&mut store, accept()).unwrap();
+    crate::sharing::action(&mut store, accept()).unwrap();
+    assert_eq!(store.load().unwrap().collections.len(), 1);
+    let connection = rusqlite::Connection::open(root.path().join("sqlite/state.db")).unwrap();
+    connection.execute_batch("CREATE TRIGGER fail_import BEFORE INSERT ON collection_imports BEGIN SELECT RAISE(ABORT, 'fixture storage failure'); END;").unwrap();
+    let before = store.load().unwrap();
+    assert!(
+        crate::sharing::action(
+            &mut store,
+            crate::sharing::Action::Accept {
+                text,
+                request_id: Uuid::new_v4().to_string(),
+                expected_revision: before.revision.to_string()
+            }
+        )
+        .is_err()
+    );
+    assert_eq!(store.load().unwrap(), before);
+}
+
+#[test]
+fn sharing_queues_missing_approved_content_after_one_acceptance_and_retains_cancelled_references() {
+    let (_source, source, entries) = fixture();
+    let target = tempfile::tempdir().unwrap();
+    let mut store = Storage::open(target.path()).unwrap();
+    store
+        .save_catalog_cache(&source.catalog_cache().unwrap().unwrap())
+        .unwrap();
+    let mut queue = packages::Packages::open(&mut store).unwrap();
+    let id = import(
+        &mut store,
+        &shared("Missing package", &[entries[0].reference.clone()]),
+    );
+    crate::sharing::poll(&mut store, &mut queue).unwrap();
+    let operations = queue.operations(&store).unwrap();
+    assert_eq!(operations.len(), 1);
+    assert_eq!(operations[0].release_id, "fixture.core.1");
+    assert_eq!(operations[0].hash, entries[0].reference.hash);
+    queue.cancel(&mut store, &operations[0].id).unwrap();
+    finish_imports(&mut store, &mut queue);
+    assert_eq!(
+        store.collection_imports().unwrap()[0].entries[0].status,
+        crate::sharing::Status::Unresolved
+    );
+    assert!(store.load().unwrap().library.is_empty());
+    assert_eq!(
+        store.load().unwrap().collections[0].entries[0],
+        entries[0].reference
+    );
+    store
+        .set_active_collection(Some(&id), store.load().unwrap().revision)
+        .unwrap();
+    assert!(requested(&store).is_err());
+}
+
 fn fixture() -> (tempfile::TempDir, Storage, Vec<LibraryEntry>) {
     fixture_with_lua(false)
 }

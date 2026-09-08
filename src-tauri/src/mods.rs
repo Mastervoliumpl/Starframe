@@ -71,6 +71,7 @@ pub struct View {
     pub collections: Vec<crate::storage::Collection>,
     pub active_collection: Option<String>,
     pub cleanup_errors: Vec<String>,
+    pub imports: Vec<crate::sharing::Import>,
 }
 
 #[derive(Serialize)]
@@ -92,7 +93,9 @@ pub fn view(store: &Storage) -> Result<View> {
         .catalog_cache()
         .map_err(|e| e.to_string())?
         .and_then(|c| c.catalog);
-    let order = if let Some(missing) = enabled
+    let order = if let Some(error) = crate::sharing::active_error(store, &records)? {
+        Err(error)
+    } else if let Some(missing) = enabled
         .iter()
         .find(|r| !records.library.iter().any(|e| &e.reference == *r))
     {
@@ -146,6 +149,7 @@ pub fn view(store: &Storage) -> Result<View> {
         })
         .collect();
     Ok(View {
+        imports: store.collection_imports().map_err(|e| e.to_string())?,
         catalog,
         order,
         order_error,
@@ -401,6 +405,9 @@ fn dependency_entries(
 
 pub fn requested(store: &Storage) -> Result<Value> {
     let records = store.load().map_err(|e| e.to_string())?;
+    if let Some(error) = crate::sharing::active_error(store, &records)? {
+        return Err(error);
+    }
     let entries = records
         .collections
         .iter()
