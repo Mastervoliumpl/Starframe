@@ -12,7 +12,7 @@ Internal correctness and maintenance milestone; no published installer or app re
 
 - Give each logical mod a deployment root derived from its mod ID and archive hash. Mods can share cached bytes and activate together; uninstall retains artifacts referenced by another mod (#53).
 
-- Reject packages above the runtime's 1,024-file, 64 MiB file, 16 MiB assembly or 256 MiB package limits before success. Cached reuse and enablement apply the same checks; older oversized inventories remain readable for repair (#52).
+- Reject packages above the runtime's 1,024-file, 64 MiB file, 16 MiB assembly or 256 MiB package and activation limits before success. Cached reuse and enablement apply the same checks; older oversized inventories remain readable for repair (#52).
 
 - Bound the runtime inventory independently of library size, retain all active entries, and report omitted disabled mods in the in-game menu. Activation schema 3 adds the omitted count; readers retain schema 2 support (#51).
 

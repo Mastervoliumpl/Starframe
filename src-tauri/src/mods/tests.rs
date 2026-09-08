@@ -763,6 +763,45 @@ fn logical_mods_share_verified_bytes_with_distinct_stable_deployment_roots() {
 }
 
 #[test]
+fn combined_runtime_byte_limit_is_checked_before_payload_or_game_mutation() {
+    let (root, mut store, entries) = fixture();
+    enable(&mut store, &entries[1], true);
+    let before = store.load().unwrap();
+    let connection = rusqlite::Connection::open(root.path().join("sqlite/state.db")).unwrap();
+    for extra in [0, 1] {
+        for (i, entry) in entries.iter().enumerate() {
+            let mut prepared = store
+                .prepared_artifact(&entry.reference.hash)
+                .unwrap()
+                .unwrap();
+            prepared.files.truncate(1);
+            prepared.files[0].size_bytes = 16 * 1024 * 1024;
+            for n in 0..2 {
+                prepared.files.push(PreparedFile {
+                    path: format!("package/data{n}.bin"),
+                    sha256: "ab".repeat(32),
+                    size_bytes: 56 * 1024 * 1024 + if i == 1 && n == 1 { extra } else { 0 },
+                });
+            }
+            packages::supported_files(&prepared.files).unwrap();
+            connection
+                .execute(
+                    "UPDATE prepared_artifacts SET record=? WHERE hash=?",
+                    rusqlite::params![serde_json::to_string(&prepared).unwrap(), prepared.hash],
+                )
+                .unwrap();
+        }
+        let result = requested(&store);
+        if extra == 0 {
+            result.unwrap();
+        } else {
+            assert!(result.unwrap_err().contains("combined 256 MiB"));
+        }
+        assert_eq!(store.load().unwrap(), before);
+    }
+}
+
+#[test]
 fn collision_winners_follow_effective_order_and_content_payloads_keep_their_paths() {
     let (_temp, mut store, entries) = fixture_with_lua(true);
     enable(&mut store, &entries[0], true);

@@ -8,6 +8,7 @@ use std::fmt;
 pub const MAX_DOCUMENT_BYTES: usize = 1_048_576;
 pub const MAX_MODS: usize = 256;
 pub const MAX_FILES_PER_MOD: usize = 1024;
+pub const MAX_ACTIVATION_BYTES: u64 = 256 * 1024 * 1024;
 type Result<T> = std::result::Result<T, String>;
 
 pub fn read(bytes: &[u8], kind: &str) -> Result<Value> {

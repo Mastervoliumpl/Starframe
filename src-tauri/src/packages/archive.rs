@@ -23,7 +23,7 @@ pub(crate) fn supported_files(files: &[PreparedFile]) -> Result<()> {
         }
         total += file.size_bytes;
     }
-    if total > 256 * 1024 * 1024 {
+    if total > crate::runtime_contract::MAX_ACTIVATION_BYTES {
         return Err("This package exceeds the runtime's 256 MiB activation limit. Ask the author to split or reduce it.".into());
     }
     Ok(())

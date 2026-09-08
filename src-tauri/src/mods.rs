@@ -444,6 +444,7 @@ pub fn requested(store: &Storage) -> Result<Value> {
     }
     let ordered = crate::ordering::resolve(&catalog, entries)?.effective;
     let mut mods = Vec::new();
+    let mut total_bytes = 0;
     for reference in &ordered {
         let release = release(&catalog, reference)?;
         let prepared = store
@@ -451,6 +452,10 @@ pub fn requested(store: &Storage) -> Result<Value> {
             .map_err(|e| e.to_string())?
             .ok_or("Prepared package inventory is missing.")?;
         packages::layout(&prepared.files, &release.artifact.layout)?;
+        total_bytes += prepared.files.iter().map(|f| f.size_bytes).sum::<u64>();
+        if total_bytes > runtime_contract::MAX_ACTIVATION_BYTES {
+            return Err("The selected mods exceed the runtime's combined 256 MiB limit. Disable some mods or choose a smaller collection; the current deployment was retained.".into());
+        }
         let (entry_path, entry_type) = match &release.artifact.layout {
             Layout::StarframeManagedZip {
                 root,
