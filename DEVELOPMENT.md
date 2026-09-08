@@ -140,3 +140,5 @@ The build icons were generated from [the approved SVG](docs/design/starframe-mar
 - [GitHub CLI issue creation](https://cli.github.com/manual/gh_issue_create)
 
 The #14 runtime settings contract and game-native menu have [a verification record and final milestone display checks](docs/verification/runtime-settings.md). The Unity menu still requires a local game-reference build and in-game checks; reference-free CI covers the settings model, not the game controls.
+
+BepInEx 5 plugin compatibility and Ladder Reporter acceptance are tracked in [#57 verification](docs/verification/bepinex-plugins.md). Compile its local fixture project with the same `BootstrapPath` and `GameManagedPath` used for the Unity bootstrap. Reference-free CI covers the core adapter dispatch; the Unity lifecycle and native BepInEx configuration require the installed-game checks. See [catalog artifact approval](docs/verification/ladder-reporter-catalog.md) for the first author release.

@@ -1,6 +1,6 @@
 # Develop and share a local mod
 
-The 0.5.0 workflow uses the normal My mods, Collections and game Mods screens. It supports the current Starframe-managed DLL interface and supported Lua files. An arbitrary DLL or conventional BepInEx plugin is not automatically compatible; broader adapters remain in [issue #30](https://github.com/Mastervoliumpl/Starframe/issues/30).
+The 0.5.0 workflow uses the normal My mods, Collections and game Mods screens. It supports the internal Starframe-managed DLL interface, [BepInEx 5 Unity/Mono plugin entries](bepinex-mods.md) and supported Lua files. The BepInEx path does not require an `IMod` rewrite. Other plugin mechanisms and broader author-mod acceptance remain in [issue #30](https://github.com/Mastervoliumpl/Starframe/issues/30).
 
 ## Import the first build
 

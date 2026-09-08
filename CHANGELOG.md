@@ -4,6 +4,9 @@
 
 ## 0.5.0 - 2026-09-08
 
+- Load supported BepInEx 5 plugin entries without an `IMod` rewrite, preserve their native configuration and expose supported settings in the game's Mods page (#57). See [compatibility checks and remaining acceptance](docs/verification/bepinex-plugins.md).
+- Approve Remmy's Ladder Reporter 0.3.0 as the first catalog mod, using the author's unchanged ModManager ZIP. See [artifact identity and catalog verification](docs/verification/ladder-reporter-catalog.md).
+
 - Verify the local developer workflow in Sanctuary: partial DLL rejection, queued rebuilds, desktop restart, latest game launch, retained settings, exact sharing and source-preserving uninstall. Add [local development instructions](docs/local-development.md) and [milestone evidence](docs/verification/milestone-0.5.0.md) (#26).
 
 - Follow imported local sources while the desktop is open. Verify settled snapshots, retain the previous build on invalid output, and advance matching active local collections. Queue game-file changes until the game closes. Schema 12 persists the watched source; startup/resume reconciliation and bounded fallback scans recover missed notifications. Shared and inactive collections retain exact builds; see [watcher behavior and checks](docs/verification/local-watching.md) (#25).

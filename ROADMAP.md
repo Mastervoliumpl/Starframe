@@ -108,6 +108,8 @@ These fixes do not establish general compatibility with conventional BepInEx plu
 
 ### 0.5.0: Local mod development
 
+The owner added [#57: BepInEx plugin compatibility and Ladder Reporter verification](https://github.com/Mastervoliumpl/Starframe/issues/57) to this milestone and PR #56. The [compatibility checks](docs/verification/bepinex-plugins.md) record remaining acceptance. [Ladder Reporter 0.3.0](docs/verification/ladder-reporter-catalog.md) is the first approved catalog mod; publication follows merge. This remains an internal milestone, with public alpha distribution gates in 0.6.0.
+
 Active. Issue #24 adds local DLL/folder imports with normal management controls; [local import guidance](docs/verification/local-imports.md) defines the supported inputs and checks. Issue #25 adds [stable watched copies](docs/verification/local-watching.md), and #26 verifies the [developer/game workflow](docs/verification/milestone-0.5.0.md). Exit: local rebuilds apply after game exit, incomplete builds retain usable content, and source files survive uninstall.
 
 - [#24: Import local mods with normal management controls](https://github.com/Mastervoliumpl/Starframe/issues/24)
