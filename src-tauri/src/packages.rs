@@ -630,11 +630,20 @@ async fn prepare(
 }
 
 fn layout(files: &[PreparedFile], layout: &Layout) -> Result<()> {
+    if matches!(layout, Layout::StarframeLuaZip {}) {
+        if files.is_empty() || files.iter().any(|f| !lua_path(&f.path)) {
+            return Err("Lua overlays require only .lua files under LJ/lua; AI and map content are unsupported.".into());
+        }
+        return Ok(());
+    }
     let Layout::StarframeManagedZip {
         root,
         entry_assembly,
         ..
-    } = layout;
+    } = layout
+    else {
+        unreachable!()
+    };
     let entry = if root.is_empty() {
         entry_assembly.clone()
     } else {
@@ -649,6 +658,14 @@ fn layout(files: &[PreparedFile], layout: &Layout) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+pub(crate) fn lua_path(path: &str) -> bool {
+    let path = path.to_ascii_lowercase();
+    path.starts_with("lj/lua/")
+        && path.ends_with(".lua")
+        && !path.split('/').any(|part| part == "ai")
+        && crate::runtime_contract::relative_path(&path).is_ok()
 }
 
 fn extract(

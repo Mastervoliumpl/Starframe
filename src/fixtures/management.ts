@@ -72,16 +72,37 @@ export function fixtureManagement(
       },
     })),
     enabled: [],
+    order: { effective: [], adjustments: [] },
+    orderError: null,
+    collisions: [],
     collections: [],
     cleanupErrors: [],
   };
   const operations: PackageOperation[] = [];
   const commit = () => {
+    data.order = { effective: [...data.enabled], adjustments: [] };
     data.revision = String(BigInt(data.revision) + 1n);
     changed(data);
   };
   return {
     async mods(action) {
+      if (action.kind === 'reorder') {
+        if (action.expectedRevision !== data.revision)
+          throw new Error(
+            'The collection changed. Retry with its current revision.',
+          );
+        if (
+          action.modIds.length !== data.enabled.length ||
+          new Set(action.modIds).size !== data.enabled.length
+        )
+          throw new Error('Include each enabled mod once.');
+        data.enabled = action.modIds.map((id) => {
+          const reference = data.enabled.find((r) => r.modId === id);
+          if (!reference) throw new Error('Unknown enabled mod.');
+          return reference;
+        });
+        commit();
+      }
       if (action.kind === 'set_enabled' || action.kind === 'uninstall') {
         if (action.expectedRevision !== data.revision)
           throw new Error(

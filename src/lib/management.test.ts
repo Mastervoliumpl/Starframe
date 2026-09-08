@@ -23,6 +23,9 @@ const data = (revision = '0'): ModView => ({
   catalog: null,
   library: [entry],
   enabled: [],
+  order: { effective: [], adjustments: [] },
+  orderError: null,
+  collisions: [],
   collections: [],
   cleanupErrors: [],
 });

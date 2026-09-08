@@ -29,12 +29,14 @@ export type Release = {
     url: string;
     sha256: string;
     sizeBytes: number;
-    layout: {
-      kind: 'starframe_managed_zip';
-      root: string;
-      entryAssembly: string;
-      entryType: string;
-    };
+    layout:
+      | { kind: 'starframe_lua_zip' }
+      | {
+          kind: 'starframe_managed_zip';
+          root: string;
+          entryAssembly: string;
+          entryType: string;
+        };
   };
 };
 export type CatalogMod = {
@@ -55,6 +57,12 @@ export type ModView = {
   } | null;
   library: LibraryEntry[];
   enabled: Reference[];
+  order: {
+    effective: Reference[];
+    adjustments: { before: string; after: string; message: string }[];
+  } | null;
+  orderError: string | null;
+  collisions: { path: string; mods: string[]; winner: string }[];
   collections: {
     id: string;
     name: string;
@@ -75,6 +83,7 @@ export type PackageOperation = {
 };
 export type ModAction =
   | { kind: 'list' | 'retry_cleanup' }
+  | { kind: 'reorder'; modIds: string[]; expectedRevision: string }
   | {
       kind: 'set_enabled';
       modId: string;
@@ -181,6 +190,19 @@ export function createManagement(transport: ManagementTransport | null) {
     },
     refresh,
     dismissError: () => update({ error: '' }),
+    reorder(modIds: string[]) {
+      return run('membership', async () => {
+        if (!view.data) return;
+        const data = await confirmed(
+          transport!.mods({
+            kind: 'reorder',
+            modIds,
+            expectedRevision: view.data.revision,
+          }),
+        );
+        if (!stopped) update({ data });
+      });
+    },
     async membership(entries: LibraryEntry[], enabled: boolean) {
       if (view.pending.includes('membership')) return false;
       return run('membership', async () => {

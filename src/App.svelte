@@ -6,6 +6,7 @@
   import GameSettings from './features/GameSettings.svelte';
   import LaunchBar from './features/LaunchBar.svelte';
   import ModList from './features/ModList.svelte';
+  import LoadOrder from './features/LoadOrder.svelte';
   import PackageDownloads from './features/PackageDownloads.svelte';
   import { createManagement } from './lib/management';
   import { createDesktop } from './lib/state';
@@ -217,13 +218,11 @@
         hidden={page !== 'collections'}
         aria-label="Collections"
       >
-        <div class="empty-state">
-          <h2>Saved collections</h2>
-          <p>
-            A collection will hold a name and an ordered list of mods.
-            Collection editing is not available in this build.
-          </p>
-        </div>
+        <LoadOrder
+          {manager}
+          name={activeCollection}
+          unavailable={$desktop.connection !== 'connected'}
+        />
       </section>
       <section
         class="page"

@@ -171,6 +171,54 @@ const catalog = {
   ],
 };
 const db = new DatabaseSync(join(data, 'sqlite/state.db'));
+const luaBytes = Buffer.from('return "native order fixture"');
+const luaHash = hash(luaBytes);
+const luaId = 'fixture.lua';
+const luaPath = 'LJ/lua/starframe_fixture.lua';
+await mkdir(join(data, 'artifacts', luaHash, 'LJ/lua'), { recursive: true });
+await writeFile(join(data, 'artifacts', luaHash, luaPath), luaBytes);
+catalog.schemaVersion = 2;
+catalog.mods.push({
+  id: luaId,
+  name: 'Lua native fixture',
+  author: 'Fixture',
+  sourceUrl: 'https://example.invalid/source',
+  releases: [
+    {
+      id: 'fixture.lua.1',
+      version: '1',
+      withdrawn: false,
+      requires: [reference.releaseId],
+      testedGameBuilds: [],
+      artifact: {
+        url: 'https://example.invalid/lua.zip',
+        sha256: luaHash,
+        sizeBytes: luaBytes.length,
+        layout: { kind: 'starframe_lua_zip' },
+      },
+    },
+  ],
+});
+db.prepare(
+  'INSERT INTO library(mod_id,hash,origin,release_id,name,author,version) VALUES (?,?,?,?,?,?,?)',
+).run(
+  luaId,
+  luaHash,
+  'catalog',
+  'fixture.lua.1',
+  'Lua native fixture',
+  'Fixture',
+  '1',
+);
+db.prepare('INSERT INTO prepared_artifacts(hash,record) VALUES (?,?)').run(
+  luaHash,
+  JSON.stringify({
+    hash: luaHash,
+    files: [
+      { path: luaPath, sha256: hash(luaBytes), sizeBytes: luaBytes.length },
+    ],
+  }),
+);
 db.prepare(
   'INSERT INTO library(mod_id,hash,origin,release_id,name,author,version) VALUES (?,?,?,?,?,?,?)',
 ).run(
@@ -247,7 +295,7 @@ try {
   await withDesktop(
     data,
     async (page) => {
-      await expect.poll(async () => (await list(page)).library.length).toBe(1);
+      await expect.poll(async () => (await list(page)).library.length).toBe(2);
       await page
         .getByRole('switch', { name: 'Enable Native fixture 1', exact: true })
         .click();
@@ -259,6 +307,61 @@ try {
       ).toBeChecked();
       await waitForDeployment(1);
       expect(await readFile(deployed)).toEqual(bytes);
+      await action(page, {
+        kind: 'set_enabled',
+        modId: luaId,
+        hash: luaHash,
+        enabled: true,
+        expectedRevision: (await list(page)).revision,
+      });
+      await waitForDeployment(2);
+      const beforeOrder = await list(page);
+      const reordered = await action(page, {
+        kind: 'reorder',
+        modIds: [luaId, reference.modId],
+        expectedRevision: beforeOrder.revision,
+      });
+      expect(reordered.enabled.map((r) => r.modId)).toEqual([
+        luaId,
+        reference.modId,
+      ]);
+      expect(reordered.order.effective.map((r) => r.modId)).toEqual([
+        reference.modId,
+        luaId,
+      ]);
+      await expect
+        .poll(async () => (await activation()).deploymentRevision, {
+          timeout: 30000,
+        })
+        .toBe(reordered.revision);
+      expect((await activation()).mods.map((m) => m.modId)).toEqual([
+        reference.modId,
+        luaId,
+      ]);
+      await page
+        .getByRole('button', { name: 'Collections', exact: true })
+        .click();
+      await expect(
+        page
+          .getByRole('list', { name: 'Effective load order' })
+          .getByRole('listitem')
+          .first(),
+      ).toContainText('Native fixture');
+      await expect(
+        page.getByRole('region', { name: 'Collections', exact: true }),
+      ).toContainText('Native fixture must load before Lua native fixture');
+      await page.screenshot({
+        path: 'test-results/native/load-order-live.png',
+      });
+      await action(page, {
+        kind: 'set_enabled',
+        modId: luaId,
+        hash: luaHash,
+        enabled: false,
+        expectedRevision: reordered.revision,
+      });
+      await waitForDeployment(1);
+      await page.getByRole('button', { name: 'My mods', exact: true }).click();
       await page.screenshot({ path: 'test-results/native/my-mods-live.png' });
       await page
         .getByRole('button', { name: 'Native fixture', exact: true })
@@ -319,7 +422,7 @@ try {
       await expect(page.getByRole('dialog')).toContainText('Default');
       await page.getByRole('button', { name: 'Confirm uninstall' }).click();
       await waitForDeployment(0);
-      expect((await list(page)).library).toHaveLength(0);
+      expect((await list(page)).library).toHaveLength(1);
       expect(await exists(artifactRoot)).toBe(false);
       expect(await readFile(settings, 'utf8')).toBe('retain user settings');
     },
@@ -329,5 +432,5 @@ try {
   if (running?.exitCode === null) running.kill();
 }
 console.log(
-  'PASS: native mod membership, withdrawn installed copy, game-running deferral, restart application and uninstall retention.',
+  'PASS: native requested/effective ordering, Lua payload deployment, mod membership, withdrawn installed copy, game-running deferral, restart application and uninstall retention.',
 );

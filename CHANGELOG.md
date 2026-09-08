@@ -4,6 +4,11 @@
 
 Development version: `0.4.0-dev.1`. Started ordered collections with issue #20. No app release or installer is published.
 
+- Added deterministic dependency ordering, mandatory before/after constraints, optional preference warnings and separate requested/effective priority (#20).
+- Added keyboard and drag reorder controls, revision checks, adjustment messages and visible Lua collision winners.
+- Added verified Lua overlays for existing game directories, with later effective order winning. Maps, AI packages and conventional BepInEx plugins remain unsupported.
+- Excluded .NET build output from Vite's watcher after a Windows file-lock failure during concurrent checks.
+
 ## 0.3.0 - 2026-09-07
 
 Internal curated-mod milestone; no published installer or app release. The metadata-only catalog starts empty.

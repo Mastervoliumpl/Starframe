@@ -5,6 +5,10 @@ use std::fs;
 use uuid::Uuid;
 
 fn fixture() -> (tempfile::TempDir, Storage, Vec<LibraryEntry>) {
+    fixture_with_lua(false)
+}
+
+fn fixture_with_lua(lua: bool) -> (tempfile::TempDir, Storage, Vec<LibraryEntry>) {
     let temp = tempfile::tempdir().unwrap();
     let mut store = Storage::open(temp.path()).unwrap();
     let mut mods = Vec::new();
@@ -26,12 +30,21 @@ fn fixture() -> (tempfile::TempDir, Storage, Vec<LibraryEntry>) {
             version: "1".into(),
         };
         mods.push(json!({"id":id,"name":id,"author":"Fixture","sourceUrl":"https://example.invalid/source","releases":[{"id":release_id,"version":"1","withdrawn":false,"testedGameBuilds":[],"requires":if index == 0 {vec![]} else {vec!["fixture.core.1"]},"artifact":{"url":"https://example.invalid/package.zip","sha256":artifact_hash,"sizeBytes":10,"layout":{"kind":"starframe_managed_zip","root":if index == 0 {""} else {"package"},"entryAssembly":if index == 0 {"package/Fixture.dll"} else {"Fixture.dll"},"entryType":"Fixture.Entry"}}}]}));
+        if lua {
+            let release = &mut mods.last_mut().unwrap()["releases"][0];
+            release["artifact"]["layout"] = json!({"kind":"starframe_lua_zip"});
+            release["requires"] = json!([]);
+        }
         let path = store
             .artifact_directory(&entry.reference)
             .unwrap()
-            .join("package");
+            .join(if lua { "LJ/lua" } else { "package" });
         fs::create_dir_all(&path).unwrap();
-        fs::write(path.join("Fixture.dll"), &bytes).unwrap();
+        fs::write(
+            path.join(if lua { "Fixture.lua" } else { "Fixture.dll" }),
+            &bytes,
+        )
+        .unwrap();
         let operation = Operation {
             id: Uuid::new_v4().to_string(),
             request_id: Uuid::new_v4().to_string(),
@@ -50,7 +63,12 @@ fn fixture() -> (tempfile::TempDir, Storage, Vec<LibraryEntry>) {
                 &Prepared {
                     hash: artifact_hash,
                     files: vec![PreparedFile {
-                        path: "package/Fixture.dll".into(),
+                        path: if lua {
+                            "LJ/lua/Fixture.lua"
+                        } else {
+                            "package/Fixture.dll"
+                        }
+                        .into(),
                         sha256: digest,
                         size_bytes: bytes.len() as u64,
                     }],
@@ -60,7 +78,10 @@ fn fixture() -> (tempfile::TempDir, Storage, Vec<LibraryEntry>) {
         entries.push(entry);
     }
     let catalog = Catalog::read(
-        &serde_json::to_vec(&json!({"schemaVersion":1,"catalogRevision":"1","mods":mods})).unwrap(),
+        &serde_json::to_vec(
+            &json!({"schemaVersion":if lua {2} else {1},"catalogRevision":"1","mods":mods}),
+        )
+        .unwrap(),
     )
     .unwrap();
     store
@@ -84,6 +105,32 @@ fn enable(store: &mut Storage, entry: &LibraryEntry, enabled: bool) -> View {
         },
     )
     .unwrap()
+}
+
+#[test]
+fn collision_winners_follow_effective_order_and_content_payloads_keep_their_paths() {
+    let (_temp, mut store, entries) = fixture_with_lua(true);
+    enable(&mut store, &entries[0], true);
+    let initial = enable(&mut store, &entries[1], true);
+    assert_eq!(initial.collisions.len(), 1);
+    assert_eq!(initial.collisions[0].winner, "fixture.addon");
+    assert_eq!(initial.collisions[0].path, "lj/lua/fixture.lua");
+    let view = action(
+        &mut store,
+        Action::Reorder {
+            mod_ids: vec!["fixture.addon".into(), "fixture.core".into()],
+            expected_revision: initial.revision,
+        },
+    )
+    .unwrap();
+    assert_eq!(view.collisions[0].winner, "fixture.core");
+    let activation = requested(&store).unwrap();
+    assert!(activation["mods"][0]["entryAssembly"].is_null());
+    assert!(
+        payload(&store, &activation).unwrap()[0]
+            .0
+            .ends_with("LJ/lua/Fixture.lua")
+    );
 }
 
 #[test]
@@ -146,6 +193,64 @@ fn archive_root_entry_is_relative_in_the_activation_manifest() {
         "package/Fixture.dll"
     );
     assert_eq!(payload(&store, &activation).unwrap().len(), 1);
+}
+
+#[test]
+fn requested_priority_survives_restart_while_activation_keeps_dependencies_first() {
+    let (temp, mut store, entries) = fixture();
+    let initial = enable(&mut store, &entries[1], true);
+    let reversed: Vec<_> = entries
+        .iter()
+        .rev()
+        .map(|e| e.reference.mod_id.clone())
+        .collect();
+    let changed = action(
+        &mut store,
+        Action::Reorder {
+            mod_ids: reversed.clone(),
+            expected_revision: initial.revision.clone(),
+        },
+    )
+    .unwrap();
+    assert_eq!(changed.enabled[0], entries[1].reference);
+    assert_eq!(changed.order.unwrap().effective[0], entries[0].reference);
+    assert_eq!(
+        requested(&store).unwrap()["mods"][0]["modId"],
+        "fixture.core"
+    );
+    assert!(
+        action(
+            &mut store,
+            Action::Reorder {
+                mod_ids: reversed.clone(),
+                expected_revision: initial.revision
+            }
+        )
+        .is_err()
+    );
+    for invalid in [
+        vec![reversed[0].clone(); 2],
+        vec!["foreign".into(), reversed[0].clone()],
+        vec![],
+    ] {
+        assert!(
+            action(
+                &mut store,
+                Action::Reorder {
+                    mod_ids: invalid,
+                    expected_revision: changed.revision.clone()
+                }
+            )
+            .is_err()
+        );
+    }
+    let unchanged = enable(&mut store, &entries[1], true);
+    assert_eq!(unchanged.enabled[0], entries[1].reference);
+    drop(store);
+    let store = Storage::open(temp.path()).unwrap();
+    let restored = super::view(&store).unwrap();
+    assert_eq!(restored.enabled[0], entries[1].reference);
+    assert_eq!(restored.order.unwrap().effective[0], entries[0].reference);
 }
 
 #[test]

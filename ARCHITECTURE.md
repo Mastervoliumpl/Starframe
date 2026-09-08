@@ -193,7 +193,7 @@ sequenceDiagram
 
 An accepted command is not a completed operation. Persisted changes become confirmed only after their commit. Rust assigns operation IDs and recognizes repeated request IDs during the session so a retry does not start a second install. A duplicate pending action reuses its existing operation. After restart, recovery examines saved operation records instead of blindly repeating the request.
 
-In 0.3.0 the frontend allows one membership request at a time and shows a pending message until acknowledgement. Switches reflect confirmed membership; navigation, search and selection remain usable. Bulk actions send exact references sequentially using each confirmed saved-data revision. A stale edit stops with an error and retains earlier successful edits. Rust rejects stale revisions instead of silently overwriting a newer change. Coalesced rapid edits and collection priority controls remain 0.4.0 work.
+The frontend allows one membership request at a time and shows a pending message until acknowledgement. Switches reflect confirmed membership; navigation, search and selection remain usable. Bulk actions send exact references sequentially using each confirmed saved-data revision. A stale edit stops with an error and retains earlier successful edits. Rust rejects stale revisions instead of silently overwriting a newer change. Issue #20 uses the same mutation queue for collection priority controls. Coalesced rapid edits remain later collection work.
 
 Use async I/O for transfers and bounded background workers for SQLite, extraction, hashing and other synchronous work. Keep the existing single database owner and request queue. Never hold a shared-state lock through network or file work. Simply marking a function async does not make expensive synchronous work nonblocking. Cancellation of blocking work must be cooperative; aborting its async handle cannot stop a blocking task that has already started. [Tokio blocking-task behavior](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
 
@@ -314,11 +314,13 @@ Enabling a mod adds it to the active collection; disabling removes it from that 
 
 ### Load order
 
+Issue #20 implements the resolver in `ordering.rs` and revision-checked reordering in `mods.rs`. SQLite collection positions retain requested priority; the guarded deployment manifest records effective order separately. The Collections view shows effective positions, requested positions and the constraints responsible for adjustments. [Verification and Lua scope](docs/verification/ordering.md) record the runtime evidence. Named collection operations and sharing remain #21/#22.
+
 Support automatic resolution and manual ordering. A collection stores the user's requested sequence; deployment records the effective sequence that the runtime will use. Show both when constraints require an adjustment. Manual ordering must have keyboard move-up/down controls as well as drag-and-drop.
 
 The ordering module builds a directed graph: required dependencies load before their dependents, and mandatory author/curator `before`/`after` rules become additional edges. Among valid next choices, prefer the user's order, then stable mod ID as a final tie-breaker. This produces the same effective order for the same inputs. Use an existing suitable graph routine where it fits; otherwise a small stable topological traversal with standard collections is sufficient. Do not build a general version solver.
 
-For example, if Terrain Tools requires Core Library, moving Terrain Tools above it keeps Core Library first and explains that dependency. A hard cycle lists the mods and constraints involved; an arbitrary alphabetical fallback must not pretend to resolve it. Optional suggestions remain warnings, so the user can choose another order when it is valid.
+For example, if Terrain Tools requires Core Library, moving Terrain Tools above it keeps Core Library first and explains that dependency. A hard cycle lists the involved mod IDs in edge order and offers disabling an involved mod or selecting compatible releases. Optional suggestions remain warnings, so the user can choose another order when it is valid. Catalog schema 2 names these fields `loadBefore`, `loadAfter`, `preferBefore` and `preferAfter`; they target stable mod IDs while `requires` targets exact release IDs. Requested positions are unique, so no additional alphabetical tie-break is needed.
 
 ```mermaid
 flowchart LR
