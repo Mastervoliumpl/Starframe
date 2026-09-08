@@ -516,11 +516,14 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                     activation["deploymentRevision"].as_str()
                         != revision.map(|r| r.to_string()).as_deref()
                 });
-                if differs && view.running != Running::Stopped {
-                    view.launch.details = vec![
-                        "Collection changes are saved. Deployment waits until the game closes."
-                            .into(),
-                    ];
+                if differs
+                    && view.running != Running::Stopped
+                    && let Some(revision) = revision
+                {
+                    view.launch.details = vec![format!(
+                        "Waiting for game to close. Saved collection revision {} will apply after exit.",
+                        revision
+                    )];
                 }
                 if differs
                     && view.running == Running::Stopped

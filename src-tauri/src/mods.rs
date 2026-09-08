@@ -23,6 +23,23 @@ type Result<T> = std::result::Result<T, String>;
 pub enum Action {
     List,
     RetryCleanup,
+    CreateCollection {
+        name: String,
+        expected_revision: String,
+    },
+    RenameCollection {
+        id: String,
+        name: String,
+        expected_revision: String,
+    },
+    DeleteCollection {
+        id: String,
+        expected_revision: String,
+    },
+    SelectCollection {
+        id: String,
+        expected_revision: String,
+    },
     Reorder {
         mod_ids: Vec<String>,
         expected_revision: String,
@@ -52,6 +69,7 @@ pub struct View {
     pub order_error: Option<String>,
     pub collisions: Vec<Collision>,
     pub collections: Vec<crate::storage::Collection>,
+    pub active_collection: Option<String>,
     pub cleanup_errors: Vec<String>,
 }
 
@@ -74,7 +92,15 @@ pub fn view(store: &Storage) -> Result<View> {
         .catalog_cache()
         .map_err(|e| e.to_string())?
         .and_then(|c| c.catalog);
-    let order = if enabled.is_empty() {
+    let order = if let Some(missing) = enabled
+        .iter()
+        .find(|r| !records.library.iter().any(|e| &e.reference == *r))
+    {
+        Err(format!(
+            "{} is unavailable in the library. Prepare its exact package from Catalog to use this collection.",
+            missing.mod_id
+        ))
+    } else if enabled.is_empty() {
         Ok(crate::ordering::Resolution {
             effective: vec![],
             adjustments: vec![],
@@ -128,6 +154,7 @@ pub fn view(store: &Storage) -> Result<View> {
         library: records.library,
         enabled,
         collections: records.collections,
+        active_collection: records.active_collection,
         cleanup_errors: store
             .pending_removals()
             .map_err(|e| e.to_string())?
@@ -141,6 +168,50 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
     match action {
         Action::List => (),
         Action::RetryCleanup => cleanup(store)?,
+        Action::CreateCollection {
+            name,
+            expected_revision,
+        } => {
+            current_records(store, &expected_revision)?;
+            store
+                .save_collection(&uuid::Uuid::new_v4().to_string(), name.trim(), &[], 0)
+                .map_err(|e| e.to_string())?;
+        }
+        Action::RenameCollection {
+            id,
+            name,
+            expected_revision,
+        } => {
+            let records = current_records(store, &expected_revision)?;
+            let collection = records
+                .collections
+                .iter()
+                .find(|c| c.id == id)
+                .ok_or("This collection no longer exists.")?;
+            store
+                .save_collection(&id, name.trim(), &collection.entries, collection.revision)
+                .map_err(|e| e.to_string())?;
+        }
+        Action::DeleteCollection {
+            id,
+            expected_revision,
+        } => {
+            store
+                .delete_collection(&id, revision(&expected_revision)?)
+                .map_err(|e| e.to_string())?;
+        }
+        Action::SelectCollection {
+            id,
+            expected_revision,
+        } => {
+            let records = current_records(store, &expected_revision)?;
+            if !records.collections.iter().any(|c| c.id == id) {
+                return Err("This collection no longer exists.".into());
+            }
+            store
+                .set_active_collection(Some(&id), records.revision)
+                .map_err(|e| e.to_string())?;
+        }
         Action::Reorder {
             mod_ids,
             expected_revision,
@@ -260,6 +331,14 @@ fn revision(value: &str) -> Result<i64> {
         return Err("Invalid library revision.".into());
     }
     Ok(parsed)
+}
+
+fn current_records(store: &Storage, expected: &str) -> Result<Records> {
+    let records = store.load().map_err(|e| e.to_string())?;
+    if records.revision != revision(expected)? {
+        return Err("The library changed. Retry with its current revision.".into());
+    }
+    Ok(records)
 }
 
 fn catalog(store: &Storage) -> Result<Catalog> {

@@ -1,6 +1,24 @@
 use super::*;
 
 impl Storage {
+    pub fn delete_collection(&mut self, id: &str, expected: i64) -> Result<i64> {
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let result = (|| {
+            check_revision(&tx, expected)?;
+            tx.execute(
+                "UPDATE preferences SET active_collection=NULL WHERE active_collection=?",
+                [id],
+            )?;
+            if tx.execute("DELETE FROM collections WHERE id=?", [id])? != 1 {
+                return Err(Error::Invalid("This collection no longer exists.".into()));
+            }
+            bump(&tx)
+        })();
+        finish(tx, result)
+    }
+
     pub fn set_mod_membership(&mut self, entries: &[ModReference], expected: i64) -> Result<i64> {
         if entries.len() > 256 {
             return Err(Error::Invalid(

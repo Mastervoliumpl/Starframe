@@ -34,6 +34,13 @@
   <div>
     <strong>Active collection: {collection}</strong>
     <p id="launch-reason" role="status">{reason}</p>
+    {#if game?.launch.details.find( (detail) => detail.startsWith('Waiting for game to close.') )}
+      <p role="status">
+        {game.launch.details.find((detail) =>
+          detail.startsWith('Waiting for game to close.'),
+        )}
+      </p>
+    {/if}
     {#if game?.launch.phase === 'failed' || game?.launch.phase === 'runtime_failed' || game?.launch.details.length}
       <button class="text-button" onclick={onsetup}>View issues</button>
     {/if}

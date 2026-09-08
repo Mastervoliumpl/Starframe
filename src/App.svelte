@@ -6,7 +6,8 @@
   import GameSettings from './features/GameSettings.svelte';
   import LaunchBar from './features/LaunchBar.svelte';
   import ModList from './features/ModList.svelte';
-  import LoadOrder from './features/LoadOrder.svelte';
+  import Collections from './features/Collections.svelte';
+  import CollectionSelect from './features/CollectionSelect.svelte';
   import PackageDownloads from './features/PackageDownloads.svelte';
   import { createManagement } from './lib/management';
   import { createDesktop } from './lib/state';
@@ -150,7 +151,10 @@
         </p>{/if}
       <section class="page" hidden={page !== 'mods'} aria-label="My mods">
         <div class="toolbar">
-          <p>Active collection: <strong>{activeCollection}</strong></p>
+          <CollectionSelect
+            {manager}
+            unavailable={$desktop.connection !== 'connected'}
+          />
           <p class="muted">Switches change the active collection.</p>
         </div>
         {#if managementError}<p class="error" role="alert">
@@ -218,9 +222,9 @@
         hidden={page !== 'collections'}
         aria-label="Collections"
       >
-        <LoadOrder
+        <Collections
           {manager}
-          name={activeCollection}
+          onmods={() => navigate('mods')}
           unavailable={$desktop.connection !== 'connected'}
         />
       </section>

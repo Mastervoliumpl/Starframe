@@ -59,7 +59,9 @@ export function fixtureTransport(): Transport {
         revision: data.revision,
         libraryCount: data.library.length,
         collectionCount: data.collections.length,
-        activeCollectionName: data.collections[0]?.name ?? null,
+        activeCollectionName:
+          data.collections.find((c) => c.id === data.activeCollection)?.name ??
+          null,
       };
       snapshot.revision = String(BigInt(snapshot.revision) + 1n);
       publish();

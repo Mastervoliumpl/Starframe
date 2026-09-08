@@ -282,15 +282,11 @@ const exists = (path) =>
     () => true,
     () => false,
   );
-const setEnabled = async (page, enabled) =>
-  action(page, {
-    kind: 'set_enabled',
-    modId: reference.modId,
-    hash: artifactHash,
-    enabled,
-    expectedRevision: (await list(page)).revision,
-  });
 let running;
+let originalCollection;
+let spareCollection;
+const collectionAction = async (page, change) =>
+  action(page, { ...change, expectedRevision: (await list(page)).revision });
 try {
   await withDesktop(
     data,
@@ -305,6 +301,64 @@ try {
           exact: true,
         }),
       ).toBeChecked();
+      await waitForDeployment(1);
+      originalCollection = (await list(page)).activeCollection;
+      const created = await collectionAction(page, {
+        kind: 'create_collection',
+        name: 'Spare fixture',
+      });
+      spareCollection = created.collections.find(
+        (c) => c.name === 'Spare fixture',
+      ).id;
+      await collectionAction(page, {
+        kind: 'rename_collection',
+        id: spareCollection,
+        name: 'Empty fixture',
+      });
+      const keptSettings = join(
+        engine,
+        'BepInEx/config/collection-fixture.cfg',
+      );
+      await mkdir(join(engine, 'BepInEx/config'), { recursive: true });
+      await writeFile(keptSettings, 'settings survive collection edits');
+      await collectionAction(page, {
+        kind: 'select_collection',
+        id: spareCollection,
+      });
+      await waitForDeployment(0);
+      await collectionAction(page, {
+        kind: 'select_collection',
+        id: originalCollection,
+      });
+      await waitForDeployment(1);
+      expect(await readFile(keptSettings, 'utf8')).toBe(
+        'settings survive collection edits',
+      );
+      running = spawn(join(engine, 'Sanctuary.exe'), ['-t', '127.0.0.1'], {
+        windowsHide: true,
+        stdio: 'ignore',
+      });
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      await expect(
+        page.getByText('Game running', { exact: true }),
+      ).toBeVisible();
+      const pendingCollection = await collectionAction(page, {
+        kind: 'select_collection',
+        id: spareCollection,
+      });
+      expect((await activation()).mods).toHaveLength(1);
+      running.kill();
+      await expect
+        .poll(() => running.exitCode !== null || running.signalCode !== null)
+        .toBe(true);
+      await waitForDeployment(0);
+      expect((await activation()).deploymentRevision).toBe(
+        pendingCollection.revision,
+      );
+      await collectionAction(page, {
+        kind: 'select_collection',
+        id: originalCollection,
+      });
       await waitForDeployment(1);
       expect(await readFile(deployed)).toEqual(bytes);
       await action(page, {
@@ -378,9 +432,27 @@ try {
       await expect(
         page.getByText('Game running', { exact: true }),
       ).toBeVisible();
-      await setEnabled(page, false);
-      await setEnabled(page, true);
-      await setEnabled(page, false);
+      await collectionAction(page, {
+        kind: 'select_collection',
+        id: spareCollection,
+      });
+      await collectionAction(page, {
+        kind: 'select_collection',
+        id: originalCollection,
+      });
+      await collectionAction(page, {
+        kind: 'select_collection',
+        id: spareCollection,
+      });
+      const deleted = await collectionAction(page, {
+        kind: 'delete_collection',
+        id: spareCollection,
+      });
+      expect(deleted.activeCollection).toBeNull();
+      expect(deleted.library).toHaveLength(2);
+      await expect(page.locator('footer')).toContainText(
+        `Saved collection revision ${deleted.revision}`,
+      );
       expect((await activation()).mods).toHaveLength(1);
       expect(await exists(deployed)).toBe(true);
     },
@@ -399,8 +471,20 @@ try {
       expect(await exists(join(artifactRoot, 'package/Fixture.dll'))).toBe(
         true,
       );
-      await setEnabled(page, true);
+      const restored = await collectionAction(page, {
+        kind: 'select_collection',
+        id: originalCollection,
+      });
+      expect(
+        restored.collections.find((c) => c.id === originalCollection).name,
+      ).toBe('Default');
       await waitForDeployment(1);
+      expect(
+        await readFile(
+          join(engine, 'BepInEx/config/collection-fixture.cfg'),
+          'utf8',
+        ),
+      ).toBe('settings survive collection edits');
       const settings = join(engine, 'BepInEx/config/fixture.cfg');
       await mkdir(join(engine, 'BepInEx/config'), { recursive: true });
       await writeFile(settings, 'retain user settings');
@@ -432,5 +516,5 @@ try {
   if (running?.exitCode === null) running.kill();
 }
 console.log(
-  'PASS: native requested/effective ordering, Lua payload deployment, mod membership, withdrawn installed copy, game-running deferral, restart application and uninstall retention.',
+  'PASS: native named collection creation, rename, selection, deletion without uninstall, settings retention, game-exit and restart application, requested/effective ordering and Lua payload deployment.',
 );

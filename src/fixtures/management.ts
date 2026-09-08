@@ -59,6 +59,7 @@ export function fixtureManagement(
     : [];
   const data: ModView = {
     revision: '0',
+    activeCollection: null,
     catalog: { schemaVersion: 1, catalogRevision: '1', mods },
     library: mods.slice(0, 3).map((m) => ({
       name: m.name,
@@ -80,12 +81,56 @@ export function fixtureManagement(
   };
   const operations: PackageOperation[] = [];
   const commit = () => {
+    const active = data.collections.find((c) => c.id === data.activeCollection);
+    if (active) active.entries = [...data.enabled];
     data.order = { effective: [...data.enabled], adjustments: [] };
     data.revision = String(BigInt(data.revision) + 1n);
     changed(data);
   };
   return {
     async mods(action) {
+      if (
+        'expectedRevision' in action &&
+        action.expectedRevision !== data.revision
+      )
+        throw new Error(
+          'The library changed. Retry with its current revision.',
+        );
+      if (action.kind === 'create_collection') {
+        data.collections.push({
+          id: crypto.randomUUID(),
+          name: action.name.trim(),
+          revision: 1,
+          entries: [],
+        });
+        commit();
+      }
+      if (
+        action.kind === 'rename_collection' ||
+        action.kind === 'delete_collection' ||
+        action.kind === 'select_collection'
+      ) {
+        const selected = data.collections.find((c) => c.id === action.id);
+        if (!selected) throw new Error('This collection no longer exists.');
+        if (action.kind === 'rename_collection') {
+          selected.name = action.name.trim();
+          selected.revision++;
+        }
+        if (action.kind === 'select_collection') {
+          data.activeCollection = selected.id;
+          data.enabled = [...selected.entries];
+        }
+        if (action.kind === 'delete_collection') {
+          data.collections = data.collections.filter(
+            (c) => c.id !== selected.id,
+          );
+          if (data.activeCollection === selected.id) {
+            data.activeCollection = null;
+            data.enabled = [];
+          }
+        }
+        commit();
+      }
       if (action.kind === 'reorder') {
         if (action.expectedRevision !== data.revision)
           throw new Error(
@@ -119,14 +164,15 @@ export function fixtureManagement(
           data.enabled.push(entry.reference);
         if (action.kind === 'uninstall')
           data.library = data.library.filter((e) => e !== entry);
-        data.collections = [
-          {
-            id: 'default',
+        if (!data.activeCollection) {
+          data.activeCollection = crypto.randomUUID();
+          data.collections.push({
+            id: data.activeCollection,
             name: 'Default',
             revision: 1,
             entries: [...data.enabled],
-          },
-        ];
+          });
+        }
         commit();
       }
       return structuredClone(data);

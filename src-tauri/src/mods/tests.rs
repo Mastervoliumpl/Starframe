@@ -134,6 +134,210 @@ fn collision_winners_follow_effective_order_and_content_payloads_keep_their_path
 }
 
 #[test]
+fn named_collections_switch_and_delete_without_uninstall_and_survive_restart() {
+    let (temp, mut store, entries) = fixture();
+    let initial = enable(&mut store, &entries[1], true);
+    let original = initial.active_collection.unwrap();
+    let settings = temp.path().join("settings-fixture.cfg");
+    fs::write(&settings, "keep settings").unwrap();
+    let created = action(
+        &mut store,
+        Action::CreateCollection {
+            name: "  Empty setup  ".into(),
+            expected_revision: initial.revision,
+        },
+    )
+    .unwrap();
+    let empty = created
+        .collections
+        .iter()
+        .find(|c| c.name == "Empty setup")
+        .unwrap()
+        .id
+        .clone();
+    assert_eq!(created.active_collection.as_ref(), Some(&original));
+    assert_eq!(created.enabled.len(), 2);
+    let selected = action(
+        &mut store,
+        Action::SelectCollection {
+            id: empty.clone(),
+            expected_revision: created.revision,
+        },
+    )
+    .unwrap();
+    assert!(selected.enabled.is_empty());
+    assert_eq!(requested(&store).unwrap()["mods"], json!([]));
+    let renamed = action(
+        &mut store,
+        Action::RenameCollection {
+            id: original.clone(),
+            name: "With mods".into(),
+            expected_revision: selected.revision,
+        },
+    )
+    .unwrap();
+    let selected = action(
+        &mut store,
+        Action::SelectCollection {
+            id: original.clone(),
+            expected_revision: renamed.revision,
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        selected.enabled,
+        entries
+            .iter()
+            .map(|e| e.reference.clone())
+            .collect::<Vec<_>>()
+    );
+    let before = store.load().unwrap();
+    drop(store);
+    let mut store = Storage::open(temp.path()).unwrap();
+    assert_eq!(store.load().unwrap(), before);
+    let removed = action(
+        &mut store,
+        Action::DeleteCollection {
+            id: empty,
+            expected_revision: before.revision.to_string(),
+        },
+    )
+    .unwrap();
+    assert_eq!(removed.active_collection.as_ref(), Some(&original));
+    let removed = action(
+        &mut store,
+        Action::DeleteCollection {
+            id: original,
+            expected_revision: removed.revision,
+        },
+    )
+    .unwrap();
+    assert!(removed.active_collection.is_none());
+    assert!(removed.collections.is_empty());
+    assert!(removed.enabled.is_empty());
+    assert_eq!(removed.library, before.library);
+    assert!(store.pending_removals().unwrap().is_empty());
+    for entry in &entries {
+        assert!(
+            store
+                .artifact_directory(&entry.reference)
+                .unwrap()
+                .join("package/Fixture.dll")
+                .exists()
+        );
+    }
+    assert_eq!(fs::read_to_string(settings).unwrap(), "keep settings");
+    assert_eq!(requested(&store).unwrap()["mods"], json!([]));
+}
+
+#[test]
+fn collection_edits_reject_stale_or_invalid_requests_and_keep_latest_order() {
+    let (_temp, mut store, entries) = fixture_with_lua(true);
+    enable(&mut store, &entries[0], true);
+    let initial = enable(&mut store, &entries[1], true);
+    let id = initial.active_collection.unwrap();
+    let manifest = requested(&store).unwrap();
+    let stale = initial.revision.clone();
+    let mut current = initial.revision;
+    for ids in [
+        vec!["fixture.addon", "fixture.core"],
+        vec!["fixture.core", "fixture.addon"],
+        vec!["fixture.addon", "fixture.core"],
+    ] {
+        let updated = action(
+            &mut store,
+            Action::Reorder {
+                mod_ids: ids.into_iter().map(str::to_owned).collect(),
+                expected_revision: current,
+            },
+        )
+        .unwrap();
+        current = updated.revision;
+    }
+    assert!(payload(&store, &manifest).is_err());
+    let before = store.load().unwrap();
+    for edit in [
+        Action::RenameCollection {
+            id: id.clone(),
+            name: "stale".into(),
+            expected_revision: stale.clone(),
+        },
+        Action::DeleteCollection {
+            id: id.clone(),
+            expected_revision: stale.clone(),
+        },
+        Action::SelectCollection {
+            id: id.clone(),
+            expected_revision: stale.clone(),
+        },
+        Action::CreateCollection {
+            name: "stale".into(),
+            expected_revision: stale,
+        },
+        Action::CreateCollection {
+            name: "  ".into(),
+            expected_revision: current.clone(),
+        },
+        Action::RenameCollection {
+            id: id.clone(),
+            name: "x".repeat(201),
+            expected_revision: current.clone(),
+        },
+        Action::DeleteCollection {
+            id: "missing".into(),
+            expected_revision: current.clone(),
+        },
+        Action::SelectCollection {
+            id: "missing".into(),
+            expected_revision: current,
+        },
+    ] {
+        assert!(action(&mut store, edit).is_err());
+        assert_eq!(store.load().unwrap(), before);
+    }
+    let latest = requested(&store).unwrap();
+    assert_eq!(latest["mods"][0]["modId"], "fixture.addon");
+    assert_eq!(latest["deploymentRevision"], before.revision.to_string());
+}
+
+#[test]
+fn selecting_collection_with_uninstalled_content_reports_unresolved_membership() {
+    let (_temp, mut store, entries) = fixture_with_lua(true);
+    let initial = enable(&mut store, &entries[0], true);
+    let id = initial.active_collection.unwrap();
+    let rev = store
+        .set_active_collection(None, initial.revision.parse().unwrap())
+        .unwrap();
+    let removed = action(
+        &mut store,
+        Action::Uninstall {
+            mod_id: entries[0].reference.mod_id.clone(),
+            hash: entries[0].reference.hash.clone(),
+            expected_revision: rev.to_string(),
+            confirm_references: true,
+        },
+    )
+    .unwrap();
+    let selected = action(
+        &mut store,
+        Action::SelectCollection {
+            id,
+            expected_revision: removed.revision,
+        },
+    )
+    .unwrap();
+    assert!(selected.order.is_none());
+    assert!(
+        selected
+            .order_error
+            .unwrap()
+            .contains("unavailable in the library")
+    );
+    assert_eq!(selected.enabled, vec![entries[0].reference.clone()]);
+    assert!(requested(&store).is_err());
+}
+
+#[test]
 fn membership_orders_exact_dependencies_and_survives_restart_and_withdrawal() {
     let (temp, mut store, entries) = fixture();
     let view = enable(&mut store, &entries[1], true);

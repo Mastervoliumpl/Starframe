@@ -50,6 +50,7 @@ export type CatalogMod = {
 };
 export type ModView = {
   revision: string;
+  activeCollection: string | null;
   catalog: {
     schemaVersion: number;
     catalogRevision: string;
@@ -83,6 +84,18 @@ export type PackageOperation = {
 };
 export type ModAction =
   | { kind: 'list' | 'retry_cleanup' }
+  | { kind: 'create_collection'; name: string; expectedRevision: string }
+  | {
+      kind: 'rename_collection';
+      id: string;
+      name: string;
+      expectedRevision: string;
+    }
+  | {
+      kind: 'delete_collection' | 'select_collection';
+      id: string;
+      expectedRevision: string;
+    }
   | { kind: 'reorder'; modIds: string[]; expectedRevision: string }
   | {
       kind: 'set_enabled';
@@ -102,6 +115,10 @@ export type PackageAction =
   | { kind: 'list' }
   | { kind: 'prepare'; requestId: string; releaseId: string }
   | { kind: 'cancel'; operationId: string };
+export type CollectionEdit =
+  | { kind: 'create_collection'; name: string }
+  | { kind: 'rename_collection'; id: string; name: string }
+  | { kind: 'delete_collection' | 'select_collection'; id: string };
 export interface ManagementTransport {
   mods(action: ModAction): Promise<ModView>;
   packages(action: PackageAction): Promise<PackageOperation[]>;
@@ -190,6 +207,18 @@ export function createManagement(transport: ManagementTransport | null) {
     },
     refresh,
     dismissError: () => update({ error: '' }),
+    collection(action: CollectionEdit, expectedRevision?: string) {
+      return run('membership', async () => {
+        if (!view.data) throw new Error('Collection data is unavailable.');
+        const data = await confirmed(
+          transport!.mods({
+            ...action,
+            expectedRevision: expectedRevision ?? view.data.revision,
+          }),
+        );
+        if (!stopped) update({ data });
+      });
+    },
     reorder(modIds: string[]) {
       return run('membership', async () => {
         if (!view.data) return;
