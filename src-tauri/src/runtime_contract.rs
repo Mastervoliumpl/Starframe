@@ -6,6 +6,8 @@ use std::collections::HashSet;
 use std::fmt;
 
 pub const MAX_DOCUMENT_BYTES: usize = 1_048_576;
+pub const MAX_MODS: usize = 256;
+pub const MAX_FILES_PER_MOD: usize = 1024;
 type Result<T> = std::result::Result<T, String>;
 
 pub fn read(bytes: &[u8], kind: &str) -> Result<Value> {
@@ -13,7 +15,11 @@ pub fn read(bytes: &[u8], kind: &str) -> Result<Value> {
     let Strict(value) = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
     depth(&value, 0)?;
     require(
-        value["schemaVersion"].as_u64() == Some(if kind == "activation" { 2 } else { 1 }),
+        if kind == "activation" {
+            matches!(value["schemaVersion"].as_u64(), Some(2 | 3))
+        } else {
+            value["schemaVersion"].as_u64() == Some(1)
+        },
         "schema version",
     )?;
     require(
@@ -34,20 +40,27 @@ pub fn read(bytes: &[u8], kind: &str) -> Result<Value> {
 }
 
 fn activation(root: &Value) -> Result<()> {
-    fields(
-        root,
-        &[
-            "schemaVersion",
-            "runtimeContractVersion",
-            "integrationId",
-            "deploymentRevision",
-            "installedMods",
-            "mods",
-        ],
-    )?;
+    let mut expected = vec![
+        "schemaVersion",
+        "runtimeContractVersion",
+        "integrationId",
+        "deploymentRevision",
+        "installedMods",
+        "mods",
+    ];
+    if root["schemaVersion"] == 3 {
+        expected.push("omittedDisabledMods");
+        require(
+            root["omittedDisabledMods"]
+                .as_u64()
+                .is_some_and(|n| n <= i32::MAX as u64),
+            "omitted inventory count",
+        )?;
+    }
+    fields(root, &expected)?;
     decimal(&root["deploymentRevision"])?;
     let mut installed = HashSet::new();
-    for item in array(&root["installedMods"], 256)? {
+    for item in array(&root["installedMods"], MAX_MODS)? {
         fields(item, &["modId", "name", "version"])?;
         require(
             installed.insert(id(&item["modId"])?),
@@ -56,10 +69,14 @@ fn activation(root: &Value) -> Result<()> {
         text(&item["name"], 256, false)?;
         text(&item["version"], 128, false)?;
     }
+    require(
+        root["omittedDisabledMods"].as_u64().unwrap_or(0) == 0 || installed.len() == MAX_MODS,
+        "incomplete bounded inventory",
+    )?;
     let mut active = HashSet::new();
     let mut roots: Vec<String> = Vec::new();
     let mut total_files = 0;
-    for item in array(&root["mods"], 256)? {
+    for item in array(&root["mods"], MAX_MODS)? {
         fields(
             item,
             &[
@@ -112,7 +129,7 @@ fn activation(root: &Value) -> Result<()> {
             Some(assembly)
         };
         let mut paths: Vec<String> = Vec::new();
-        for file in array(&item["files"], 1024)? {
+        for file in array(&item["files"], MAX_FILES_PER_MOD)? {
             fields(file, &["path", "sha256"])?;
             let file_path = path(&file["path"])?;
             require(
@@ -223,7 +240,7 @@ fn report(root: &Value) -> Result<()> {
     let pid = root["processId"].as_u64().ok_or("process ID")?;
     require(pid > 0 && pid <= u32::MAX as u64, "process ID")?;
     let mut ids = HashSet::new();
-    for item in array(&root["mods"], 256)? {
+    for item in array(&root["mods"], MAX_MODS)? {
         fields(item, &["modId", "outcome", "errorCode", "message"])?;
         require(ids.insert(id(&item["modId"])?), "duplicate report ID")?;
         let outcome = text(&item["outcome"], 32, false)?;

@@ -20,7 +20,7 @@ impl Storage {
     }
 
     pub fn set_mod_membership(&mut self, entries: &[ModReference], expected: i64) -> Result<i64> {
-        if entries.len() > 256 {
+        if entries.len() > crate::runtime_contract::MAX_MODS {
             return Err(Error::Invalid(
                 "This runtime supports at most 256 active mods.".into(),
             ));

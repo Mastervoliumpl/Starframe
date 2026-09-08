@@ -408,9 +408,12 @@ pub fn requested(store: &Storage) -> Result<Value> {
         .iter()
         .find(|c| Some(&c.id) == records.active_collection.as_ref())
         .map_or(&[][..], |c| c.entries.as_slice());
+    let (inventory, omitted) = inventory(&records, entries);
     if entries.is_empty() {
         let mut value = crate::launch::requested(&records)?;
-        value["installedMods"] = inventory(&records, entries);
+        value["schemaVersion"] = json!(3);
+        value["installedMods"] = inventory;
+        value["omittedDisabledMods"] = json!(omitted);
         return runtime_contract::read(
             &serde_json::to_vec(&value).map_err(|e| e.to_string())?,
             "activation",
@@ -461,24 +464,32 @@ pub fn requested(store: &Storage) -> Result<Value> {
             .collect::<std::result::Result<_, _>>()?;
         mods.push(json!({"modId": reference.mod_id, "source": {"kind":"catalog", "releaseId": release.id}, "root": format!("mods/{}", reference.hash), "entryAssembly": entry_path, "entryType": entry_type, "requires":requires, "files":prepared.files.iter().map(|f| json!({"path":f.path,"sha256":f.sha256})).collect::<Vec<_>>() }));
     }
-    let value = json!({"schemaVersion":2, "runtimeContractVersion":1, "integrationId":"starframe.bepinex", "deploymentRevision":records.revision.to_string(), "installedMods":inventory(&records, entries),"mods":mods});
+    let value = json!({"schemaVersion":3, "runtimeContractVersion":1, "integrationId":"starframe.bepinex", "deploymentRevision":records.revision.to_string(), "installedMods":inventory,"omittedDisabledMods":omitted,"mods":mods});
     runtime_contract::read(
         &serde_json::to_vec(&value).map_err(|e| e.to_string())?,
         "activation",
     )
 }
 
-fn inventory(records: &Records, enabled: &[ModReference]) -> Value {
+fn inventory(records: &Records, enabled: &[ModReference]) -> (Value, usize) {
     let mut seen = BTreeSet::new();
     let entries = enabled
         .iter()
         .filter_map(|r| records.library.iter().find(|e| &e.reference == r))
         .chain(records.library.iter());
-    json!(
-        entries
-            .filter(|e| seen.insert(&e.reference.mod_id))
-            .map(|e| json!({"modId":e.reference.mod_id,"name":e.name,"version":e.version}))
-            .collect::<Vec<_>>()
+    let entries: Vec<_> = entries
+        .filter(|e| seen.insert(&e.reference.mod_id))
+        .collect();
+    let omitted = entries.len().saturating_sub(runtime_contract::MAX_MODS);
+    (
+        json!(
+            entries
+                .into_iter()
+                .take(runtime_contract::MAX_MODS)
+                .map(|e| json!({"modId":e.reference.mod_id,"name":e.name,"version":e.version}))
+                .collect::<Vec<_>>()
+        ),
+        omitted,
     )
 }
 

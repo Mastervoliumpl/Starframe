@@ -6,6 +6,8 @@ Issue [#11](https://github.com/Mastervoliumpl/Starframe/issues/11) implements th
 
 ## Bounds and activation
 
+Desktop 0.4.1 writes activation schema 3. It adds the required nonnegative integer `omittedDisabledMods` (at most 2,147,483,647). Readers also accept schema 2 with an implicit zero count. The bounded inventory includes all active mods first, then disabled mods in saved library order, with one entry per mod ID and at most 256 entries. A nonzero omitted count requires a full 256-entry inventory. The in-game menu reports the omitted disabled count; their files and settings remain in the desktop library. Library size does not limit an otherwise valid launch. Active mods remain limited to 256.
+
 Issue #20's game adapter supports content-only Lua entries whose complete file paths are under `LJ/lua`, subject to the limits in [ordering verification](../docs/verification/ordering.md). The wire format is unchanged: other content-only entries remain representable but fail activation as unsupported. Effective manifest order controls both managed initialization and supported Lua overlay precedence.
 
 Each UTF-8 document is at most 1,048,576 bytes with JSON depth at most 32. Inventory, activation, required dependencies and report outcomes each allow 256 entries. One mod allows 1,024 files; an activation allows 8,192 files total. String limits count UTF-8 bytes and reject control characters. IDs use lowercase ASCII letters, digits, dots, underscores and hyphens, start with a letter/digit and allow 128 bytes. Display names allow 256 bytes and versions 128; display text never authorizes loading and must be rendered as text.

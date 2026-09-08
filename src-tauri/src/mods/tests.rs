@@ -449,7 +449,12 @@ fn reapproved_bytes_preserve_both_release_references_and_satisfy_new_dependencie
     new.reference.release_id = Some("fixture.core.2".into());
     let pinned = Uuid::new_v4().to_string();
     store
-        .save_collection(&pinned, "Old approval", &[old.reference.clone()], 0)
+        .save_collection(
+            &pinned,
+            "Old approval",
+            std::slice::from_ref(&old.reference),
+            0,
+        )
         .unwrap();
     let mut cache = store.catalog_cache().unwrap().unwrap();
     let catalog = cache.catalog.as_mut().unwrap();
@@ -519,6 +524,67 @@ fn reapproved_bytes_preserve_both_release_references_and_satisfy_new_dependencie
             .unwrap(),
         prepared
     );
+}
+
+#[test]
+fn large_disabled_libraries_keep_bounded_inventory_and_active_mods_across_restart() {
+    for count in [255, 256, 257] {
+        let (root, mut store, entries) = fixture();
+        for i in 2..count {
+            let mut entry = entries[0].clone();
+            entry.reference.mod_id = format!("aaa.disabled{i}");
+            entry.reference.origin = Origin::LocalImport;
+            entry.reference.release_id = None;
+            store
+                .put_library_entry(&entry, store.load().unwrap().revision)
+                .unwrap();
+        }
+        fs::write(root.path().join("settings.cfg"), b"retain").unwrap();
+        for active in [false, true] {
+            if active {
+                enable(&mut store, &entries[1], true);
+            }
+            let activation = requested(&store).unwrap();
+            assert_eq!(
+                activation["installedMods"].as_array().unwrap().len(),
+                count.min(256)
+            );
+            assert_eq!(activation["omittedDisabledMods"], count.saturating_sub(256));
+            assert_eq!(
+                activation["mods"].as_array().unwrap().len(),
+                if active { 2 } else { 0 }
+            );
+            if active {
+                assert_eq!(
+                    activation["installedMods"][0]["modId"],
+                    entries[0].reference.mod_id
+                );
+                payload(&store, &activation).unwrap();
+            }
+            drop(store);
+            store = Storage::open(root.path()).unwrap();
+            assert_eq!(requested(&store).unwrap(), activation);
+            assert_eq!(store.load().unwrap().library.len(), count);
+            assert_eq!(
+                fs::read(root.path().join("settings.cfg")).unwrap(),
+                b"retain"
+            );
+        }
+        if count == 257 {
+            let records = store.load().unwrap();
+            let all: Vec<_> = records
+                .library
+                .iter()
+                .map(|e| e.reference.clone())
+                .collect();
+            assert!(store.set_mod_membership(&all, records.revision).is_err());
+            assert_eq!(store.load().unwrap(), records);
+        }
+        store
+            .set_mod_membership(&[], store.load().unwrap().revision)
+            .unwrap();
+        assert_eq!(requested(&store).unwrap()["mods"], json!([]));
+    }
 }
 
 #[test]

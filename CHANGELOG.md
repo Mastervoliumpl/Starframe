@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Bound the runtime inventory independently of library size, retain all active entries, and report omitted disabled mods in the in-game menu. Activation schema 3 adds the omitted count; readers retain schema 2 support (#51).
+
 - Preserve distinct approval references over shared archive bytes, including exact enable/uninstall selection and collection references. Schema 10 retains existing records and deduplicates local content (#50).
 
 ## 0.4.0 - 2026-09-08

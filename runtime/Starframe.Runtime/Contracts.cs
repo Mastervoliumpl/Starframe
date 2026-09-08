@@ -12,6 +12,8 @@ namespace Starframe.Runtime;
 public static class Contracts
 {
     public const int MaxDocumentBytes = 1_048_576;
+    public const int MaxMods = 256;
+    public const int MaxFilesPerMod = 1024;
 
     public static JsonDocument Read(byte[] utf8, string kind)
     {
@@ -21,7 +23,8 @@ public static class Contracts
         {
             var root = document.RootElement;
             CheckDuplicates(root);
-            Require(root.GetProperty("schemaVersion").GetRawText() == (kind == "activation" ? "2" : "1"), "schema version");
+            string schema = root.GetProperty("schemaVersion").GetRawText();
+            Require(kind == "activation" ? schema is "2" or "3" : schema == "1", "schema version");
             Require(root.GetProperty("runtimeContractVersion").GetRawText() == "1", "runtime contract version");
             Require(Text(root, "integrationId", 64) == "starframe.bepinex", "integration ID");
             switch (kind)
@@ -42,20 +45,28 @@ public static class Contracts
 
     private static void Activation(JsonElement root)
     {
-        Fields(root, "schemaVersion", "runtimeContractVersion", "integrationId", "deploymentRevision", "installedMods", "mods");
+        var fields = new List<string> { "schemaVersion", "runtimeContractVersion", "integrationId", "deploymentRevision", "installedMods", "mods" };
+        int omitted = 0;
+        if (root.GetProperty("schemaVersion").GetInt32() == 3)
+        {
+            fields.Add("omittedDisabledMods");
+            Require(root.GetProperty("omittedDisabledMods").TryGetInt32(out omitted) && omitted >= 0, "omitted inventory count");
+        }
+        Fields(root, fields.ToArray());
         Decimal(root, "deploymentRevision");
         var installed = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var mod in Array(root, "installedMods", 256))
+        foreach (var mod in Array(root, "installedMods", MaxMods))
         {
             Fields(mod, "modId", "name", "version");
             Require(installed.Add(Id(mod, "modId")), "duplicate inventory ID");
             Text(mod, "name", 256);
             Text(mod, "version", 128);
         }
+        Require(omitted == 0 || installed.Count == MaxMods, "incomplete bounded inventory");
         var active = new HashSet<string>(StringComparer.Ordinal);
         var roots = new List<string>();
         int totalFiles = 0;
-        foreach (var mod in Array(root, "mods", 256))
+        foreach (var mod in Array(root, "mods", MaxMods))
         {
             Fields(mod, "modId", "source", "root", "entryAssembly", "entryType", "requires", "files");
             string id = Id(mod, "modId");
@@ -75,7 +86,7 @@ public static class Contracts
             Require(content ? mod.GetProperty("entryType").ValueKind == JsonValueKind.Null : assembly!.EndsWith(".dll", StringComparison.Ordinal), "entry assembly");
             if (!content) Require(Matches(Text(mod, "entryType", 256), @"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*"), "entry type");
             var paths = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var file in Array(mod, "files", 1024))
+            foreach (var file in Array(mod, "files", MaxFilesPerMod))
             {
                 Fields(file, "path", "sha256");
                 string path = Path(Text(file, "path", 240)).ToLowerInvariant();
@@ -129,7 +140,7 @@ public static class Contracts
         Require(Guid.TryParseExact(session, "D", out var guid) && guid != Guid.Empty && session == guid.ToString("D"), "session ID");
         Require(root.GetProperty("processId").TryGetUInt32(out uint pid) && pid > 0, "process ID");
         var ids = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var mod in Array(root, "mods", 256))
+        foreach (var mod in Array(root, "mods", MaxMods))
         {
             Fields(mod, "modId", "outcome", "errorCode", "message");
             Require(ids.Add(Id(mod, "modId")), "duplicate report ID");

@@ -383,5 +383,20 @@
     "file": "activation-v1.json",
     "kind": "activation",
     "valid": false
+  },
+  {
+    "file": "activation-v3.json",
+    "kind": "activation",
+    "valid": true
+  },
+  {
+    "file": "activation-v3-invalid-omitted.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-v3-incomplete-inventory.json",
+    "kind": "activation",
+    "valid": false
   }
 ]
