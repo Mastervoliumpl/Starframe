@@ -4,6 +4,24 @@
 
 No changes yet.
 
+## 0.4.0 - 2026-09-08
+
+Internal ordered-collection milestone; no published installer or app release.
+
+- Verified mixed cached/missing sharing across two libraries, actual game order, compatibility warnings, game-exit application and per-mod settings retention (#23). See [exit evidence and the four known 0.4.1 limits](docs/verification/milestone-0.4.0.md).
+- Added ordering limits and recovery guidance to Help & logs.
+
+- Added version-1 collection JSON import/export, review before one acceptance, verified local reuse, queued exact approved packages and persistent unresolved references (#22).
+- Added schema-9 import progress, restart recovery and retry; incomplete imports cannot apply. Collection dialogs use the existing management dialog styles.
+
+- Added named collection creation, rename, confirmed deletion and active selection, sharing existing mod files and settings (#21).
+- Added visible pending collection revisions during play, with latest-revision application after exit.
+- Replaced Move up/down buttons with a drag handle and right-aligned order number; the handle retains keyboard and select-then-place operation.
+- Added deterministic dependency ordering, mandatory before/after constraints, optional preference warnings and separate requested/effective priority (#20).
+- Added keyboard and drag reorder controls, revision checks, adjustment messages and visible Lua collision winners.
+- Added verified Lua overlays for existing game directories, with later effective order winning. Maps, AI packages and conventional BepInEx plugins remain unsupported.
+- Excluded .NET build output from Vite's watcher after a Windows file-lock failure during concurrent checks.
+
 ## 0.3.0 - 2026-09-07
 
 Internal curated-mod milestone; no published installer or app release. The metadata-only catalog starts empty.

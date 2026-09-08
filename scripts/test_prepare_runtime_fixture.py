@@ -3,6 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from prepare_runtime_fixture import prepare
+from prepare_ordering_fixture import prepare_ordering
 
 
 class RuntimeFixturePreparation(unittest.TestCase):
@@ -23,6 +24,15 @@ class RuntimeFixturePreparation(unittest.TestCase):
                 inventory = json.loads((output / 'runtime-package.json').read_text())
                 self.assertEqual(len(inventory), 9)
                 self.assertFalse(any('disabled' in item['path'] for item in inventory))
+            for reverse in [False, True]:
+                output = root / f'order-{reverse}'
+                prepare_ordering(output, runtime, fixture, reverse)
+                activation = json.loads((output / 'Starframe/activation.json').read_text())
+                self.assertEqual(activation['mods'][-1]['modId'], 'fixture.lua.a' if reverse else 'fixture.lua.b')
+                self.assertIsNone(activation['mods'][-1]['entryAssembly'])
+                self.assertEqual(activation['mods'][-1]['files'][0]['path'], activation['mods'][-2]['files'][0]['path'])
+                inventory = json.loads((output / 'runtime-package.json').read_text())
+                self.assertEqual(len(inventory), 11)
             (runtime / 'System.Memory.dll').unlink()
             with self.assertRaises(ValueError):
                 prepare(root / 'missing-dependency', runtime, fixture, False)

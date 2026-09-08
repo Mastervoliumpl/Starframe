@@ -12,6 +12,7 @@
     <Reference Include="UnityEngine.ImageConversionModule"><HintPath>$(GameManagedPath)/UnityEngine.ImageConversionModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.AnimationModule"><HintPath>$(GameManagedPath)/UnityEngine.AnimationModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Trebuchet"><HintPath>$(GameManagedPath)/Trebuchet.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.Collections"><HintPath>$(GameManagedPath)/Unity.Collections.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Michsky.UI.Beam"><HintPath>$(GameManagedPath)/Michsky.UI.Beam.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="0Harmony"><HintPath>$(BootstrapPath)/BepInEx/core/0Harmony.dll</HintPath><Private>false</Private></Reference>
     <EmbeddedResource Include="Resources/starframe-mark-mono.png" />

@@ -6,6 +6,8 @@
   import GameSettings from './features/GameSettings.svelte';
   import LaunchBar from './features/LaunchBar.svelte';
   import ModList from './features/ModList.svelte';
+  import Collections from './features/Collections.svelte';
+  import CollectionSelect from './features/CollectionSelect.svelte';
   import PackageDownloads from './features/PackageDownloads.svelte';
   import { createManagement } from './lib/management';
   import { createDesktop } from './lib/state';
@@ -149,7 +151,10 @@
         </p>{/if}
       <section class="page" hidden={page !== 'mods'} aria-label="My mods">
         <div class="toolbar">
-          <p>Active collection: <strong>{activeCollection}</strong></p>
+          <CollectionSelect
+            {manager}
+            unavailable={$desktop.connection !== 'connected'}
+          />
           <p class="muted">Switches change the active collection.</p>
         </div>
         {#if managementError}<p class="error" role="alert">
@@ -217,13 +222,11 @@
         hidden={page !== 'collections'}
         aria-label="Collections"
       >
-        <div class="empty-state">
-          <h2>Saved collections</h2>
-          <p>
-            A collection will hold a name and an ordered list of mods.
-            Collection editing is not available in this build.
-          </p>
-        </div>
+        <Collections
+          {manager}
+          onmods={() => navigate('mods')}
+          unavailable={$desktop.connection !== 'connected'}
+        />
       </section>
       <section
         class="page"
@@ -368,6 +371,50 @@
         <DiagnosticList />
         <div class="settings-section">
           <h2>Project help</h2>
+          <details>
+            <summary>Collection order and current limits</summary>
+            <p>
+              Drag a row by its handle to set priority. With the handle focused,
+              use arrow keys or Home and End. The number on the right shows the
+              effective order. Required dependencies can move ahead of your
+              requested position; Collections explains each adjustment.
+            </p>
+            <p>
+              A later Lua overlay wins when two mods supply the same supported
+              path. Changes apply after the game closes. Switching collections
+              keeps each mod’s saved settings. A game build warning allows you
+              to try the collection; it does not confirm compatibility.
+            </p>
+            <p>
+              This internal build supports Starframe managed packages and the
+              verified Lua overlay paths. General BepInEx plugins, AI and maps
+              need further adapters and testing. Keep the library at 256 mods or
+              fewer and each package at 1,024 files or fewer. Two mod IDs
+              sharing one archive and reapproved copies of identical archives
+              have known identity or deployment limits, tracked for 0.4.1.
+            </p>
+          </details>
+          <details>
+            <summary>Share or repair a collection</summary>
+            <p>
+              In Collections, choose Export and save the collection file. On
+              another installation, choose Import collection, select the file or
+              paste its JSON, then review and accept once.
+            </p>
+            <p>
+              Starframe verifies matching files and prepares missing approved
+              releases. Import details keep unavailable references visible.
+              Choose Use collection to enable the complete valid setup after the
+              game closes.
+            </p>
+            <p>
+              If an import stops, use Retry import. For a withdrawn release,
+              changed identity or missing dependency, ask the sender for a
+              repaired collection. You can also export the saved list, edit its
+              exact references, and import it as a new collection. Newer
+              releases are never selected automatically.
+            </p>
+          </details>
           <p>Log export is not available yet.</p>
           <details>
             <summary>Artwork credit</summary>

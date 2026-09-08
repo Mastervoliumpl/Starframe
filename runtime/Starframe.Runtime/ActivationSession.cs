@@ -21,13 +21,16 @@ public sealed class ActivationSession : IDisposable
     private bool started;
     private readonly Func<string, ModSettings> settingsFactory;
     private readonly Dictionary<string, ModSettings> settings = new();
+    private readonly Action<string, IReadOnlyDictionary<string, byte[]>>? applyLua;
     public IReadOnlyDictionary<string, ModSettings> Settings => settings;
     public string SessionId { get; } = Guid.NewGuid().ToString("D");
     public JsonElement[] InstalledMods { get; private set; } = System.Array.Empty<JsonElement>();
 
-    public ActivationSession(Action<string> log, IEnumerable<string> gameAssemblies, Func<string, ModSettings>? settingsFactory = null)
+    public ActivationSession(Action<string> log, IEnumerable<string> gameAssemblies, Func<string, ModSettings>? settingsFactory = null,
+        Action<string, IReadOnlyDictionary<string, byte[]>>? applyLua = null)
     {
         this.log = log;
+        this.applyLua = applyLua;
         this.settingsFactory = settingsFactory ?? (_ => new ModSettings(_ => null, (_, _) => throw new InvalidOperationException("Settings persistence is unavailable.")));
         trusted = new HashSet<string>(AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetName().Name!), StringComparer.OrdinalIgnoreCase);
         trusted.UnionWith(gameAssemblies);
@@ -42,11 +45,14 @@ public sealed class ActivationSession : IDisposable
         InstalledMods = activation.GetProperty("installedMods").EnumerateArray().Select(m => m.Clone()).ToArray();
         root = Path.GetFullPath(root);
         var errors = new Dictionary<string, string>();
+        var content = new Dictionary<string, IReadOnlyDictionary<string, byte[]>>();
         long total = 0;
         foreach (var mod in activation.GetProperty("mods").EnumerateArray())
         {
             string id = mod.GetProperty("modId").GetString()!;
             var own = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            var lua = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            bool contentOnly = mod.GetProperty("entryAssembly").ValueKind == JsonValueKind.Null;
             try
             {
                 foreach (var file in mod.GetProperty("files").EnumerateArray())
@@ -60,16 +66,17 @@ public sealed class ActivationSession : IDisposable
                     using var sha = SHA256.Create();
                     string digest = string.Concat(sha.ComputeHash(input).Select(b => b.ToString("x2", CultureInfo.InvariantCulture)));
                     if (digest != file.GetProperty("sha256").GetString()) throw new IOException("File hash mismatch: " + relative);
-                    if (relative.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                    if (contentOnly || relative.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (input.Length > 16 * 1024 * 1024) throw new IOException("Managed assembly exceeds 16 MiB.");
+                        if (!contentOnly && input.Length > 16 * 1024 * 1024) throw new IOException("Managed assembly exceeds 16 MiB.");
                         input.Position = 0;
                         using var bytes = new MemoryStream();
                         input.CopyTo(bytes);
                         byte[] verified = bytes.ToArray();
                         string copiedHash = string.Concat(sha.ComputeHash(verified).Select(b => b.ToString("x2", CultureInfo.InvariantCulture)));
-                        if (copiedHash != digest) throw new IOException("Assembly changed during verification.");
-                        own.Add(Path.GetFileNameWithoutExtension(relative), verified);
+                        if (copiedHash != digest) throw new IOException("Content changed during verification.");
+                        if (contentOnly) lua.Add(relative, verified);
+                        else own.Add(Path.GetFileNameWithoutExtension(relative), verified);
                     }
                 }
                 foreach (var pair in own)
@@ -79,6 +86,7 @@ public sealed class ActivationSession : IDisposable
                         throw new IOException("Conflicting managed assembly identity: " + pair.Key);
                 }
                 foreach (var pair in own) assemblies[pair.Key] = pair.Value;
+                if (contentOnly) content.Add(id, lua);
             }
             catch (Exception error) { errors[id] = Message(error); }
         }
@@ -104,8 +112,17 @@ public sealed class ActivationSession : IDisposable
                 }
                 else if (mod.GetProperty("entryAssembly").ValueKind == JsonValueKind.Null)
                 {
-                    outcome = "failed"; code = "unsupported_content";
-                    message = "Content metadata is supported; this runtime has no verified content activation adapter yet.";
+                    var files = content[id];
+                    if (applyLua == null || files.Keys.Any(path => !IsLuaPath(path)))
+                    {
+                        outcome = "failed"; code = "unsupported_content";
+                        message = "This adapter supports only Lua overlays under LJ/lua. AI and map content are unsupported.";
+                    }
+                    else
+                    {
+                        applyLua(id, files);
+                        successful.Add(id);
+                    }
                 }
                 else
                 {
@@ -146,6 +163,10 @@ public sealed class ActivationSession : IDisposable
         using var checkedReport = Contracts.Read(report, "report");
         return report;
     }
+
+    private static bool IsLuaPath(string path) => path.StartsWith("LJ/lua/", StringComparison.OrdinalIgnoreCase)
+        && path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)
+        && !path.Split('/').Any(part => part.Equals("ai", StringComparison.OrdinalIgnoreCase));
 
     private Assembly? Resolve(object? sender, ResolveEventArgs args)
     {

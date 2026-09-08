@@ -24,6 +24,10 @@ use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 enum Request {
+    Sharing(
+        starframe::sharing::Action,
+        tokio::sync::oneshot::Sender<Result<starframe::sharing::Reply, String>>,
+    ),
     Mod(
         starframe::mods::Action,
         tokio::sync::oneshot::Sender<Result<starframe::mods::View, String>>,
@@ -45,6 +49,26 @@ pub struct GameService {
     writing: Arc<AtomicBool>,
 }
 impl GameService {
+    pub async fn sharing(
+        &self,
+        action: starframe::sharing::Action,
+    ) -> Result<starframe::sharing::Reply, CommandError> {
+        let (reply, result) = tokio::sync::oneshot::channel();
+        self.sender
+            .try_send(Request::Sharing(action, reply))
+            .map_err(|_| {
+                CommandError::new("sharing_busy", "The storage worker is busy. Retry shortly.")
+            })?;
+        result
+            .await
+            .map_err(|_| {
+                CommandError::new(
+                    "sharing_unavailable",
+                    "Collection sharing is unavailable. Restart Starframe.",
+                )
+            })?
+            .map_err(|message| CommandError::new("sharing_failed", &message))
+    }
     pub async fn mods(
         &self,
         action: starframe::mods::Action,
@@ -333,7 +357,10 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
             }
             let now = SystemTime::now();
             if let (Ok(Some(packages)), Some(storage)) = (&mut packages, &mut storage) {
-                match packages.poll(storage) {
+                match packages.poll(storage).and_then(|changed| {
+                    starframe::sharing::poll(storage, packages)
+                        .map(|imports_changed| changed || imports_changed)
+                }) {
                     Ok(true) => core.lock().expect("state lock").saved_data(
                         saved_status(storage)
                             .unwrap_or_else(|message| SavedData::Unavailable { message }),
@@ -516,11 +543,14 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                     activation["deploymentRevision"].as_str()
                         != revision.map(|r| r.to_string()).as_deref()
                 });
-                if differs && view.running != Running::Stopped {
-                    view.launch.details = vec![
-                        "Collection changes are saved. Deployment waits until the game closes."
-                            .into(),
-                    ];
+                if differs
+                    && view.running != Running::Stopped
+                    && let Some(revision) = revision
+                {
+                    view.launch.details = vec![format!(
+                        "Waiting for game to close. Saved collection revision {} will apply after exit.",
+                        revision
+                    )];
                 }
                 if differs
                     && view.running == Running::Stopped
@@ -557,6 +587,22 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                 Err(mpsc::RecvTimeoutError::Timeout) => continue,
                 Err(_) => break,
             };
+            if let Request::Sharing(action, reply) = request {
+                let result = (|| {
+                    if core.lock().expect("state lock").stopped {
+                        return Err("Starframe is closing.".into());
+                    }
+                    let store = storage.as_mut().ok_or("Saved data is unavailable.")?;
+                    let result = starframe::sharing::action(store, action)?;
+                    core.lock().expect("state lock").saved_data(
+                        saved_status(store)
+                            .unwrap_or_else(|message| SavedData::Unavailable { message }),
+                    );
+                    Ok(result)
+                })();
+                let _ = reply.send(result);
+                continue;
+            }
             if let Request::Mod(action, reply) = request {
                 let result = (|| {
                     if core.lock().expect("state lock").stopped {
@@ -682,6 +728,7 @@ pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
                 | Request::Launch
                 | Request::RemoveRuntime
                 | Request::Mod(..)
+                | Request::Sharing(..)
                 | Request::Package(..) => unreachable!(),
                 Request::Discover => {
                     discover(&mut view);

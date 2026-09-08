@@ -40,6 +40,10 @@ fn catalog(artifact: Artifact) -> Catalog {
             description: String::new(),
             unmaintained: false,
             releases: vec![crate::catalog::Release {
+                load_before: vec![],
+                load_after: vec![],
+                prefer_before: vec![],
+                prefer_after: vec![],
                 id: "fixture.core.1".into(),
                 version: "1".into(),
                 withdrawn: false,
@@ -59,6 +63,37 @@ fn extract_fixture(bytes: &[u8]) -> Result<Prepared> {
     fs::write(&archive, bytes).unwrap();
     fs::create_dir(&content).unwrap();
     extract(&archive, &content, &artifact(bytes), &Cancel::default())
+}
+
+#[test]
+fn lua_packages_preserve_cache_paths_and_reject_other_content() {
+    for (path, valid) in [
+        ("LJ/lua/fixture.lua", true),
+        ("LJ/lua/AI/fixture.lua", false),
+        ("Maps/fixture.sanmap", false),
+        ("LJ/lua/Fixture.dll", false),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let bytes = zip(&[(path, b"return 1")]);
+        let mut artifact = artifact(&bytes);
+        artifact.layout = Layout::StarframeLuaZip {};
+        let mut metadata = catalog(artifact.clone());
+        assert!(metadata.validate().is_err());
+        metadata.schema_version = 2;
+        metadata.validate().unwrap();
+        fs::write(root.path().join("download.zip"), bytes).unwrap();
+        fs::create_dir(root.path().join("content")).unwrap();
+        let result = extract(
+            &root.path().join("download.zip"),
+            &root.path().join("content"),
+            &artifact,
+            &Cancel::default(),
+        );
+        assert_eq!(result.is_ok(), valid, "{path}");
+        if valid {
+            assert_eq!(result.unwrap().files[0].path, path);
+        }
+    }
 }
 fn operation(artifact: &Artifact) -> Operation {
     Operation {

@@ -131,6 +131,9 @@ pub struct Packages {
 }
 
 impl Packages {
+    pub(crate) fn can_start(&self, hash: &str) -> bool {
+        self.active.len() < 3 && !self.busy_hash(hash)
+    }
     pub fn busy_hash(&self, hash: &str) -> bool {
         self.active
             .values()
@@ -138,6 +141,7 @@ impl Packages {
     }
     pub fn open(storage: &mut Storage) -> Result<Self> {
         storage.recover_packages().map_err(|e| e.to_string())?;
+        crate::sharing::recover(storage)?;
         Ok(Self {
             client: transfer::client()?,
             active: HashMap::new(),
@@ -261,6 +265,74 @@ impl Packages {
             .map_err(|e| e.to_string())
     }
 
+    pub(crate) fn verify_local(
+        &mut self,
+        storage: &mut Storage,
+        reference: &ModReference,
+    ) -> Result<Operation> {
+        if reference.origin != Origin::LocalImport || !self.can_start(&reference.hash) {
+            return Err("Local verification is unavailable. Retry shortly.".into());
+        }
+        let entry = storage
+            .load()
+            .map_err(|e| e.to_string())?
+            .library
+            .into_iter()
+            .find(|e| &e.reference == reference)
+            .ok_or("The exact local content is missing.")?;
+        let prepared = storage.prepared_artifact(&reference.hash).map_err(|e| e.to_string())?.ok_or("This local content has no verified file manifest. Import the exact build again when local imports are supported.")?;
+        let total_bytes = prepared
+            .files
+            .iter()
+            .map(|f| f.size_bytes)
+            .sum::<u64>()
+            .max(1);
+        let operation = Operation {
+            id: Uuid::new_v4().to_string(),
+            request_id: Uuid::new_v4().to_string(),
+            release_id: "local-verification".into(),
+            hash: reference.hash.clone(),
+            status: Status::Preparing,
+            message: "Verifying matching local content. No download is needed.".into(),
+            received_bytes: 0,
+            total_bytes,
+        };
+        storage
+            .save_package(&operation)
+            .map_err(|e| e.to_string())?;
+        let root = storage.package_root().to_owned();
+        let path = storage
+            .artifact_directory(reference)
+            .map_err(|e| e.to_string())?;
+        let cancel = Cancel::default();
+        let worker_cancel = cancel.clone();
+        let (sender, result) = mpsc::sync_channel(1);
+        tauri::async_runtime::spawn_blocking(move || {
+            let outcome = (|| {
+                verify_existing(
+                    &mut Directory::open(&root)?,
+                    &path,
+                    &prepared,
+                    &worker_cancel,
+                )?;
+                Ok(prepared)
+            })();
+            let _ = sender.send(outcome);
+        });
+        self.active.insert(
+            operation.id.clone(),
+            Active {
+                operation: operation.clone(),
+                entry,
+                cancel,
+                progress: Arc::new(AtomicU64::new(0)),
+                result,
+                ready: None,
+            },
+        );
+        Ok(operation)
+    }
+
     pub fn poll(&mut self, storage: &mut Storage) -> Result<bool> {
         let mut changed = false;
         for id in self.active.keys().cloned().collect::<Vec<_>>() {
@@ -276,6 +348,18 @@ impl Packages {
             // Completion is committed here, so cancellation can still win after extraction.
             let outcome = active.ready.as_ref().unwrap().clone().and_then(|prepared| {
                 active.cancel.check()?;
+                if active.entry.reference.origin == Origin::LocalImport {
+                    if !storage
+                        .load()
+                        .map_err(|e| e.to_string())?
+                        .library
+                        .iter()
+                        .any(|e| e.reference == active.entry.reference)
+                    {
+                        return Err("The local reference changed during verification.".into());
+                    }
+                    return Ok(prepared);
+                }
                 let catalog = storage
                     .catalog_cache()
                     .map_err(|e| e.to_string())?
@@ -291,9 +375,11 @@ impl Packages {
                     active.operation.status = Status::Completed;
                     active.operation.received_bytes = active.operation.total_bytes;
                     active.operation.message = "Verified package saved in the library.".into();
-                    if let Err(error) =
+                    if let Err(error) = if active.entry.reference.origin == Origin::LocalImport {
+                        storage.save_package(&active.operation)
+                    } else {
                         storage.complete_package(&active.operation, &active.entry, &prepared)
-                    {
+                    } {
                         active.operation.status = Status::Failed;
                         active.operation.message = format!(
                             "Could not save the prepared package: {error}. Retry the release; verified content was retained."
@@ -630,11 +716,20 @@ async fn prepare(
 }
 
 fn layout(files: &[PreparedFile], layout: &Layout) -> Result<()> {
+    if matches!(layout, Layout::StarframeLuaZip {}) {
+        if files.is_empty() || files.iter().any(|f| !lua_path(&f.path)) {
+            return Err("Lua overlays require only .lua files under LJ/lua; AI and map content are unsupported.".into());
+        }
+        return Ok(());
+    }
     let Layout::StarframeManagedZip {
         root,
         entry_assembly,
         ..
-    } = layout;
+    } = layout
+    else {
+        unreachable!()
+    };
     let entry = if root.is_empty() {
         entry_assembly.clone()
     } else {
@@ -649,6 +744,14 @@ fn layout(files: &[PreparedFile], layout: &Layout) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+pub(crate) fn lua_path(path: &str) -> bool {
+    let path = path.to_ascii_lowercase();
+    path.starts_with("lj/lua/")
+        && path.ends_with(".lua")
+        && !path.split('/').any(|part| part == "ai")
+        && crate::runtime_contract::relative_path(&path).is_ok()
 }
 
 fn extract(

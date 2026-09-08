@@ -84,6 +84,8 @@ fn main() {
             commands::open_external,
             commands::game_action,
             commands::package_action,
+            commands::sharing_action,
+            commands::save_collection_file,
             commands::mod_action
         ])
         .run(context)

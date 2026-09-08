@@ -59,7 +59,7 @@ fn schema_rejects_ambiguous_identities_hashes_layouts_and_dependencies() {
     let good = fixture();
     assert!(read(&good).is_ok());
     for (pointer, value) in [
-        ("/schemaVersion", json!(2)),
+        ("/schemaVersion", json!(3)),
         ("/catalogRevision", json!(1)),
         ("/catalogRevision", json!("01")),
         ("/catalogRevision", json!("0")),

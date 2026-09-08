@@ -8,6 +8,8 @@ fn main() {
             "game_action",
             "package_action",
             "mod_action",
+            "sharing_action",
+            "save_collection_file",
         ]),
     ))
     .expect("Tauri build configuration");

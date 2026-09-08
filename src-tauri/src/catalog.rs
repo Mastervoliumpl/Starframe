@@ -42,6 +42,14 @@ pub struct Release {
     pub compatibility_problems: Vec<CompatibilityProblem>,
     pub artifact: Artifact,
     pub requires: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub load_before: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub load_after: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub prefer_before: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub prefer_after: Vec<String>,
     pub tested_game_builds: Vec<String>,
 }
 
@@ -65,6 +73,7 @@ pub struct Artifact {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Layout {
+    StarframeLuaZip {},
     #[serde(rename_all = "camelCase")]
     StarframeManagedZip {
         root: String,
@@ -140,7 +149,10 @@ impl Catalog {
     }
 
     pub fn validate(&self) -> Result<()> {
-        ensure(self.schema_version == 1, "unsupported schema version")?;
+        ensure(
+            matches!(self.schema_version, 1 | 2),
+            "unsupported schema version",
+        )?;
         self.revision()?;
         ensure(self.mods.len() <= 1024, "too many mods")?;
         let mut mods = HashSet::new();
@@ -195,31 +207,35 @@ impl Catalog {
                     (1..=2_147_483_648).contains(&r.artifact.size_bytes),
                     "artifact size must be 1 byte to 2 GiB",
                 )?;
-                let Layout::StarframeManagedZip {
+                if let Layout::StarframeManagedZip {
                     root,
                     entry_assembly,
                     entry_type,
-                } = &r.artifact.layout;
-                if !root.is_empty() {
-                    crate::runtime_contract::relative_path(root)?;
+                } = &r.artifact.layout
+                {
+                    if !root.is_empty() {
+                        crate::runtime_contract::relative_path(root)?;
+                    }
+                    crate::runtime_contract::relative_path(entry_assembly)?;
+                    ensure(
+                        entry_assembly.ends_with(".dll"),
+                        "managed entry must be a DLL",
+                    )?;
+                    text(entry_type, 256)?;
+                    ensure(
+                        entry_type.split('.').all(|part| {
+                            !part.is_empty()
+                                && part.bytes().enumerate().all(|(i, c)| {
+                                    c.is_ascii_alphabetic()
+                                        || c == b'_'
+                                        || (i > 0 && c.is_ascii_digit())
+                                })
+                        }),
+                        "invalid managed entry type",
+                    )?;
+                } else {
+                    ensure(self.schema_version == 2, "Lua packages require schema 2")?;
                 }
-                crate::runtime_contract::relative_path(entry_assembly)?;
-                ensure(
-                    entry_assembly.ends_with(".dll"),
-                    "managed entry must be a DLL",
-                )?;
-                text(entry_type, 256)?;
-                ensure(
-                    entry_type.split('.').all(|part| {
-                        !part.is_empty()
-                            && part.bytes().enumerate().all(|(i, c)| {
-                                c.is_ascii_alphabetic()
-                                    || c == b'_'
-                                    || (i > 0 && c.is_ascii_digit())
-                            })
-                    }),
-                    "invalid managed entry type",
-                )?;
                 ensure(
                     r.requires.len() <= 64 && r.tested_game_builds.len() <= 64,
                     "too many dependencies or game builds",
@@ -233,6 +249,26 @@ impl Catalog {
                     )?;
                 }
                 let mut builds = HashSet::new();
+                for targets in [
+                    &r.load_before,
+                    &r.load_after,
+                    &r.prefer_before,
+                    &r.prefer_after,
+                ] {
+                    ensure(targets.len() <= 64, "too many ordering constraints")?;
+                    ensure(
+                        targets.is_empty() || self.schema_version == 2,
+                        "ordering constraints require schema 2",
+                    )?;
+                    let mut seen = HashSet::new();
+                    for target in targets {
+                        id(target)?;
+                        ensure(
+                            target != &m.id && seen.insert(target),
+                            "duplicate or self ordering constraint",
+                        )?;
+                    }
+                }
                 for build in &r.tested_game_builds {
                     text(build, 128)?;
                     ensure(builds.insert(build), "duplicate tested build")?;
@@ -294,7 +330,11 @@ impl Catalog {
                     && r.artifact.sha256 == old.artifact.sha256
                     && r.artifact.size_bytes == old.artifact.size_bytes
                     && r.artifact.layout == old.artifact.layout
-                    && r.requires == old.requires,
+                    && r.requires == old.requires
+                    && r.load_before == old.load_before
+                    && r.load_after == old.load_after
+                    && r.prefer_before == old.prefer_before
+                    && r.prefer_after == old.prefer_after,
                 "existing release identity changed; use a new release ID",
             )?;
             ensure(

@@ -23,6 +23,27 @@ type Result<T> = std::result::Result<T, String>;
 pub enum Action {
     List,
     RetryCleanup,
+    CreateCollection {
+        name: String,
+        expected_revision: String,
+    },
+    RenameCollection {
+        id: String,
+        name: String,
+        expected_revision: String,
+    },
+    DeleteCollection {
+        id: String,
+        expected_revision: String,
+    },
+    SelectCollection {
+        id: String,
+        expected_revision: String,
+    },
+    Reorder {
+        mod_ids: Vec<String>,
+        expected_revision: String,
+    },
     SetEnabled {
         mod_id: String,
         hash: String,
@@ -44,8 +65,21 @@ pub struct View {
     pub revision: String,
     pub library: Vec<LibraryEntry>,
     pub enabled: Vec<ModReference>,
+    pub order: Option<crate::ordering::Resolution>,
+    pub order_error: Option<String>,
+    pub collisions: Vec<Collision>,
     pub collections: Vec<crate::storage::Collection>,
+    pub active_collection: Option<String>,
     pub cleanup_errors: Vec<String>,
+    pub imports: Vec<crate::sharing::Import>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Collision {
+    pub path: String,
+    pub mods: Vec<String>,
+    pub winner: String,
 }
 
 pub fn view(store: &Storage) -> Result<View> {
@@ -55,15 +89,76 @@ pub fn view(store: &Storage) -> Result<View> {
         .iter()
         .find(|c| Some(&c.id) == records.active_collection.as_ref())
         .map_or(vec![], |c| c.entries.clone());
+    let catalog = store
+        .catalog_cache()
+        .map_err(|e| e.to_string())?
+        .and_then(|c| c.catalog);
+    let order = if let Some(error) = crate::sharing::active_error(store, &records)? {
+        Err(error)
+    } else if let Some(missing) = enabled
+        .iter()
+        .find(|r| !records.library.iter().any(|e| &e.reference == *r))
+    {
+        Err(format!(
+            "{} is unavailable in the library. Prepare its exact package from Catalog to use this collection.",
+            missing.mod_id
+        ))
+    } else if enabled.is_empty() {
+        Ok(crate::ordering::Resolution {
+            effective: vec![],
+            adjustments: vec![],
+        })
+    } else {
+        catalog
+            .as_ref()
+            .ok_or_else(|| "Catalog metadata is unavailable.".to_string())
+            .and_then(|catalog| crate::ordering::resolve(catalog, &enabled))
+    };
+    let (order, order_error) = match order {
+        Ok(order) => (Some(order), None),
+        Err(error) => (None, Some(error)),
+    };
+    let mut overlays = std::collections::BTreeMap::<String, Vec<String>>::new();
+    if let (Some(order), Some(catalog)) = (&order, &catalog) {
+        for reference in &order.effective {
+            if matches!(
+                release(catalog, reference)?.artifact.layout,
+                Layout::StarframeLuaZip {}
+            ) {
+                let prepared = store
+                    .prepared_artifact(&reference.hash)
+                    .map_err(|e| e.to_string())?
+                    .ok_or("Prepared Lua inventory is missing. Prepare the exact package again.")?;
+                for file in prepared.files {
+                    overlays
+                        .entry(file.path.to_ascii_lowercase())
+                        .or_default()
+                        .push(reference.mod_id.clone());
+                }
+            }
+        }
+    }
+    let collisions = overlays
+        .into_iter()
+        .filter_map(|(path, mods)| {
+            (mods.len() > 1).then(|| Collision {
+                path,
+                winner: mods.last().unwrap().clone(),
+                mods,
+            })
+        })
+        .collect();
     Ok(View {
-        catalog: store
-            .catalog_cache()
-            .map_err(|e| e.to_string())?
-            .and_then(|c| c.catalog),
+        imports: store.collection_imports().map_err(|e| e.to_string())?,
+        catalog,
+        order,
+        order_error,
+        collisions,
         revision: records.revision.to_string(),
         library: records.library,
         enabled,
         collections: records.collections,
+        active_collection: records.active_collection,
         cleanup_errors: store
             .pending_removals()
             .map_err(|e| e.to_string())?
@@ -77,6 +172,86 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
     match action {
         Action::List => (),
         Action::RetryCleanup => cleanup(store)?,
+        Action::CreateCollection {
+            name,
+            expected_revision,
+        } => {
+            current_records(store, &expected_revision)?;
+            store
+                .save_collection(&uuid::Uuid::new_v4().to_string(), name.trim(), &[], 0)
+                .map_err(|e| e.to_string())?;
+        }
+        Action::RenameCollection {
+            id,
+            name,
+            expected_revision,
+        } => {
+            let records = current_records(store, &expected_revision)?;
+            let collection = records
+                .collections
+                .iter()
+                .find(|c| c.id == id)
+                .ok_or("This collection no longer exists.")?;
+            store
+                .save_collection(&id, name.trim(), &collection.entries, collection.revision)
+                .map_err(|e| e.to_string())?;
+        }
+        Action::DeleteCollection {
+            id,
+            expected_revision,
+        } => {
+            store
+                .delete_collection(&id, revision(&expected_revision)?)
+                .map_err(|e| e.to_string())?;
+        }
+        Action::SelectCollection {
+            id,
+            expected_revision,
+        } => {
+            let records = current_records(store, &expected_revision)?;
+            if !records.collections.iter().any(|c| c.id == id) {
+                return Err("This collection no longer exists.".into());
+            }
+            store
+                .set_active_collection(Some(&id), records.revision)
+                .map_err(|e| e.to_string())?;
+        }
+        Action::Reorder {
+            mod_ids,
+            expected_revision,
+        } => {
+            let expected = revision(&expected_revision)?;
+            let records = store.load().map_err(|e| e.to_string())?;
+            if records.revision != expected {
+                return Err("The library changed. Retry with its current revision.".into());
+            }
+            let entries = records
+                .collections
+                .iter()
+                .find(|c| Some(&c.id) == records.active_collection.as_ref())
+                .map_or(&[][..], |c| c.entries.as_slice());
+            if mod_ids.len() != entries.len()
+                || mod_ids.iter().collect::<BTreeSet<_>>().len() != entries.len()
+            {
+                return Err("Reordering must include each enabled mod exactly once.".into());
+            }
+            let reordered = mod_ids
+                .iter()
+                .map(|id| {
+                    entries
+                        .iter()
+                        .find(|r| &r.mod_id == id)
+                        .cloned()
+                        .ok_or_else(|| {
+                            "Reordering cannot change collection membership.".to_string()
+                        })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            crate::ordering::resolve(&catalog(store)?, &reordered)?;
+            store
+                .set_mod_membership(&reordered, expected)
+                .map_err(|e| e.to_string())?;
+        }
         Action::SetEnabled {
             mod_id,
             hash,
@@ -109,6 +284,9 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
                     &mut BTreeSet::new(),
                 )?;
                 for reference in needed {
+                    if entries.contains(&reference) {
+                        continue;
+                    }
                     entries.retain(|r| r.mod_id != reference.mod_id);
                     entries.push(reference);
                 }
@@ -157,6 +335,14 @@ fn revision(value: &str) -> Result<i64> {
         return Err("Invalid library revision.".into());
     }
     Ok(parsed)
+}
+
+fn current_records(store: &Storage, expected: &str) -> Result<Records> {
+    let records = store.load().map_err(|e| e.to_string())?;
+    if records.revision != revision(expected)? {
+        return Err("The library changed. Retry with its current revision.".into());
+    }
+    Ok(records)
 }
 
 fn catalog(store: &Storage) -> Result<Catalog> {
@@ -219,6 +405,9 @@ fn dependency_entries(
 
 pub fn requested(store: &Storage) -> Result<Value> {
     let records = store.load().map_err(|e| e.to_string())?;
+    if let Some(error) = crate::sharing::active_error(store, &records)? {
+        return Err(error);
+    }
     let entries = records
         .collections
         .iter()
@@ -233,7 +422,6 @@ pub fn requested(store: &Storage) -> Result<Value> {
         );
     }
     let catalog = catalog(store)?;
-    let mut ordered = Vec::new();
     for reference in entries {
         if !records.library.iter().any(|e| &e.reference == reference) {
             return Err(format!(
@@ -241,17 +429,8 @@ pub fn requested(store: &Storage) -> Result<Value> {
                 reference.mod_id
             ));
         }
-        dependency_entries(
-            &catalog,
-            &records,
-            reference,
-            &mut ordered,
-            &mut BTreeSet::new(),
-        )?;
     }
-    if ordered.iter().any(|r| !entries.contains(r)) {
-        return Err("An enabled mod requires a disabled dependency. Enable the dependency or disable the dependent mod.".into());
-    }
+    let ordered = crate::ordering::resolve(&catalog, entries)?.effective;
     let mut mods = Vec::new();
     for reference in &ordered {
         let release = release(&catalog, reference)?;
@@ -259,11 +438,21 @@ pub fn requested(store: &Storage) -> Result<Value> {
             .prepared_artifact(&reference.hash)
             .map_err(|e| e.to_string())?
             .ok_or("Prepared package inventory is missing.")?;
-        let Layout::StarframeManagedZip {
-            root,
-            entry_assembly,
-            entry_type,
-        } = &release.artifact.layout;
+        let (entry_path, entry_type) = match &release.artifact.layout {
+            Layout::StarframeManagedZip {
+                root,
+                entry_assembly,
+                entry_type,
+            } => (
+                Some(if root.is_empty() {
+                    entry_assembly.clone()
+                } else {
+                    format!("{root}/{entry_assembly}")
+                }),
+                Some(entry_type),
+            ),
+            Layout::StarframeLuaZip {} => (None, None),
+        };
         let requires: Vec<_> = release
             .requires
             .iter()
@@ -275,11 +464,6 @@ pub fn requested(store: &Storage) -> Result<Value> {
                     .ok_or("Required release metadata is missing.")
             })
             .collect::<std::result::Result<_, _>>()?;
-        let entry_path = if root.is_empty() {
-            entry_assembly.clone()
-        } else {
-            format!("{root}/{entry_assembly}")
-        };
         mods.push(json!({"modId": reference.mod_id, "source": {"kind":"catalog", "releaseId": release.id}, "root": format!("mods/{}", reference.hash), "entryAssembly": entry_path, "entryType": entry_type, "requires":requires, "files":prepared.files.iter().map(|f| json!({"path":f.path,"sha256":f.sha256})).collect::<Vec<_>>() }));
     }
     let value = json!({"schemaVersion":2, "runtimeContractVersion":1, "integrationId":"starframe.bepinex", "deploymentRevision":records.revision.to_string(), "installedMods":inventory(&records, entries),"mods":mods});

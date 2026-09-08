@@ -3,6 +3,8 @@ import type {
   ManagementTransport,
   ModView,
   PackageOperation,
+  Reference,
+  SharingReply,
 } from '../lib/management';
 export function fixtureManagement(
   changed: (data: ModView) => void,
@@ -58,7 +60,9 @@ export function fixtureManagement(
       }))
     : [];
   const data: ModView = {
+    imports: [],
     revision: '0',
+    activeCollection: null,
     catalog: { schemaVersion: 1, catalogRevision: '1', mods },
     library: mods.slice(0, 3).map((m) => ({
       name: m.name,
@@ -72,16 +76,224 @@ export function fixtureManagement(
       },
     })),
     enabled: [],
+    order: { effective: [], adjustments: [] },
+    orderError: null,
+    collisions: [],
     collections: [],
     cleanupErrors: [],
   };
   const operations: PackageOperation[] = [];
   const commit = () => {
+    const active = data.collections.find((c) => c.id === data.activeCollection);
+    if (active) active.entries = [...data.enabled];
+    data.order = { effective: [...data.enabled], adjustments: [] };
     data.revision = String(BigInt(data.revision) + 1n);
     changed(data);
   };
   return {
+    async saveCollection(text) {
+      const url = URL.createObjectURL(
+        new Blob([text], { type: 'application/json' }),
+      );
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'collection.starframe-collection.json';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return true;
+    },
+    async sharing(action) {
+      const collection =
+        'id' in action
+          ? data.collections.find((c) => c.id === action.id)
+          : null;
+      const document: {
+        format: string;
+        schemaVersion: number;
+        name: string;
+        entries: Reference[];
+      } = collection
+        ? {
+            format: 'starframe-collection',
+            schemaVersion: 1,
+            name: collection.name,
+            entries: collection.entries,
+          }
+        : JSON.parse('text' in action ? action.text : '{}');
+      if (
+        document.format !== 'starframe-collection' ||
+        document.schemaVersion !== 1
+      )
+        throw new Error('Unsupported collection format or version.');
+      if (
+        Object.keys(document).some(
+          (key) =>
+            !['format', 'schemaVersion', 'name', 'entries'].includes(key),
+        )
+      )
+        throw new Error('Invalid collection file: unknown field.');
+      if (
+        !document.name?.trim() ||
+        !Array.isArray(document.entries) ||
+        document.entries.length > 256
+      )
+        throw new Error('Invalid collection name or entries.');
+      const reply: SharingReply = {
+        text: null,
+        name: document.name,
+        collectionId: null,
+        orderError: null,
+        entries: document.entries.map((reference) => {
+          if (
+            Object.keys(reference).some(
+              (key) => !['modId', 'hash', 'origin', 'releaseId'].includes(key),
+            )
+          )
+            throw new Error('Invalid collection reference: unknown field.');
+          const release = mods
+            .find((m) => m.id === reference.modId)
+            ?.releases.find(
+              (r) =>
+                r.id === reference.releaseId &&
+                r.artifact.sha256 === reference.hash,
+            );
+          const local = data.library.some(
+            (e) => JSON.stringify(e.reference) === JSON.stringify(reference),
+          );
+          const available =
+            reference.origin === 'local_import'
+              ? local
+              : release && !release.withdrawn;
+          return {
+            reference,
+            status: available ? 'pending' : 'unresolved',
+            message: !available
+              ? 'Exact release unavailable or withdrawn. No substitute was selected.'
+              : local
+                ? 'Already downloaded; verify local files before reuse.'
+                : 'Download and verify this exact approved release.',
+            operationId: null,
+          };
+        }),
+      };
+      if (action.kind === 'export')
+        return { ...reply, text: JSON.stringify(document, null, 2) };
+      if (action.kind === 'review') return reply;
+      const id = action.kind === 'accept' ? action.requestId : action.id;
+      if (!data.collections.some((c) => c.id === id))
+        data.collections.push({
+          id,
+          name: document.name,
+          entries: document.entries,
+          revision: 1,
+        });
+      const imported = { collectionId: id, entries: reply.entries };
+      data.imports = [
+        ...data.imports.filter((i) => i.collectionId !== id),
+        imported,
+      ];
+      commit();
+      for (const entry of imported.entries) {
+        if (entry.status !== 'pending') continue;
+        entry.status = 'preparing';
+        if (
+          data.library.some(
+            (e) =>
+              e.reference.modId === entry.reference.modId &&
+              e.reference.hash === entry.reference.hash,
+          )
+        ) {
+          setTimeout(() => {
+            entry.status = 'ready';
+            entry.message = 'Exact package verified and available.';
+            commit();
+          }, 600);
+        } else {
+          await this.packages({
+            kind: 'prepare',
+            requestId: crypto.randomUUID(),
+            releaseId: entry.reference.releaseId!,
+          });
+          const operation = operations.find(
+            (o) => o.releaseId === entry.reference.releaseId,
+          )!;
+          entry.operationId = operation.id;
+          const timer = setInterval(() => {
+            if (
+              operation.status === 'preparing' ||
+              operation.status === 'cancelling'
+            )
+              return;
+            entry.status =
+              operation.status === 'completed' ? 'ready' : 'unresolved';
+            entry.message = operation.message;
+            clearInterval(timer);
+            commit();
+          }, 100);
+        }
+      }
+      return { ...reply, collectionId: id };
+    },
     async mods(action) {
+      if (
+        'expectedRevision' in action &&
+        action.expectedRevision !== data.revision
+      )
+        throw new Error(
+          'The library changed. Retry with its current revision.',
+        );
+      if (action.kind === 'create_collection') {
+        data.collections.push({
+          id: crypto.randomUUID(),
+          name: action.name.trim(),
+          revision: 1,
+          entries: [],
+        });
+        commit();
+      }
+      if (
+        action.kind === 'rename_collection' ||
+        action.kind === 'delete_collection' ||
+        action.kind === 'select_collection'
+      ) {
+        const selected = data.collections.find((c) => c.id === action.id);
+        if (!selected) throw new Error('This collection no longer exists.');
+        if (action.kind === 'rename_collection') {
+          selected.name = action.name.trim();
+          selected.revision++;
+        }
+        if (action.kind === 'select_collection') {
+          data.activeCollection = selected.id;
+          data.enabled = [...selected.entries];
+        }
+        if (action.kind === 'delete_collection') {
+          data.collections = data.collections.filter(
+            (c) => c.id !== selected.id,
+          );
+          if (data.activeCollection === selected.id) {
+            data.activeCollection = null;
+            data.enabled = [];
+          }
+        }
+        commit();
+      }
+      if (action.kind === 'reorder') {
+        if (action.expectedRevision !== data.revision)
+          throw new Error(
+            'The collection changed. Retry with its current revision.',
+          );
+        if (
+          action.modIds.length !== data.enabled.length ||
+          new Set(action.modIds).size !== data.enabled.length
+        )
+          throw new Error('Include each enabled mod once.');
+        data.enabled = action.modIds.map((id) => {
+          const reference = data.enabled.find((r) => r.modId === id);
+          if (!reference) throw new Error('Unknown enabled mod.');
+          return reference;
+        });
+        commit();
+      }
       if (action.kind === 'set_enabled' || action.kind === 'uninstall') {
         if (action.expectedRevision !== data.revision)
           throw new Error(
@@ -98,14 +310,15 @@ export function fixtureManagement(
           data.enabled.push(entry.reference);
         if (action.kind === 'uninstall')
           data.library = data.library.filter((e) => e !== entry);
-        data.collections = [
-          {
-            id: 'default',
+        if (!data.activeCollection) {
+          data.activeCollection = crypto.randomUUID();
+          data.collections.push({
+            id: data.activeCollection,
             name: 'Default',
             revision: 1,
             entries: [...data.enabled],
-          },
-        ];
+          });
+        }
         commit();
       }
       return structuredClone(data);

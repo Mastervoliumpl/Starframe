@@ -4,13 +4,13 @@
 
 After a maintainer merges catalog changes to `main`, clients read [the catalog endpoint](https://raw.githubusercontent.com/Mastervoliumpl/Starframe/main/catalog/releases.json). GitHub/CDN caching can delay visibility. Catalog edits increase `catalogRevision` without changing VERSION or publishing an app release. Mod archives stay at author-controlled download locations.
 
-## Schema 1
+## Schemas 1 and 2
 
 The Rust [catalog validator](../src-tauri/src/catalog.rs) defines the accepted schema. It rejects unknown or duplicate JSON fields, missing fields, unsupported layouts and documents over 2 MiB.
 
 | Field | Contract |
 | --- | --- |
-| `schemaVersion` | Integer `1`. A different format needs explicit app support. |
+| `schemaVersion` | Integer `1` or `2`. Schema 2 adds ordering constraints and Lua overlays. Older clients retain their last supported catalog. |
 | `catalogRevision` | Positive unsigned 64-bit integer encoded as a decimal string without leading zeros. Increase it whenever metadata changes. |
 | `mods` | At most 1,024 mod records and 4,096 releases in total. |
 | Mod `id` | Stable ID, 1–128 lowercase ASCII letters, digits, dots, underscores or hyphens. Start with a letter or digit. |
@@ -25,10 +25,16 @@ The Rust [catalog validator](../src-tauri/src/catalog.rs) defines the accepted s
 | Release `compatibilityProblems` | Optional list of up to 64 findings with exact `gameBuild`, `note` (up to 2,000 bytes) and HTTPS `sourceUrl` evidence. A build cannot also appear in `testedGameBuilds`. Warnings allow enable/launch. |
 | Release `artifact` | Exact `url`, lowercase SHA-256 `sha256`, integer `sizeBytes` (1 byte–2 GiB), and `layout`. The hash identifies the reviewed archive bytes. |
 | Release `requires` | Up to 64 exact release IDs. References must exist. Reject duplicates, self dependencies, cycles and multiple direct requirements for the same mod. |
+| Release `loadBefore`, `loadAfter` | Schema 2 optional arrays of up to 64 distinct other mod IDs each. Mandatory ordering applies when the target mod is enabled; these fields do not install or enable it. Combined cycles block deployment with the involved IDs. |
+| Release `preferBefore`, `preferAfter` | Schema 2 optional arrays with the same bounds. These are warnings when the effective order differs. User priority and mandatory constraints take precedence; absent targets and optional cycles never block deployment. |
 | Release `testedGameBuilds` | Up to 64 distinct observed build labels, each at most 128 bytes. An empty list means no recorded test evidence. These labels do not impose enable/launch restrictions. |
-| Layout `kind` | Only `starframe_managed_zip` is accepted initially. Content overlays and conventional BepInEx plugins need separately verified package support. |
+| Layout `kind` | `starframe_managed_zip`, or schema 2 `starframe_lua_zip`. Conventional BepInEx plugins and maps are unsupported. |
 | Layout `root` | Relative archive folder, or an empty string for the archive root. |
 | Layout `entryAssembly`, `entryType` | Relative `.dll` path within that root and a dotted managed type name implementing the supported runtime lifecycle. |
+
+`starframe_lua_zip` has no extra layout fields. Its archive contains only `.lua` files under `LJ/lua/`; every file retains that path in the managed payload. The runtime serves verified bytes through the game's cache after cache construction. Target directories must already exist in the game. Paths containing an `ai` component, map content, binaries and other file types are rejected. Managed DLL companion files are not automatically overlaid. Later effective order wins a case-insensitive path collision; Collections lists the participants and expected winner. See [ordering verification](../docs/verification/ordering.md) for the tested game build and remaining limits.
+
+Ordering arrays default to empty for older caches. Changing ordering metadata on an existing release requires a new release ID, like changing its required dependencies. The published development catalog remains empty at schema 1 until a schema 2 release is approved.
 
 Paths reuse the runtime's Windows alias/device/path checks. Artifact URLs have the same HTTPS and length rules as source URLs. This issue validates declarations only; archive inspection, hash verification and extraction belong to #17. Catalog validation never loads DLLs or runs installation scripts.
 

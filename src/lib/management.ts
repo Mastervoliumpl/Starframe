@@ -29,12 +29,14 @@ export type Release = {
     url: string;
     sha256: string;
     sizeBytes: number;
-    layout: {
-      kind: 'starframe_managed_zip';
-      root: string;
-      entryAssembly: string;
-      entryType: string;
-    };
+    layout:
+      | { kind: 'starframe_lua_zip' }
+      | {
+          kind: 'starframe_managed_zip';
+          root: string;
+          entryAssembly: string;
+          entryType: string;
+        };
   };
 };
 export type CatalogMod = {
@@ -47,7 +49,9 @@ export type CatalogMod = {
   releases: Release[];
 };
 export type ModView = {
+  imports: { collectionId: string; entries: ImportEntry[] }[];
   revision: string;
+  activeCollection: string | null;
   catalog: {
     schemaVersion: number;
     catalogRevision: string;
@@ -55,6 +59,12 @@ export type ModView = {
   } | null;
   library: LibraryEntry[];
   enabled: Reference[];
+  order: {
+    effective: Reference[];
+    adjustments: { before: string; after: string; message: string }[];
+  } | null;
+  orderError: string | null;
+  collisions: { path: string; mods: string[]; winner: string }[];
   collections: {
     id: string;
     name: string;
@@ -75,6 +85,19 @@ export type PackageOperation = {
 };
 export type ModAction =
   | { kind: 'list' | 'retry_cleanup' }
+  | { kind: 'create_collection'; name: string; expectedRevision: string }
+  | {
+      kind: 'rename_collection';
+      id: string;
+      name: string;
+      expectedRevision: string;
+    }
+  | {
+      kind: 'delete_collection' | 'select_collection';
+      id: string;
+      expectedRevision: string;
+    }
+  | { kind: 'reorder'; modIds: string[]; expectedRevision: string }
   | {
       kind: 'set_enabled';
       modId: string;
@@ -93,7 +116,35 @@ export type PackageAction =
   | { kind: 'list' }
   | { kind: 'prepare'; requestId: string; releaseId: string }
   | { kind: 'cancel'; operationId: string };
+export type CollectionEdit =
+  | { kind: 'create_collection'; name: string }
+  | { kind: 'rename_collection'; id: string; name: string }
+  | { kind: 'delete_collection' | 'select_collection'; id: string };
+export type ImportEntry = {
+  reference: Reference;
+  status: 'pending' | 'preparing' | 'ready' | 'unresolved';
+  message: string;
+  operationId: string | null;
+};
+export type SharingAction =
+  | { kind: 'review'; text: string }
+  | {
+      kind: 'accept';
+      text: string;
+      requestId: string;
+      expectedRevision: string;
+    }
+  | { kind: 'retry' | 'export'; id: string };
+export type SharingReply = {
+  text: string | null;
+  name: string;
+  entries: ImportEntry[];
+  collectionId: string | null;
+  orderError: string | null;
+};
 export interface ManagementTransport {
+  saveCollection(text: string): Promise<boolean>;
+  sharing(action: SharingAction): Promise<SharingReply>;
   mods(action: ModAction): Promise<ModView>;
   packages(action: PackageAction): Promise<PackageOperation[]>;
 }
@@ -181,6 +232,45 @@ export function createManagement(transport: ManagementTransport | null) {
     },
     refresh,
     dismissError: () => update({ error: '' }),
+    async saveCollection(text: string) {
+      let saved = false;
+      await run('sharing', async () => {
+        saved = await transport!.saveCollection(text);
+      });
+      return saved;
+    },
+    async sharing(action: SharingAction) {
+      let reply: SharingReply | null = null;
+      await run('sharing', async () => {
+        reply = await confirmed(transport!.sharing(action));
+      });
+      return reply as SharingReply | null;
+    },
+    collection(action: CollectionEdit, expectedRevision?: string) {
+      return run('membership', async () => {
+        if (!view.data) throw new Error('Collection data is unavailable.');
+        const data = await confirmed(
+          transport!.mods({
+            ...action,
+            expectedRevision: expectedRevision ?? view.data.revision,
+          }),
+        );
+        if (!stopped) update({ data });
+      });
+    },
+    reorder(modIds: string[]) {
+      return run('membership', async () => {
+        if (!view.data) return;
+        const data = await confirmed(
+          transport!.mods({
+            kind: 'reorder',
+            modIds,
+            expectedRevision: view.data.revision,
+          }),
+        );
+        if (!stopped) update({ data });
+      });
+    },
     async membership(entries: LibraryEntry[], enabled: boolean) {
       if (view.pending.includes('membership')) return false;
       return run('membership', async () => {
