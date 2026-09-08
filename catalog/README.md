@@ -1,6 +1,6 @@
 # Curated release catalog
 
-`releases.json` contains metadata only. Revision 2 approves Remmy's Ladder Reporter 0.3.0 as the first catalog mod. It requires the BepInEx plugin support added in Starframe 0.5.0. See the [release review](../docs/verification/ladder-reporter-catalog.md). Test releases use `example.invalid` and exist only in automated tests.
+`releases.json` contains metadata only. Revision 3 adds Remmy's Sanctuary HUD, Build Hotkeys, Camera Utilities, Eco Manager, Replay Manager and Idle Engineers alongside Ladder Reporter. These mods require the BepInEx plugin support added in Starframe 0.5.0. See the [six-release review and HUD voice-pack limitation](../docs/verification/remmy-catalog.md) and the earlier [Ladder Reporter review](../docs/verification/ladder-reporter-catalog.md). Test releases use `example.invalid` and exist only in automated tests.
 
 After a maintainer merges catalog changes to `main`, clients read [the catalog endpoint](https://raw.githubusercontent.com/Mastervoliumpl/Starframe/main/catalog/releases.json). GitHub/CDN caching can delay visibility. Catalog edits increase `catalogRevision` without changing VERSION or publishing an app release. Mod archives stay at author-controlled download locations.
 
@@ -34,7 +34,7 @@ The Rust [catalog validator](../src-tauri/src/catalog.rs) defines the accepted s
 
 `starframe_lua_zip` has no extra layout fields. Its archive contains only `.lua` files under `LJ/lua/`; every file retains that path in the managed payload. The runtime serves verified bytes through the game's cache after cache construction. Target directories must already exist in the game. Paths containing an `ai` component, map content, binaries and other file types are rejected. Managed DLL companion files are not automatically overlaid. Later effective order wins a case-insensitive path collision; Collections lists the participants and expected winner. See [ordering verification](../docs/verification/ordering.md) for the tested game build and remaining limits.
 
-Ordering arrays default to empty for older caches. Changing ordering metadata on an existing release requires a new release ID, like changing its required dependencies. Revision 2 uses schema 1 because Ladder Reporter does not require schema 2 fields.
+Ordering arrays default to empty for older caches. Changing ordering metadata on an existing release requires a new release ID, like changing its required dependencies. Revision 3 uses schema 1 because the approved releases do not require schema 2 fields.
 
 Managed archives retain all files. `root` locates the entry assembly; it does not filter the archive. Approve the author's mod-only archive when a standalone bundle includes BepInEx or another loader. Those bundled assemblies can conflict with Starframe's runtime even inside private package storage. Catalog metadata supplies the import identity, so authors do not need to include `starframe.local.json`. See [BepInEx plugin support and limits](../docs/bepinex-mods.md).
 

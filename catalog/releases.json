@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogRevision": "2",
+  "catalogRevision": "3",
   "mods": [
     {
       "id": "com.sanctuarydb.ladderreporter",
@@ -24,6 +24,168 @@
               "root": "SanctuaryMods/LadderReporter",
               "entryAssembly": "LadderReporter.dll",
               "entryType": "SanctuaryHud.LadderReporterPlugin"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "com.sanctuarydb.hud",
+      "name": "Sanctuary HUD",
+      "author": "Remmy",
+      "sourceUrl": "https://github.com/Remmyboy/sanctuary-mods/releases/tag/SanctuaryHud-0.8.0",
+      "description": "Economy and commander health HUD with reclaim values, build countdowns and alerts. Requires Starframe 0.5.0 with BepInEx plugin support. Known limitation: bundled voice packs are not discovered in Starframe-managed storage; the mod falls back to tones when alert sounds are enabled. Sounds are off by default.",
+      "releases": [
+        {
+          "id": "com.sanctuarydb.hud.0.8.0",
+          "version": "0.8.0",
+          "withdrawn": false,
+          "requires": [],
+          "testedGameBuilds": [],
+          "artifact": {
+            "url": "https://github.com/Remmyboy/sanctuary-mods/releases/download/SanctuaryHud-0.8.0/SanctuaryHud-0.8.0-ModManager.zip",
+            "sha256": "9097bdfffe3b6750934ecec08e4703acdef6d65ed7210c7da1e68f145f2aaf59",
+            "sizeBytes": 1349764,
+            "layout": {
+              "kind": "starframe_managed_zip",
+              "root": "SanctuaryMods/SanctuaryHud",
+              "entryAssembly": "SanctuaryHud.dll",
+              "entryType": "SanctuaryHud.SanctuaryHudPlugin"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "com.sanctuarydb.buildhotkeys",
+      "name": "Build Hotkeys",
+      "author": "Remmy",
+      "sourceUrl": "https://github.com/Remmyboy/sanctuary-mods/releases/tag/BuildHotkeys-0.1.1",
+      "description": "Configurable build hotkeys shared across factions, tier cycling and a build overlay. Escape clears selected factory queues. Requires Starframe 0.5.0 with BepInEx plugin support.",
+      "releases": [
+        {
+          "id": "com.sanctuarydb.buildhotkeys.0.1.1",
+          "version": "0.1.1",
+          "withdrawn": false,
+          "requires": [],
+          "testedGameBuilds": [],
+          "artifact": {
+            "url": "https://github.com/Remmyboy/sanctuary-mods/releases/download/BuildHotkeys-0.1.1/BuildHotkeys-0.1.1-ModManager.zip",
+            "sha256": "eaa9d75f87623ab85a998f18beb342bcee0102125ba3691aa6f5a1985cca320a",
+            "sizeBytes": 37674,
+            "layout": {
+              "kind": "starframe_managed_zip",
+              "root": "SanctuaryMods/BuildHotkeys",
+              "entryAssembly": "BuildHotkeys.dll",
+              "entryType": "SanctuaryHud.BuildHotkeysPlugin"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "com.sanctuarydb.camerautilities",
+      "name": "Camera Utilities",
+      "author": "Remmy",
+      "sourceUrl": "https://github.com/Remmyboy/sanctuary-mods/releases/tag/CameraUtilities-0.1.2",
+      "description": "Controls HUD visibility, strategic icons, range overlays, order lines, planned buildings, alloy spots and health bars. F4 opens the in-match panel. Draw-distance changes apply to the next match or replay. Requires Starframe 0.5.0 with BepInEx plugin support.",
+      "releases": [
+        {
+          "id": "com.sanctuarydb.camerautilities.0.1.2",
+          "version": "0.1.2",
+          "withdrawn": false,
+          "requires": [],
+          "testedGameBuilds": [],
+          "artifact": {
+            "url": "https://github.com/Remmyboy/sanctuary-mods/releases/download/CameraUtilities-0.1.2/CameraUtilities-0.1.2-ModManager.zip",
+            "sha256": "2859c8c164312de20e12379d7c3a3472b95b621a8fe1e7c1617cb28b1d06fee6",
+            "sizeBytes": 28459,
+            "layout": {
+              "kind": "starframe_managed_zip",
+              "root": "SanctuaryMods/CameraUtilities",
+              "entryAssembly": "CameraUtilities.dll",
+              "entryType": "SanctuaryHud.CameraUtils.CameraUtilitiesPlugin"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "com.sanctuarydb.ecomanager",
+      "name": "Eco Manager",
+      "author": "Remmy",
+      "sourceUrl": "https://github.com/Remmyboy/sanctuary-mods/releases/tag/EcoManager-0.3.0",
+      "description": "Select extractors by tier and track upgrades from an economy panel. Engineer assists can queue upgrades and pause them until assistance arrives. If an engineer is lost or reassigned, an upgrade can stay paused until you unpause it. Requires Starframe 0.5.0 with BepInEx plugin support.",
+      "releases": [
+        {
+          "id": "com.sanctuarydb.ecomanager.0.3.0",
+          "version": "0.3.0",
+          "withdrawn": false,
+          "requires": [],
+          "testedGameBuilds": [],
+          "artifact": {
+            "url": "https://github.com/Remmyboy/sanctuary-mods/releases/download/EcoManager-0.3.0/EcoManager-0.3.0-ModManager.zip",
+            "sha256": "350f976ba60a6454dd32a2d72c3a29ecb5a5b737e7009146abc31cea23682d7b",
+            "sizeBytes": 24482,
+            "layout": {
+              "kind": "starframe_managed_zip",
+              "root": "SanctuaryMods/EcoManager",
+              "entryAssembly": "EcoManager.dll",
+              "entryType": "SanctuaryHud.EcoManagerPlugin"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "com.sanctuarydb.replaymanager",
+      "name": "Replay Manager",
+      "author": "Remmy",
+      "sourceUrl": "https://github.com/Remmyboy/sanctuary-mods/releases/tag/ReplayManager-0.2.0",
+      "description": "Replay controls for player views, fog of war, economy totals, pause, speed, seeking and rewind. F7 opens the replay panel. Requires Starframe 0.5.0 with BepInEx plugin support.",
+      "releases": [
+        {
+          "id": "com.sanctuarydb.replaymanager.0.2.0",
+          "version": "0.2.0",
+          "withdrawn": false,
+          "requires": [],
+          "testedGameBuilds": [],
+          "artifact": {
+            "url": "https://github.com/Remmyboy/sanctuary-mods/releases/download/ReplayManager-0.2.0/ReplayManager-0.2.0-ModManager.zip",
+            "sha256": "0c7d0ab6732f3bfd7e3035ee0d00ba1d17a18972b41df1656b9087fd4881d410",
+            "sizeBytes": 30160,
+            "layout": {
+              "kind": "starframe_managed_zip",
+              "root": "SanctuaryMods/ReplayManager",
+              "entryAssembly": "ReplayManager.dll",
+              "entryType": "SanctuaryHud.ReplaysPlugin"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "com.sanctuarydb.idleengineers",
+      "name": "Idle Engineers",
+      "author": "Remmy",
+      "sourceUrl": "https://github.com/Remmyboy/sanctuary-mods/releases/tag/IdleEngineers-0.1.0",
+      "description": "Select idle engineers by tier, the commander or all idle builders from a draggable panel. The panel hides when nobody is idle and remembers its position. Requires Starframe 0.5.0 with BepInEx plugin support.",
+      "releases": [
+        {
+          "id": "com.sanctuarydb.idleengineers.0.1.0",
+          "version": "0.1.0",
+          "withdrawn": false,
+          "requires": [],
+          "testedGameBuilds": [],
+          "artifact": {
+            "url": "https://github.com/Remmyboy/sanctuary-mods/releases/download/IdleEngineers-0.1.0/IdleEngineers-0.1.0-ModManager.zip",
+            "sha256": "3c71e1ccdcc1aad207826df7d9102c1492f630f991804dc0c8b5de2c52a7a094",
+            "sizeBytes": 21343,
+            "layout": {
+              "kind": "starframe_managed_zip",
+              "root": "SanctuaryMods/IdleEngineers",
+              "entryAssembly": "IdleEngineers.dll",
+              "entryType": "SanctuaryHud.IdleEngineersPlugin"
             }
           }
         }
