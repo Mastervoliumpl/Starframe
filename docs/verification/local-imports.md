@@ -1,6 +1,6 @@
 # Local mod imports
 
-Issue [#24](https://github.com/Mastervoliumpl/Starframe/issues/24), milestone 0.5.0, internal version `0.5.0-dev.1`. This issue adds one-time imports. Automatic source watching remains in #25, and the complete developer/game workflow remains in #26. No installer or public release is produced.
+Issue [#24](https://github.com/Mastervoliumpl/Starframe/issues/24), milestone 0.5.0, internal version `0.5.0-dev.1`. This record covers the one-time import work. Issue #25 adds [automatic source watching](local-watching.md); the complete developer/game workflow remains in #26. No installer or public release is produced.
 
 ## Import a build
 

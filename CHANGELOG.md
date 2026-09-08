@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Import local DLLs and build output folders into managed storage, retain source metadata in SQLite schema 11, and use normal enable, order, details, collection and uninstall controls. Local builds use exact content references without catalog update or game-version checks. Uninstall retains the author's files. Automatic rebuild watching follows in #25; see [supported inputs and checks](docs/verification/local-imports.md) (#24).
+- Follow imported local sources while the desktop is open. Verify settled snapshots, retain the previous build on invalid output, and advance matching active local collections. Queue game-file changes until the game closes. Schema 12 persists the watched source; startup/resume reconciliation and bounded fallback scans recover missed notifications. Shared and inactive collections retain exact builds; see [watcher behavior and checks](docs/verification/local-watching.md) (#25).
+- Import local DLLs and build output folders into managed storage, retain source metadata in SQLite schema 11, and use normal enable, order, details, collection and uninstall controls. Local builds use exact content references without catalog update or game-version checks. Uninstall retains the author's files. See [supported inputs and checks](docs/verification/local-imports.md) (#24).
 
 ## 0.4.1 - 2026-09-08
 
