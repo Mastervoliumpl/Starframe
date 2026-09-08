@@ -7,6 +7,7 @@ use std::collections::{BTreeSet, HashMap};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Resolution {
     pub effective: Vec<ModReference>,
     pub adjustments: Vec<Adjustment>,
@@ -14,6 +15,7 @@ pub struct Resolution {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Adjustment {
     pub before: String,
     pub after: String,

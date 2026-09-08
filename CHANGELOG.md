@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Extract worker request handling and testable launch state, archive preparation, shared filesystem guards, legacy storage conversion and large inline test modules. Generate desktop management wire types with the existing ts-rs dependency and check shared Rust/C# contract boundaries (#54).
+
 - Give each logical mod a deployment root derived from its mod ID and archive hash. Mods can share cached bytes and activate together; uninstall retains artifacts referenced by another mod (#53).
 
 - Reject packages above the runtime's 1,024-file, 64 MiB file, 16 MiB assembly or 256 MiB package limits before success. Cached reuse and enablement apply the same checks; older oversized inventories remain readable for repair (#52).

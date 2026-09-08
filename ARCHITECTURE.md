@@ -538,3 +538,15 @@ ROADMAP.md gives these slices their release targets. Work only within the active
 | Windows distribution | Use Tauri NSIS, its uninstaller and signed updater. | Verify on supported Windows versions, including data retention and Starframe-owned game cleanup. |
 
 The remaining work concerns interface details and verification. The user-confirmed behavior above is not reopened as a product question. Desktop state and database recovery now have recorded implementation evidence. Game integration and installer behavior remain unverified proposals.
+
+## 0.4.1 implementation boundaries
+
+The desktop game service keeps one storage owner in `game_service/worker.rs`. It polls catalog/package work, observes the game and serializes mutations. `game_service/requests.rs` handles queued requests. `game_service/session.rs` owns launch timing and consumes supplied observations and times; its tests cover uncertain process state, launch/report timeouts, exit and reset.
+
+`packages.rs` owns the bounded queue and operations. `packages/archive.rs` validates supported layouts and extracts archives. `packages/artifacts.rs` verifies cached content, stages/promotes files and performs guarded cleanup. The shared `filesystem.rs` guards are used by package handling and deployment, so package validation no longer depends on deployment internals. Deployment keeps its ownership journal, rollback and recovery together; its larger tests are in `deployment/tests.rs`. Storage retains its transaction interface, with legacy conversion in `storage/conversion.rs` and tests in `storage/tests.rs`.
+
+Schema 10 keys library records by full reference and keeps one immutable artifact inventory per archive hash. Deployment roots hash the mod ID, a NUL separator and archive hash; logical mods sharing content receive distinct roots. Collection files retain their version-1 exact references. Activation schema 3 bounds session inventory independently of library size and reports omitted disabled mods; schema-2 runtime documents remain readable.
+
+`desktop_contract.rs` generates the management wire types in `src/lib/generated/management.ts` with ts-rs. Production transport and fixture code use those types; frontend-only convenience types remain in `management.ts`. Set `UPDATE_BINDINGS=1` when running the generator test after an intentional wire change. Ordinary Rust tests reject drift. The existing numeric wire fields stay numeric, revisions already sent as strings stay strings, and optional ordering fields retain omission behavior. ts-rs ignores Serde's runtime-only unknown-field rejection attribute; Rust deserialization still enforces it.
+
+The shared activation boundary cases in `contracts/fixtures/activation-boundaries.json` cover inventory, active-mod, per-mod file and aggregate file limits in both readers. Package readiness, cache reuse and enablement share supported-file checks. Historical oversized records remain readable for repair. These checks do not claim general BepInEx plugin or map compatibility; representative author-mod adapters remain part of #30.

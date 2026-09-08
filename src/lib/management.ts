@@ -1,145 +1,34 @@
 import { writable } from 'svelte/store';
 import { confirmed, errorMessage } from './state';
 
-export type Reference = {
-  modId: string;
-  hash: string;
-  origin: 'catalog' | 'local_import';
-  releaseId: string | null;
-};
-export type LibraryEntry = {
-  reference: Reference;
-  name: string;
-  author: string;
-  version: string;
-};
-export type Release = {
-  id: string;
-  version: string;
-  withdrawn: boolean;
-  withdrawalReason: string | null;
-  compatibilityProblems: {
-    gameBuild: string;
-    note: string;
-    sourceUrl: string;
-  }[];
-  testedGameBuilds: string[];
-  requires: string[];
-  artifact: {
-    url: string;
-    sha256: string;
-    sizeBytes: number;
-    layout:
-      | { kind: 'starframe_lua_zip' }
-      | {
-          kind: 'starframe_managed_zip';
-          root: string;
-          entryAssembly: string;
-          entryType: string;
-        };
-  };
-};
-export type CatalogMod = {
-  id: string;
-  name: string;
-  author: string;
-  sourceUrl: string;
-  description: string;
-  unmaintained: boolean;
-  releases: Release[];
-};
-export type ModView = {
-  imports: { collectionId: string; entries: ImportEntry[] }[];
-  revision: string;
-  activeCollection: string | null;
-  catalog: {
-    schemaVersion: number;
-    catalogRevision: string;
-    mods: CatalogMod[];
-  } | null;
-  library: LibraryEntry[];
-  enabled: Reference[];
-  order: {
-    effective: Reference[];
-    adjustments: { before: string; after: string; message: string }[];
-  } | null;
-  orderError: string | null;
-  collisions: { path: string; mods: string[]; winner: string }[];
-  collections: {
-    id: string;
-    name: string;
-    revision: number;
-    entries: Reference[];
-  }[];
-  cleanupErrors: string[];
-};
-export type PackageOperation = {
-  id: string;
-  requestId: string;
-  releaseId: string;
-  hash: string;
-  status: 'preparing' | 'cancelling' | 'cancelled' | 'completed' | 'failed';
-  message: string;
-  receivedBytes: number;
-  totalBytes: number;
-};
-export type ModAction =
-  | { kind: 'list' | 'retry_cleanup' }
-  | { kind: 'create_collection'; name: string; expectedRevision: string }
-  | {
-      kind: 'rename_collection';
-      id: string;
-      name: string;
-      expectedRevision: string;
-    }
-  | {
-      kind: 'delete_collection' | 'select_collection';
-      id: string;
-      expectedRevision: string;
-    }
-  | { kind: 'reorder'; modIds: string[]; expectedRevision: string }
-  | {
-      kind: 'set_enabled';
-      reference: Reference;
-      enabled: boolean;
-      expectedRevision: string;
-    }
-  | {
-      kind: 'uninstall';
-      reference: Reference;
-      expectedRevision: string;
-      confirmReferences: boolean;
-    };
-export type PackageAction =
-  | { kind: 'list' }
-  | { kind: 'prepare'; requestId: string; releaseId: string }
-  | { kind: 'cancel'; operationId: string };
+import type {
+  Reference,
+  LibraryEntry,
+  Release,
+  ModView,
+  PackageOperation,
+  ModAction,
+  PackageAction,
+  SharingAction,
+  SharingReply,
+} from './generated/management';
+export type {
+  Reference,
+  LibraryEntry,
+  Release,
+  CatalogMod,
+  ModView,
+  PackageOperation,
+  ModAction,
+  PackageAction,
+  ImportEntry,
+  SharingAction,
+  SharingReply,
+} from './generated/management';
 export type CollectionEdit =
   | { kind: 'create_collection'; name: string }
   | { kind: 'rename_collection'; id: string; name: string }
   | { kind: 'delete_collection' | 'select_collection'; id: string };
-export type ImportEntry = {
-  reference: Reference;
-  status: 'pending' | 'preparing' | 'ready' | 'unresolved';
-  message: string;
-  operationId: string | null;
-};
-export type SharingAction =
-  | { kind: 'review'; text: string }
-  | {
-      kind: 'accept';
-      text: string;
-      requestId: string;
-      expectedRevision: string;
-    }
-  | { kind: 'retry' | 'export'; id: string };
-export type SharingReply = {
-  text: string | null;
-  name: string;
-  entries: ImportEntry[];
-  collectionId: string | null;
-  orderError: string | null;
-};
 export interface ManagementTransport {
   saveCollection(text: string): Promise<boolean>;
   sharing(action: SharingAction): Promise<SharingReply>;

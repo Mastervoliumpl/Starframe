@@ -68,6 +68,8 @@ impl Portable {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ImportStatus"))]
 pub enum Status {
     Pending,
     Preparing,
@@ -77,6 +79,8 @@ pub enum Status {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ImportEntry"))]
 pub struct Entry {
     pub reference: ModReference,
     pub status: Status,
@@ -86,6 +90,8 @@ pub struct Entry {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "CollectionImport"))]
 pub struct Import {
     pub collection_id: String,
     pub entries: Vec<Entry>,
@@ -98,6 +104,8 @@ pub struct Import {
     rename_all_fields = "camelCase",
     deny_unknown_fields
 )]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "SharingAction"))]
 pub enum Action {
     Review {
         text: String,
@@ -117,6 +125,8 @@ pub enum Action {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "SharingReply"))]
 pub struct Reply {
     pub text: Option<String>,
     pub name: String,

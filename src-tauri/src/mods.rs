@@ -21,6 +21,8 @@ type Result<T> = std::result::Result<T, String>;
     rename_all_fields = "camelCase",
     deny_unknown_fields
 )]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ModAction"))]
 pub enum Action {
     List,
     RetryCleanup,
@@ -59,6 +61,8 @@ pub enum Action {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "ModView"))]
 pub struct View {
     pub catalog: Option<Catalog>,
     pub revision: String,
@@ -75,6 +79,7 @@ pub struct View {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Collision {
     pub path: String,
     pub mods: Vec<String>,

@@ -1,0 +1,11 @@
+[
+  { "dimension": "inventory", "count": 255, "valid": true },
+  { "dimension": "inventory", "count": 256, "valid": true },
+  { "dimension": "inventory", "count": 257, "valid": false },
+  { "dimension": "mods", "count": 256, "valid": true },
+  { "dimension": "mods", "count": 257, "valid": false },
+  { "dimension": "files", "count": 1024, "valid": true },
+  { "dimension": "files", "count": 1025, "valid": false },
+  { "dimension": "totalFiles", "count": 8192, "valid": true },
+  { "dimension": "totalFiles", "count": 8193, "valid": false }
+]
