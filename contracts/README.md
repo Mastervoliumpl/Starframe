@@ -2,7 +2,7 @@
 
 Issue [#11](https://github.com/Mastervoliumpl/Starframe/issues/11) implements the file boundary in [HANDOFF.md](../docs/HANDOFF.md). The runtime reads prepared files independently of the desktop database. These are internal formats; a public SDK has not been released.
 
-[Activation](fixtures/activation.json), [capabilities](fixtures/capabilities.json) and [report](fixtures/report.json) are executable examples. Both readers consume every case in [cases.json](fixtures/cases.json). Activation uses `schemaVersion: 2`; capabilities/reports use `schemaVersion: 1`. All use `runtimeContractVersion: 1`; `integrationId` is `starframe.bepinex`. Unsupported versions, duplicate JSON properties, unknown/missing fields, unexpected null values, comments and trailing data are rejected. Product version is separate.
+[Activation](fixtures/activation.json), [capabilities](fixtures/capabilities.json) and [report](fixtures/report.json) are executable examples. Both readers consume every case in [cases.json](fixtures/cases.json). Activation readers support `schemaVersion: 2` and `3`; capabilities/reports use `schemaVersion: 1`. All use `runtimeContractVersion: 1`; `integrationId` is `starframe.bepinex`. Unsupported versions, duplicate JSON properties, unknown/missing fields, unexpected null values, comments and trailing data are rejected. Product version is separate.
 
 ## Bounds and activation
 

@@ -1,7 +1,7 @@
 {
   "name": "starframe",
   "private": true,
-  "version": "0.4.1-dev.1",
+  "version": "0.4.1",
   "description": "Desktop mod manager for Sanctuary: Shattered Sun",
   "license": "AGPL-3.0-only",
   "type": "module",

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+No changes yet.
+
+## 0.4.1 - 2026-09-08
+
+Internal correctness and maintenance milestone; no published installer or app release. See [verification](docs/verification/milestone-0.4.1.md).
+
 - Extract worker request handling and testable launch state, archive preparation, shared filesystem guards, legacy storage conversion and large inline test modules. Generate desktop management wire types with the existing ts-rs dependency and check shared Rust/C# contract boundaries (#54).
 
 - Give each logical mod a deployment root derived from its mod ID and archive hash. Mods can share cached bytes and activate together; uninstall retains artifacts referenced by another mod (#53).
