@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-Active milestone: **[0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5)**, starting with **[#20](https://github.com/Mastervoliumpl/Starframe/issues/20)**. The development version is `0.4.0-dev.1`. Completed milestones: **0.0.1**, **0.0.2**, **0.1.0**, **0.1.1**, **0.2.0** and **0.3.0**. The [0.3.0 exit evidence](docs/verification/milestone-0.3.0.md) records the delivered workflow and limits. No app release or installer is published.
+Active milestone: **[0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5)**, continuing with **[#22](https://github.com/Mastervoliumpl/Starframe/issues/22)** after #20 and #21. The development version is `0.4.0-dev.1`. Completed milestones: **0.0.1**, **0.0.2**, **0.1.0**, **0.1.1**, **0.2.0** and **0.3.0**. The [0.3.0 exit evidence](docs/verification/milestone-0.3.0.md) records the delivered workflow and limits. No app release or installer is published.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -14,7 +14,8 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | [0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10) | Replace Turso with bundled SQLite and preserve existing data | Complete |
 | [0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3) | Starframe in-game runtime | Complete |
 | [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Complete |
-| [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Active: #20 |
+| [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Active: #22 |
+| [0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11) | Exact approval identities and package/runtime limits | Planned |
 | [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Planned |
 | [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Planned |
 | [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Native game integration | Blocked on official game API |
@@ -86,16 +87,27 @@ Complete. Version 0.3.0 delivers catalog refresh, verified downloads, installed-
 
 ### 0.4.0: Ordered and shared collections
 
-Started on 8 September 2026 with #20. Deliver deterministic dependency ordering, accessible manual priority, automatic collection application and exact-content sharing. Exit: reproduce an ordered collection on a second library, reusing matching artifacts and explaining unresolved entries. Issues #21–#23 remain planned.
+Started on 8 September 2026 with #20. Issues #20 and #21 are complete; #22 is active and #23 remains planned. Deliver deterministic dependency ordering, accessible manual priority, automatic collection application and exact-content sharing. Exit: reproduce an ordered collection on a second library, reusing matching artifacts and explaining unresolved entries. Record the four known limits assigned to 0.4.1 in the exit evidence.
 
 - [#20: Resolve dependency constraints and manual load priority](https://github.com/Mastervoliumpl/Starframe/issues/20)
 - [#21: Build named ordered collections and automatic switching](https://github.com/Mastervoliumpl/Starframe/issues/21)
 - [#22: Share and recreate collections using exact mod references](https://github.com/Mastervoliumpl/Starframe/issues/22)
 - [#23: Verify ordered collection behavior across desktop and game](https://github.com/Mastervoliumpl/Starframe/issues/23)
 
+### 0.4.1: Approval identities and runtime limits
+
+Planned after 0.4.0 and before 0.5.0, as requested by the owner on 8 September 2026. A separate review reproduced these findings against the 0.3.0 merge, `ba448ef`; source inspection found the affected paths still present at `b5ccc20`. Reproduce them on the patch branch, preserve existing records and artifacts, and verify the corrected boundaries across package preparation, collections and runtime activation.
+
+- [#50: Preserve distinct approval references when archive bytes are reapproved](https://github.com/Mastervoliumpl/Starframe/issues/50)
+- [#51: Keep large disabled libraries from blocking valid game launches](https://github.com/Mastervoliumpl/Starframe/issues/51)
+- [#52: Validate package file counts against supported runtime limits](https://github.com/Mastervoliumpl/Starframe/issues/52)
+- [#53: Resolve overlapping deployment roots for mods sharing an archive](https://github.com/Mastervoliumpl/Starframe/issues/53)
+
+These fixes do not establish general compatibility with conventional BepInEx plugins, Lua packages or maps. Adapters and tests with representative author mods remain part of the route to a usable public alpha.
+
 ### 0.5.0: Local mod development
 
-Planned; starts after 0.4.0 closes. Deliver local DLL/folder imports, normal management controls and stable watched build copies. Exit: local rebuilds apply after game exit, incomplete builds retain usable content, and source files survive uninstall.
+Planned; starts after 0.4.1 closes. Deliver local DLL/folder imports, normal management controls and stable watched build copies. Exit: local rebuilds apply after game exit, incomplete builds retain usable content, and source files survive uninstall.
 
 - [#24: Import local mods with normal management controls](https://github.com/Mastervoliumpl/Starframe/issues/24)
 - [#25: Follow local builds and apply stable copies after game exit](https://github.com/Mastervoliumpl/Starframe/issues/25)
