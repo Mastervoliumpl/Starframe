@@ -36,9 +36,10 @@ public sealed class Plugin : BaseUnityPlugin
         {
             string root = Path.Combine(Paths.GameRootPath, "Starframe");
             var overlays = new LuaOverlays(message => Logger.LogInfo(message));
+            var plugins = new BepInExPlugins(gameObject);
             session = new ActivationSession(message => Logger.LogInfo(message),
                 Directory.GetFiles(Paths.ManagedPath, "*.dll").Select(Path.GetFileNameWithoutExtension)!,
-                id => SettingsPersistence.Open(Path.Combine(Paths.ConfigPath, "Starframe"), id), overlays.Apply);
+                id => SettingsPersistence.Open(Path.Combine(Paths.ConfigPath, "Starframe"), id), overlays.Apply, plugins.Prepare);
             var report = session.Activate(root, ActivationSession.ReadManifest(Path.Combine(root, "activation.json")));
             ActivationSession.WriteReport(Path.Combine(root, "report.json"), report);
             try { menu = new ModsMenu(this, session, report); }

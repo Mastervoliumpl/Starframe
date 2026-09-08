@@ -354,7 +354,7 @@ internal sealed class ModsMenu : IDisposable
             focus.Add(field.gameObject);
         }
         settingControls.Add(enable);
-        Text(setting.Description + " Default: " + setting.DefaultText + ". " + (setting.Live ? "Applies while the game is running." : "Takes effect after restart."));
+        Text(setting.Description + " Default: " + setting.DefaultText + ". " + setting.ApplyDescription);
         status = Text(setting.Error ?? (setting.RestartRequired ? "Restart required" : ""));
         status.gameObject.name = "Status-" + setting.Key;
     }
@@ -383,7 +383,8 @@ internal sealed class ModsMenu : IDisposable
         enable(false);
         reset.Interactable(false);
         if (status != null) status.text = "Saving…";
-        var task = Task.Run(() => setting.SaveText(value));
+        yield return null;
+        var task = SettingsTask(setting.RequiresMainThread, () => setting.SaveText(value));
         while (!task.IsCompleted) yield return null;
         if (task.IsFaulted) _ = task.Exception;
         saves--;
@@ -405,13 +406,22 @@ internal sealed class ModsMenu : IDisposable
         reset.Interactable(false);
         var controls = settingControls.ToArray();
         foreach (var control in controls) control(false);
-        var task = Task.Run(() => { foreach (var setting in settings.Entries) setting.Reset(); });
+        yield return null;
+        var task = SettingsTask(settings.Entries.Any(s => s.RequiresMainThread), () => { foreach (var setting in settings.Entries) setting.Reset(); });
         while (!task.IsCompleted) yield return null;
         if (task.IsFaulted) _ = task.Exception;
         saves--;
         foreach (var control in controls) control(true);
         if (reset != null) reset.Interactable(saves == 0);
         if (page != null && page.activeSelf && selected == id) ShowMod(id);
+    }
+
+    private static Task SettingsTask(bool mainThread, Action action)
+    {
+        // BepInEx setting events can call Unity APIs, so their setters must stay on the game thread.
+        if (!mainThread) return Task.Run(action);
+        try { action(); return Task.CompletedTask; }
+        catch (Exception error) { return Task.FromException(error); }
     }
 
     private static Sprite LoadIcon()

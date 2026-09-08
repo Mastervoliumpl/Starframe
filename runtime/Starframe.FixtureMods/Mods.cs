@@ -35,3 +35,8 @@ public sealed class Failing : IMod, IModShutdown
 }
 
 public enum FixtureMode { Calm, Fast }
+
+public sealed class ExternalEntry
+{
+    public ExternalEntry() => throw new InvalidOperationException("External entries must be created by the game adapter.");
+}
