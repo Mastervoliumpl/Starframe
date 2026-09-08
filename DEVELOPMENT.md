@@ -1,6 +1,6 @@
 # Starframe development and checks
 
-Status: milestone 0.5.0 is active; #24 imports are complete and #25 adds local build watching. Version `0.5.0-dev.1` is an internal development build with no published installer or app release. Milestone 0.4.1 is complete; see [0.4.1 exit evidence](docs/verification/milestone-0.4.1.md).
+Status: milestone 0.5.0 is in final PR checks; #24–#26 implementation and developer/game verification are complete. See [0.5.0 exit evidence](docs/verification/milestone-0.5.0.md). Version `0.5.0` is an internal development build with no published installer or app release. Milestone 0.4.1 is complete; see [0.4.1 exit evidence](docs/verification/milestone-0.4.1.md).
 
 Issue #24 adds local DLL/folder imports through the package worker and SQLite schema 11. [Local import verification](docs/verification/local-imports.md) records the metadata format, source retention, recovery and native checks. Issue #25 adds source watching and schema 12; [watcher verification](docs/verification/local-watching.md) records debounce, recovery and game-exit checks.
 
@@ -81,7 +81,7 @@ Dependency auditing moves forward to 0.3.0 as a separate CI workflow for depende
 
 ## Versions and change history
 
-[VERSION](VERSION) is the source of the product version, currently `0.5.0-dev.1`. No installer has been published. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
+[VERSION](VERSION) is the source of the product version, currently `0.5.0`. No installer has been published. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
 
 Use three-part versions: `0.MINOR.PATCH` during initial development. A capability milestone advances the minor version; a corrective release advances the patch version. The planning handoff uses `0.0.1`. Published content is immutable; never replace a release with different bytes under the same version. The `0.x` series makes no stable public API promise, but format migrations and compatibility changes still need explicit notes. [Semantic Versioning](https://semver.org/)
 

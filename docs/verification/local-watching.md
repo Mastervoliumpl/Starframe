@@ -1,6 +1,6 @@
 # Local build watching
 
-Issue [#25](https://github.com/Mastervoliumpl/Starframe/issues/25), milestone 0.5.0, internal version `0.5.0-dev.1`. This adds source watching to [local imports](local-imports.md). The complete author/game workflow remains in #26. No installer or public release is produced.
+Issue [#25](https://github.com/Mastervoliumpl/Starframe/issues/25), milestone 0.5.0, internal version `0.5.0-dev.1`. This adds source watching to [local imports](local-imports.md). The complete author/game workflow is recorded in [0.5.0 exit evidence](milestone-0.5.0.md). No installer or public release is produced.
 
 ## Behavior
 
@@ -51,6 +51,6 @@ Watcher tests cover rapid writes, malformed output, truncated managed-image head
 
 The native workflow uses a temporary Steam fixture, a renamed Windows `ping.exe` as its observable game process, inert bootstrap/runtime fixtures and local Lua payloads. It compares activation bytes during play and the deployed payload after exit. It also verifies that typing focus and search text survive a rebuild. The fixture does not execute mod code. Shared game setup is reused by the existing native mod regression; all paths are normalized before persistence.
 
-The UI retains the existing navy/orange layout, controls and typography. Energy 1, rhythm 1, motion 1. Build identity and watch status use the existing row text and error treatment. Reviewed screenshots and logs are kept under ignored `test-results`; browser tests cover enlarged layout and forced colors. Native OS sleep, screen-reader behavior and real Sanctuary loading are not established by these fixtures. Real author builds and the complete in-game workflow remain in #26; broader format/adaptor acceptance remains in #30.
+The UI retains the existing navy/orange layout, controls and typography. Energy 1, rhythm 1, motion 1. Build identity and watch status use the existing row text and error treatment. Reviewed screenshots and logs are kept under ignored `test-results`; browser tests cover enlarged layout and forced colors. Native OS sleep, screen-reader behavior and real Sanctuary loading are not established by these fixtures. The installed-game fixture workflow is recorded in [0.5.0 exit evidence](milestone-0.5.0.md); broader format/adaptor acceptance remains in #30.
 
 Run the standard checks from [DEVELOPMENT.md](../../DEVELOPMENT.md), build the debug executable, then run `node tests/native/local-watch.mjs`. The normal `npm run test:native` sequence includes this test. CI results are recorded in milestone draft PR #56.

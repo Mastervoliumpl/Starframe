@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.5.0 - 2026-09-08
+
+- Verify the local developer workflow in Sanctuary: partial DLL rejection, queued rebuilds, desktop restart, latest game launch, retained settings, exact sharing and source-preserving uninstall. Add [local development instructions](docs/local-development.md) and [milestone evidence](docs/verification/milestone-0.5.0.md) (#26).
+
 - Follow imported local sources while the desktop is open. Verify settled snapshots, retain the previous build on invalid output, and advance matching active local collections. Queue game-file changes until the game closes. Schema 12 persists the watched source; startup/resume reconciliation and bounded fallback scans recover missed notifications. Shared and inactive collections retain exact builds; see [watcher behavior and checks](docs/verification/local-watching.md) (#25).
 - Import local DLLs and build output folders into managed storage, retain source metadata in SQLite schema 11, and use normal enable, order, details, collection and uninstall controls. Local builds use exact content references without catalog update or game-version checks. Uninstall retains the author's files. See [supported inputs and checks](docs/verification/local-imports.md) (#24).
 
