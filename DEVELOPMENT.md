@@ -1,6 +1,6 @@
 # Starframe development and checks
 
-Status: development policy adopted on 6 September 2026. Milestones 0.1.0, 0.1.1 and 0.2.0 are complete. This change completes internal milestone 0.3.0; later milestones remain planned. See [exit evidence](docs/verification/milestone-0.3.0.md).
+Status: milestone 0.4.0 is active as of 8 September 2026, starting with issue #20. The development version is `0.4.0-dev.1`. Milestones through 0.3.0 are complete; see [0.3.0 exit evidence](docs/verification/milestone-0.3.0.md). Issues #21–#23 and later milestones remain planned.
 
 Issue #17 adds package preparation through the existing storage worker, with schema-7 operation history and immutable file manifests. [Package checks and recovery](docs/verification/packages.md) record the supported format and limits. Its native fixture runs with the existing native suite; [screen integration and checks](docs/verification/management.md) complete issue #19.
 
@@ -10,7 +10,7 @@ Read [DESIGN.md](DESIGN.md) for behavior and presentation, [ARCHITECTURE.md](ARC
 
 ## Work one milestone at a time
 
-The design handoff and desktop foundation **0.1.0** are complete. The SQLite corrective milestone **0.1.1** is complete. The runtime milestone **0.2.0** is complete. The curated-mod milestone **0.3.0** is complete. Milestone **0.4.0** remains planned; do not start it automatically. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
+The design handoff and milestones through **0.3.0** are complete. Milestone **0.4.0** is active with issue #20. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
 
 Work on an issue only when its milestone is active and its prerequisites are complete. Keep issue dependencies in a `Depends on` section with issue links. Each issue must state its scope, observable completion criteria and checks. Split an issue when it contains independently reviewable outcomes; avoid splitting one small change into tasks that cannot be tested separately.
 
@@ -79,7 +79,7 @@ Dependency auditing moves forward to 0.3.0 as a separate CI workflow for depende
 
 ## Versions and change history
 
-[VERSION](VERSION) is the source of the product version. This change finalizes internal `0.3.0`. No installer has been published. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
+[VERSION](VERSION) is the source of the product version, currently `0.4.0-dev.1`. No installer has been published. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
 
 Use three-part versions: `0.MINOR.PATCH` during initial development. A capability milestone advances the minor version; a corrective release advances the patch version. The planning handoff uses `0.0.1`. Published content is immutable; never replace a release with different bytes under the same version. The `0.x` series makes no stable public API promise, but format migrations and compatibility changes still need explicit notes. [Semantic Versioning](https://semver.org/)
 

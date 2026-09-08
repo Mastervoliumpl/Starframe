@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-Completed milestones: **0.0.1**, **0.0.2**, **0.1.0**, **0.1.1**, **0.2.0** and **[0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4)**. This change finalizes the internal 0.3.0 build; [exit evidence](docs/verification/milestone-0.3.0.md) records the delivered workflow and limits. No app release or installer is published. Milestone 0.4.0 remains planned until the owner starts it.
+Active milestone: **[0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5)**, starting with **[#20](https://github.com/Mastervoliumpl/Starframe/issues/20)**. The development version is `0.4.0-dev.1`. Completed milestones: **0.0.1**, **0.0.2**, **0.1.0**, **0.1.1**, **0.2.0** and **0.3.0**. The [0.3.0 exit evidence](docs/verification/milestone-0.3.0.md) records the delivered workflow and limits. No app release or installer is published.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -14,7 +14,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | [0.1.1](https://github.com/Mastervoliumpl/Starframe/milestone/10) | Replace Turso with bundled SQLite and preserve existing data | Complete |
 | [0.2.0](https://github.com/Mastervoliumpl/Starframe/milestone/3) | Starframe in-game runtime | Complete |
 | [0.3.0](https://github.com/Mastervoliumpl/Starframe/milestone/4) | Curated mod management | Complete |
-| [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Planned |
+| [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Active: #20 |
 | [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Planned |
 | [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Planned |
 | [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Native game integration | Blocked on official game API |
@@ -86,7 +86,7 @@ Complete. Version 0.3.0 delivers catalog refresh, verified downloads, installed-
 
 ### 0.4.0: Ordered and shared collections
 
-Planned; starts after 0.3.0 closes. Deliver deterministic dependency ordering, accessible manual priority, automatic collection application and exact-content sharing. Exit: reproduce an ordered collection on a second library, reusing matching artifacts and explaining unresolved entries.
+Started on 8 September 2026 with #20. Deliver deterministic dependency ordering, accessible manual priority, automatic collection application and exact-content sharing. Exit: reproduce an ordered collection on a second library, reusing matching artifacts and explaining unresolved entries. Issues #21–#23 remain planned.
 
 - [#20: Resolve dependency constraints and manual load priority](https://github.com/Mastervoliumpl/Starframe/issues/20)
 - [#21: Build named ordered collections and automatic switching](https://github.com/Mastervoliumpl/Starframe/issues/21)

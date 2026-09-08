@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-No changes yet.
+Development version: `0.4.0-dev.1`. Started ordered collections with issue #20. No app release or installer is published.
 
 ## 0.3.0 - 2026-09-07
 
