@@ -6,6 +6,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 #[cfg(test)]
@@ -471,7 +472,11 @@ pub fn requested(store: &Storage) -> Result<Value> {
                     .ok_or("Required release metadata is missing.")
             })
             .collect::<std::result::Result<_, _>>()?;
-        mods.push(json!({"modId": reference.mod_id, "source": {"kind":"catalog", "releaseId": release.id}, "root": format!("mods/{}", reference.hash), "entryAssembly": entry_path, "entryType": entry_type, "requires":requires, "files":prepared.files.iter().map(|f| json!({"path":f.path,"sha256":f.sha256})).collect::<Vec<_>>() }));
+        let root = format!(
+            "mods/{:x}",
+            Sha256::digest(format!("{}\0{}", reference.mod_id, reference.hash).as_bytes())
+        );
+        mods.push(json!({"modId": reference.mod_id, "source": {"kind":"catalog", "releaseId": release.id}, "root": root, "entryAssembly": entry_path, "entryType": entry_type, "requires":requires, "files":prepared.files.iter().map(|f| json!({"path":f.path,"sha256":f.sha256})).collect::<Vec<_>>() }));
     }
     let value = json!({"schemaVersion":3, "runtimeContractVersion":1, "integrationId":"starframe.bepinex", "deploymentRevision":records.revision.to_string(), "installedMods":inventory,"omittedDisabledMods":omitted,"mods":mods});
     runtime_contract::read(

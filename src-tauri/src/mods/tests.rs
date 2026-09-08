@@ -690,6 +690,79 @@ fn runtime_file_boundaries_hold_from_commit_through_membership_and_activation() 
 }
 
 #[test]
+fn logical_mods_share_verified_bytes_with_distinct_stable_deployment_roots() {
+    for lua in [false, true] {
+        let (root, mut store, entries) = fixture_with_lua(lua);
+        let mut shared_entry = entries[0].clone();
+        shared_entry.reference.mod_id = "fixture.shared".into();
+        shared_entry.reference.release_id = Some("fixture.shared.1".into());
+        let mut cache = store.catalog_cache().unwrap().unwrap();
+        let catalog = cache.catalog.as_mut().unwrap();
+        catalog.catalog_revision = "2".into();
+        let mut owner = catalog.mods[0].clone();
+        owner.id = shared_entry.reference.mod_id.clone();
+        owner.releases[0].id = shared_entry.reference.release_id.clone().unwrap();
+        catalog.mods.push(owner);
+        catalog.validate().unwrap();
+        store.save_catalog_cache(&cache).unwrap();
+        let prepared = store
+            .prepared_artifact(&shared_entry.reference.hash)
+            .unwrap()
+            .unwrap();
+        let op = Operation {
+            id: Uuid::new_v4().to_string(),
+            request_id: Uuid::new_v4().to_string(),
+            release_id: shared_entry.reference.release_id.clone().unwrap(),
+            hash: prepared.hash.clone(),
+            status: Status::Completed,
+            message: "Shared archive".into(),
+            received_bytes: 10,
+            total_bytes: 10,
+        };
+        store.save_package(&op).unwrap();
+        store
+            .complete_package(&op, &shared_entry, &prepared)
+            .unwrap();
+        enable(&mut store, &entries[0], true);
+        let view = enable(&mut store, &shared_entry, true);
+        let activation = requested(&store).unwrap();
+        assert_ne!(activation["mods"][0]["root"], activation["mods"][1]["root"]);
+        assert_eq!(payload(&store, &activation).unwrap().len(), 2);
+        let exported = crate::sharing::action(
+            &mut store,
+            crate::sharing::Action::Export {
+                id: view.active_collection.unwrap(),
+            },
+        )
+        .unwrap()
+        .text
+        .unwrap();
+        let mut queue = packages::Packages::open(&mut store).unwrap();
+        let id = import(&mut store, &exported);
+        finish_imports(&mut store, &mut queue);
+        store
+            .set_active_collection(Some(&id), store.load().unwrap().revision)
+            .unwrap();
+        assert_eq!(requested(&store).unwrap()["mods"], activation["mods"]);
+        drop(queue);
+        drop(store);
+        let mut store = Storage::open(root.path()).unwrap();
+        assert_eq!(requested(&store).unwrap()["mods"], activation["mods"]);
+        store
+            .uninstall_mod(&entries[0].reference, store.load().unwrap().revision, true)
+            .unwrap();
+        cleanup(&mut store).unwrap();
+        let remaining = requested(&store).unwrap();
+        assert_eq!(remaining["mods"][0]["root"], activation["mods"][1]["root"]);
+        assert_eq!(payload(&store, &remaining).unwrap().len(), 1);
+        assert_eq!(
+            store.prepared_artifact(&prepared.hash).unwrap(),
+            Some(prepared)
+        );
+    }
+}
+
+#[test]
 fn collision_winners_follow_effective_order_and_content_payloads_keep_their_paths() {
     let (_temp, mut store, entries) = fixture_with_lua(true);
     enable(&mut store, &entries[0], true);
