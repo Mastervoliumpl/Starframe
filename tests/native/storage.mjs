@@ -100,11 +100,12 @@ await withDesktop(delayed, async (page) => {
   await page.getByRole('button', { name: 'Run responsiveness check' }).click();
   await page.getByRole('button', { name: 'Downloads', exact: true }).click();
   await expect(page.getByRole('progressbar')).toHaveCount(3);
-  await unlink(join(delayed, 'hold-storage-startup'));
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByText('Opening saved data…')).toBeVisible();
+  await unlink(join(delayed, 'hold-storage-startup'));
   await expect(
     page.getByText('Saved locally: 2 library entries and 2 collections.'),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 30000 });
 });
 console.log(
   'Navigation and diagnostics remained usable while storage startup was held on its worker.',
