@@ -1,11 +1,20 @@
 import { expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, writeFile, stat } from 'node:fs/promises';
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  realpath,
+  writeFile,
+  stat,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { withDesktop } from './session.mjs';
 
-const root = await mkdtemp(join(tmpdir(), 'starframe-local-import-'));
+const root = await realpath(
+  await mkdtemp(join(tmpdir(), 'starframe-local-import-')),
+);
 const data = join(root, 'data');
 const source = join(root, 'source');
 const content = join(source, 'LJ', 'lua', 'fixture.lua');
