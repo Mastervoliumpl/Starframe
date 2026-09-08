@@ -66,6 +66,69 @@ fn extract_fixture(bytes: &[u8]) -> Result<Prepared> {
 }
 
 #[test]
+fn runtime_file_limit_counts_files_not_zip_directories_for_managed_and_lua() {
+    for lua in [false, true] {
+        for count in [1024, 1025] {
+            let root = tempfile::tempdir().unwrap();
+            let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+            writer
+                .add_directory("empty/", SimpleFileOptions::default())
+                .unwrap();
+            for index in 0..count {
+                let path = if lua {
+                    format!("LJ/lua/file{index}.lua")
+                } else if index == 0 {
+                    "package/Core.dll".into()
+                } else {
+                    format!("package/file{index}.txt")
+                };
+                writer
+                    .start_file(path, SimpleFileOptions::default())
+                    .unwrap();
+                writer.write_all(b"fixture").unwrap();
+            }
+            let bytes = writer.finish().unwrap().into_inner();
+            let mut metadata = artifact(&bytes);
+            if lua {
+                metadata.layout = Layout::StarframeLuaZip {};
+            }
+            fs::write(root.path().join("download.zip"), bytes).unwrap();
+            fs::create_dir(root.path().join("content")).unwrap();
+            let result = extract(
+                &root.path().join("download.zip"),
+                &root.path().join("content"),
+                &metadata,
+                &Cancel::default(),
+            );
+            if count == 1024 {
+                assert_eq!(result.unwrap().files.len(), count);
+            } else {
+                assert!(result.unwrap_err().contains("1,024"));
+            }
+        }
+    }
+}
+
+#[test]
+fn runtime_size_limits_are_checked_before_ready_and_cached_reuse() {
+    let file = |path: &str, size_bytes| PreparedFile {
+        path: path.into(),
+        sha256: "ab".repeat(32),
+        size_bytes,
+    };
+    assert!(supported_files(&[file("package/Core.dll", 16 * 1024 * 1024)]).is_ok());
+    assert!(supported_files(&[file("package/Core.dll", 16 * 1024 * 1024 + 1)]).is_err());
+    assert!(supported_files(&[file("data.bin", 64 * 1024 * 1024)]).is_ok());
+    assert!(supported_files(&[file("data.bin", 64 * 1024 * 1024 + 1)]).is_err());
+    let mut files: Vec<_> = (0..4)
+        .map(|i| file(&format!("data{i}.bin"), 64 * 1024 * 1024))
+        .collect();
+    assert!(supported_files(&files).is_ok());
+    files.push(file("extra.bin", 1));
+    assert!(supported_files(&files).is_err());
+}
+
+#[test]
 fn lua_packages_preserve_cache_paths_and_reject_other_content() {
     for (path, valid) in [
         ("LJ/lua/fixture.lua", true),

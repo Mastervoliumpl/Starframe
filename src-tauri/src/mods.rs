@@ -281,6 +281,14 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
                     &mut BTreeSet::new(),
                 )?;
                 for reference in needed {
+                    let prepared = store
+                        .prepared_artifact(&reference.hash)
+                        .map_err(|e| e.to_string())?
+                        .ok_or("Prepared package inventory is missing.")?;
+                    packages::layout(
+                        &prepared.files,
+                        &release(&catalog, &reference)?.artifact.layout,
+                    )?;
                     if entries.contains(&reference) {
                         continue;
                     }
@@ -436,6 +444,7 @@ pub fn requested(store: &Storage) -> Result<Value> {
             .prepared_artifact(&reference.hash)
             .map_err(|e| e.to_string())?
             .ok_or("Prepared package inventory is missing.")?;
+        packages::layout(&prepared.files, &release.artifact.layout)?;
         let (entry_path, entry_type) = match &release.artifact.layout {
             Layout::StarframeManagedZip {
                 root,

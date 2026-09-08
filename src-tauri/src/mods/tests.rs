@@ -588,6 +588,108 @@ fn large_disabled_libraries_keep_bounded_inventory_and_active_mods_across_restar
 }
 
 #[test]
+fn runtime_file_boundaries_hold_from_commit_through_membership_and_activation() {
+    for lua in [false, true] {
+        for count in [1024, 1025] {
+            let (root, mut store, entries) = fixture_with_lua(lua);
+            let entry = &entries[0];
+            let mut prepared = store
+                .prepared_artifact(&entry.reference.hash)
+                .unwrap()
+                .unwrap();
+            for i in 1..count {
+                let path = if lua {
+                    format!("LJ/lua/extra{i}.lua")
+                } else {
+                    format!("package/extra{i}.txt")
+                };
+                fs::write(
+                    store
+                        .artifact_directory(&entry.reference)
+                        .unwrap()
+                        .join(&path),
+                    b"fixture",
+                )
+                .unwrap();
+                prepared.files.push(PreparedFile {
+                    path,
+                    sha256: format!("{:x}", Sha256::digest(b"fixture")),
+                    size_bytes: 7,
+                });
+            }
+            let connection =
+                rusqlite::Connection::open(root.path().join("sqlite/state.db")).unwrap();
+            connection
+                .execute(
+                    "UPDATE prepared_artifacts SET record=? WHERE hash=?",
+                    rusqlite::params![serde_json::to_string(&prepared).unwrap(), prepared.hash],
+                )
+                .unwrap();
+            drop(connection);
+            let before = store.load().unwrap();
+            let result = action(
+                &mut store,
+                Action::SetEnabled {
+                    reference: entry.reference.clone(),
+                    enabled: true,
+                    expected_revision: before.revision.to_string(),
+                },
+            );
+            if count == 1024 {
+                result.unwrap();
+                let activation = requested(&store).unwrap();
+                assert_eq!(
+                    activation["mods"][0]["files"].as_array().unwrap().len(),
+                    count
+                );
+                assert_eq!(payload(&store, &activation).unwrap().len(), count);
+            } else {
+                assert!(result.err().unwrap().contains("1,024"));
+                assert_eq!(store.load().unwrap(), before);
+                assert!(
+                    packages::verify_artifact(&store, &entry.reference)
+                        .unwrap_err()
+                        .contains("1,024")
+                );
+                let operation = Operation {
+                    id: Uuid::new_v4().to_string(),
+                    request_id: Uuid::new_v4().to_string(),
+                    release_id: entry.reference.release_id.clone().unwrap(),
+                    hash: entry.reference.hash.clone(),
+                    status: Status::Completed,
+                    message: "Fixture".into(),
+                    received_bytes: 10,
+                    total_bytes: 10,
+                };
+                store.save_package(&operation).unwrap();
+                assert!(
+                    store
+                        .complete_package(&operation, entry, &prepared)
+                        .unwrap_err()
+                        .to_string()
+                        .contains("1,024")
+                );
+                assert_eq!(store.load().unwrap(), before);
+                store
+                    .set_mod_membership(std::slice::from_ref(&entry.reference), before.revision)
+                    .unwrap();
+                assert!(requested(&store).unwrap_err().contains("1,024"));
+            }
+            drop(store);
+            let store = Storage::open(root.path()).unwrap();
+            assert!(super::view(&store).unwrap().library.contains(entry));
+            assert_eq!(
+                store
+                    .prepared_artifact(&entry.reference.hash)
+                    .unwrap()
+                    .unwrap(),
+                prepared
+            );
+        }
+    }
+}
+
+#[test]
 fn collision_winners_follow_effective_order_and_content_payloads_keep_their_paths() {
     let (_temp, mut store, entries) = fixture_with_lua(true);
     enable(&mut store, &entries[0], true);

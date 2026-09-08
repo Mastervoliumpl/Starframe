@@ -139,6 +139,7 @@ impl Storage {
     ) -> Result<()> {
         let record = operation_record(operation)?;
         let manifest = prepared_record(prepared)?;
+        crate::packages::supported_files(&prepared.files).map_err(Error::Invalid)?;
         validate_reference(&entry.reference)?;
         validate_text(&entry.name, "Mod name")?;
         validate_text(&entry.version, "Version label")?;

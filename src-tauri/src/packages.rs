@@ -465,6 +465,7 @@ pub(crate) fn verify_artifact(store: &Storage, reference: &ModReference) -> Resu
         .prepared_artifact(&reference.hash)
         .map_err(|e| e.to_string())?
         .ok_or("The package has no verified file manifest. Prepare it again.")?;
+    supported_files(&prepared.files)?;
     let mut directory = Directory::open(store.package_root())?;
     verify_existing(
         &mut directory,
@@ -715,7 +716,37 @@ async fn prepare(
     }).await.map_err(|e| format!("Package extraction worker failed: {e}"))?
 }
 
-fn layout(files: &[PreparedFile], layout: &Layout) -> Result<()> {
+pub(crate) fn supported_files(files: &[PreparedFile]) -> Result<()> {
+    if files.is_empty() || files.len() > crate::runtime_contract::MAX_FILES_PER_MOD {
+        return Err(format!(
+            "This package contains {} runtime files; supported packages contain 1–1,024. Ask the author to split or reduce the package.",
+            files.len()
+        ));
+    }
+    let mut total = 0u64;
+    for file in files {
+        if file.size_bytes > 64 * 1024 * 1024 {
+            return Err(format!(
+                "{} exceeds the runtime's 64 MiB file limit. Ask the author to reduce it.",
+                file.path
+            ));
+        }
+        if file.path.to_ascii_lowercase().ends_with(".dll") && file.size_bytes > 16 * 1024 * 1024 {
+            return Err(format!(
+                "{} exceeds the runtime's 16 MiB managed assembly limit. Ask the author to split it.",
+                file.path
+            ));
+        }
+        total += file.size_bytes;
+    }
+    if total > 256 * 1024 * 1024 {
+        return Err("This package exceeds the runtime's 256 MiB activation limit. Ask the author to split or reduce it.".into());
+    }
+    Ok(())
+}
+
+pub(crate) fn layout(files: &[PreparedFile], layout: &Layout) -> Result<()> {
+    supported_files(files)?;
     if matches!(layout, Layout::StarframeLuaZip {}) {
         if files.is_empty() || files.iter().any(|f| !lua_path(&f.path)) {
             return Err("Lua overlays require only .lua files under LJ/lua; AI and map content are unsupported.".into());
