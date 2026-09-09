@@ -12,9 +12,9 @@ Read [DESIGN.md](DESIGN.md) for behavior and presentation, [ARCHITECTURE.md](ARC
 
 ## Work one milestone at a time
 
-For #27, use the opt-in [Windows installer recipe and verification](docs/verification/windows-installer.md). Packaging adds a local preflight and isolated install/uninstall fixture. It does not publish a release or replace the executable-only CI build. The [SignPath enquiry](docs/planning/signpath-request.md) remains an unsent draft for maintainer review.
+For #27, use the opt-in [Windows installer recipe and verification](docs/verification/windows-installer.md). Packaging adds a local preflight and isolated install/uninstall fixture. It does not publish a release or replace the executable-only CI build. DESIGN.md revision 0.10 supersedes the initial app-only uninstall and keep-data default. Windows certificate signing is deferred; [SignPath form notes](docs/planning/signpath-request.md) are retained for a later application. Installer artifact, updater and catalog verification remain required before distribution.
 
-The design handoff and milestones through **0.5.0** are complete. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
+The design handoff and milestones through **0.5.0** are complete. Implementation issues belong to one version milestone. Explicitly deferred backlog decisions, including Windows certificate signing at the owner's request, may remain without a milestone; assign one before implementation begins. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise record them as future work.
 
 Work on an issue only when its milestone is active and its prerequisites are complete. Keep issue dependencies in a `Depends on` section with issue links. Each issue must state its scope, observable completion criteria and checks. Split an issue when it contains independently reviewable outcomes; avoid splitting one small change into tasks that cannot be tested separately.
 

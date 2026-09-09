@@ -22,7 +22,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 
 AI-package support is deferred until the game provides suitable AI extension/selection facilities. Automated replacement of the shipped AI is outside the current scope. Assign that work to a future milestone after those facilities can be verified; it is not a promised 0.7.0 feature.
 
-[Security scope](SECURITY.md) keeps 0.3.0 focused on the internal mod lifecycle, accurate status messages, disk/write recovery checks and separate dependency auditing. Catalog signing/advisory delivery must precede public catalog access; Windows signing and hosted release approval remain in 0.6.0 unless distribution moves earlier. Broader fuzzing and detailed compatibility reporting are follow-up work. Publishing an empty development catalog is not approval to open a live catalog to general users.
+[Security scope](SECURITY.md) keeps 0.3.0 focused on the internal mod lifecycle, accurate status messages, disk/write recovery checks and separate dependency auditing. Catalog signing/advisory delivery must precede public catalog access; Installer/update artifact signatures and hosted release approval remain in 0.6.0. Windows publisher certificates are deferred to [#61](https://github.com/Mastervoliumpl/Starframe/issues/61), without a milestone, at the owner's request. Broader fuzzing and detailed compatibility reporting are follow-up work. Publishing an empty development catalog is not approval to open a live catalog to general users.
 
 Versions describe bounded outcomes, not dates. The native integration target may move when the official API becomes available; it must not block corrective releases to existing features. Add a patch milestone such as `0.6.1` when a released version needs fixes. Finish or explicitly pause the active milestone before changing focus.
 
@@ -122,7 +122,7 @@ Complete through PR #56. Issue #24 adds local DLL/folder imports with normal man
 
 Pre-publication follow-ups: [#46: Catalog authentication and security advisory delivery](https://github.com/Mastervoliumpl/Starframe/issues/46) and [#47: Broader archive/path fuzzing](https://github.com/Mastervoliumpl/Starframe/issues/47). Move the relevant gate forward if public distribution starts earlier; neither blocks internal 0.3.0 implementation.
 
-Active. Deliver signed user-initiated updates, NSIS install/uninstall, release checks and user documentation. Exit: whole-app Windows verification passes and a draft installer release is reviewable. Publishing remains a maintainer action. Signing service enrollment, catalog freshness policy and lawful hosted acquisition of game build references must be resolved before their dependent release checks.
+Active. Deliver signed user-initiated updates, NSIS install/uninstall, release checks and user documentation. Exit: whole-app Windows verification passes and a draft installer release is reviewable. Publishing remains a maintainer action. Windows Authenticode is deferred to #61. Private/public-key signatures for installer/update artifacts and catalog metadata remain required. Resolve catalog freshness policy and lawful hosted acquisition of game build references before their dependent release checks. Runtime installation, upgrade and uninstall are automatic; full app uninstall deletes managed app data by default with an explicit keep-data option (DESIGN.md revision 0.10).
 
 - [#27: Package Windows installation and owned-file cleanup](https://github.com/Mastervoliumpl/Starframe/issues/27)
 - [#28: Check GitHub releases and install signed updates on request](https://github.com/Mastervoliumpl/Starframe/issues/28)
@@ -135,6 +135,10 @@ Blocked on the game's official mod API and completion of 0.6.0. Replace the curr
 
 - [#31: Evaluate the official mod API when the game exposes it](https://github.com/Mastervoliumpl/Starframe/issues/31)
 - [#32: Integrate native mod loading with recoverable migration](https://github.com/Mastervoliumpl/Starframe/issues/32)
+
+## Unscheduled backlog
+
+- [#61: Add trusted Windows publisher signing when eligible](https://github.com/Mastervoliumpl/Starframe/issues/61). No milestone; does not block the initial alpha.
 
 ## Working boundaries
 

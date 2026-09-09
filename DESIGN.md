@@ -1,6 +1,6 @@
 # Starframe: design direction
 
-Status: revision 0.9, 8 September 2026. Product name: Starframe. The user retained the logo and accepted the desktop layout for the first version. This revision simplifies the in-game list to the current session; the approved launch action remains unchanged.
+Status: revision 0.10, 9 September 2026. Product name: Starframe. This revision records the owner's automatic runtime lifecycle, uninstall data default and deferred Windows certificate signing decisions. The accepted visual direction and session menu remain unchanged.
 
 This is the accepted design handoff. The user authorized milestone 0.1.0 on 6 September 2026, including desktop navigation and live state in issue #8. Later feature screens remain planned. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
@@ -32,6 +32,16 @@ The user supplied these six colors:
 Game compatibility and mod releases are separate concepts. Warn when a catalog mod was made for an older game version, while still allowing the user to enable it and try launching. Collections contain a name and an ordered list of mod references. Sharing preserves those releases and their order, without mod settings. Refresh catalog data independently on launch and every five minutes while the desktop app is open; this does not require an app update.
 
 ## 2. Visual character
+
+### Installation, updates and removal
+
+Starframe manages the game integration automatically. Choosing a validated game installation authorizes preparation of the required bootstrap/runtime when the game is closed. App installation and upgrades include the required runtime resources; the desktop prepares the matching runtime automatically on first start and after updates. If a game location is not yet known, ask for the location, not a separate runtime installation. Show preparation, waiting and failure states accurately. Keep repair/reinstall available in Settings without making it part of ordinary setup.
+
+Uninstall automatically removes Starframe's recorded game integration and restores backed-up originals before removing the desktop app. Users must not have to visit Settings first. A running game, inaccessible installation or conflicting files must stop cleanup with an explanation and a retry path. Keep the app and its recovery records until cleanup succeeds; never force-close the game or erase another loader's files.
+
+Full app uninstall deletes Starframe-managed library copies, collections, app settings, caches and retained legacy app-data backups by default. Provide an unchecked **Keep my library, collections and settings** option. Installation, upgrades, repair and reinstall always preserve those data. Original imported source folders, game saves, external plugins and unowned game configuration remain untouched. Do not mistake unowned mod-created configuration for Starframe-owned app data.
+
+The owner approved proceeding without Windows Authenticode for the initial alpha. Explain the unsigned publisher and possible Windows warnings without promising that every Windows policy permits execution. Keep private/public-key verification for installer release artifacts, Tauri updates and catalog/advisory metadata. Windows certificate signing is a future issue without a milestone; publication still requires maintainer approval.
 
 Reading this as a desktop mod-management tool for Sanctuary players and mod developers: precise, game-informed, dark navy, with concentrated orange emphasis. Dials: ENERGY 2 / RHYTHM 2 / MOTION 2.
 

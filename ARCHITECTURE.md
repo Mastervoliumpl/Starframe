@@ -466,13 +466,19 @@ Show version, release notes, and a quiet persistent notice. A dismissed release 
 
 Catalog publication remains separate. A catalog-only edit changes the independently fetched JSON and its revision; it does not rebuild the installer, update the desktop app, or replace installed mod releases.
 
-The Windows uninstaller removes app-owned installation files, shortcuts and registration. Preserve collections, imported files and saved mod settings by default. Removing game integration is a separate Starframe operation: restore backed-up originals and remove only files recorded as owned by Starframe, while the game is closed. Provide `Remove Starframe from game` in Settings. If exposed during uninstall, use Tauri's NSIS hooks to invoke that same cleanup operation before app removal, rather than implementing another installer. A failed requested cleanup must show its unresolved paths and allow retry or explicit app-only removal. Uninstalling Starframe must never recursively remove the game, another loader's files, or local mod source folders.
+The desktop automatically prepares the required runtime after game selection, on first start and after app upgrades, through the existing deployment worker. Settings provides repair/reinstall for failures or an explicit user request. No separate runtime install is part of normal setup. Game-running and unknown states defer writes; successful preparation, not app installation alone, establishes readiness.
+
+The Windows uninstaller invokes the same ownership/recovery code before deleting the app, through a finite maintenance command called by NSIS. Enumerate every recorded deployment, including a previously selected installation. Restore originals and remove only owned files. A running game, unavailable root or cleanup conflict aborts removal and retains the app/database for retry. Do not offer app-only removal that discards the records needed to finish cleanup.
+
+After successful game cleanup, full uninstall deletes Starframe-managed app data by default. An unchecked `Keep my library, collections and settings` option preserves it. Upgrades and repair/reinstall always preserve app data. Preserve original import sources, game saves, external plugins, unowned mod configuration and unexpected files. Never recursively delete a game installation or follow links into external folders. Test the default-delete and explicit-keep paths separately, including interruption before cleanup completes.
+
+Windows Authenticode is deferred by the owner on 9 September 2026. Initial alpha artifacts may lack a Windows publisher signature, but release artifacts and Tauri updates still require private/public-key signatures and catalog/advisory authority remains separate. A public key beside a download does not by itself authenticate a first installation: publish its fingerprint through the project's documented trust channel and describe independent verification. When Authenticode is added later, sign Windows files before generating signatures over the final installer bytes.
 
 An explicitly requested installer may run to replace the app after its process exits; that is a finite installation step, not a persistent update checker. No service, scheduled task, autostart agent, or hidden tray mode is installed. Ordinary close cancels checks and exits Starframe. Closing Starframe leaves an already-running game alone.
 
 ## 10. Dependencies and security scope
 
-The repository now uses the desktop, runtime, HTTP, archive and SQLite dependencies recorded in its lockfiles. The following table also includes candidates for later work; it is not an instruction to install everything now. [Security scope](SECURITY.md) distinguishes implemented checks, lightweight 0.3.0 work and pre-distribution signing/advisory requirements. Internal development continues without signing; public catalog and installer access require the corresponding checks first.
+The repository now uses the desktop, runtime, HTTP, archive and SQLite dependencies recorded in its lockfiles. The following table also includes candidates for later work; it is not an instruction to install everything now. [Security scope](SECURITY.md) distinguishes implemented checks, lightweight 0.3.0 work and pre-distribution signing/advisory requirements. Internal development continues without artifact signing; public catalog and installer access require the corresponding verification checks first. Windows publisher certificates are separately deferred to #61.
 
 | Need | Proposed reuse |
 | --- | --- |
@@ -517,7 +523,7 @@ No runtime claims are verified by this document. Add tests alongside features an
 | Shared collection with matching local content | Reuse verified bytes, download only missing approved releases, and preserve the ordered references without copying settings. |
 | In-game settings and desktop close | The runtime remains usable with the desktop closed, saves configuration once, and reports restart requirements without a merge workflow. |
 | Unsupported integration capability | The UI explains unavailable ordering/settings controls rather than presenting controls with no effect. |
-| Windows install, update and uninstall | Signed updates work; app data is preserved by default; optional game cleanup touches only owned files and handles a running game or failure visibly. |
+| Windows install, update and uninstall | Artifact/update signatures verify; runtime setup and owned-file cleanup are automatic; uninstall defaults to deleting managed app data with explicit retention; upgrades preserve data and failures retain recovery. |
 
 Use Rust tests for package/deployment behavior, frontend tests for meaningful interaction logic, and C# tests plus in-game checks for activation and settings. Run shared contract fixtures through both Rust and C# readers. Use a small Windows desktop integration suite for the Tauri connection, installer, file permissions and game launch. Browser-only UI tests cannot establish native integration behavior. Accessibility, reduced motion, Windows scaling, keyboard focus, and full-path visibility follow DESIGN.md.
 

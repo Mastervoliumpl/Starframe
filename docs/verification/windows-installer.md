@@ -2,7 +2,11 @@
 
 Issue [#27](https://github.com/Mastervoliumpl/Starframe/issues/27) is in progress on the 0.6.0 branch. The local `0.6.0-dev.1` NSIS candidate is unsigned and has not been published. These checks establish packaging behavior, not public-alpha acceptance or redistribution approval.
 
-## Implemented behavior
+## Superseding owner decision, 9 September 2026
+
+DESIGN.md revision 0.10 requires automatic runtime preparation/removal and default deletion of managed app data, with explicit retention. The initial candidate below implements the earlier policy and is not acceptance evidence for the revised lifecycle. #27 must replace that behavior and test both data choices before completion. Windows Authenticode is deferred to [#61](https://github.com/Mastervoliumpl/Starframe/issues/61), with no milestone. Release/update and catalog signatures remain required.
+
+## Initial candidate behavior (superseded)
 
 [The NSIS configuration](../../src-tauri/tauri.nsis.conf.json) extends the ordinary Tauri configuration only when selected. It uses current-user installation, Windows shortcuts/registration, the existing icon/version and Tauri's download-on-demand WebView2 prerequisite. Downgrades are disabled. Executable-only development and CI retain their existing build path. See [Tauri's installer documentation](https://v2.tauri.app/distribute/windows-installer/).
 
@@ -37,6 +41,6 @@ The installer fixture changes NSIS metadata around the same executable; it does 
 
 ## Remaining #27 acceptance
 
-Public packaging still needs the complete transitive desktop/runtime/bootstrap notice and source inventory, reviewed redistribution terms, Authenticode signing and signature/timestamp verification. Existing notices are incomplete for distribution. The [SignPath eligibility request](../planning/signpath-request.md) is prepared for maintainer review and has not been submitted.
+Public packaging still needs the complete transitive desktop/runtime/bootstrap notice and source inventory, reviewed redistribution terms, installer artifact signature verification. Windows Authenticode is deferred to #61. Existing notices are incomplete for distribution. The [SignPath form notes](../planning/signpath-request.md) are retained for a future application; no application has been submitted.
 
-Still required: a clean machine without WebView2, prerequisite download failure, actual packaged-version upgrade with populated app data, and interactive installer/uninstaller keyboard, scaling and high-contrast review. The target remains Windows 11 x64; one PC does not establish the supported matrix. #27 remains open, and #28's prerequisite has not been declared complete.
+Still required: automatic runtime preparation/update/removal, default data deletion and explicit retention, cleanup failures that preserve recovery records, a clean machine without WebView2, prerequisite download failure, actual packaged-version upgrade with populated app data, and interactive installer/uninstaller keyboard, scaling and high-contrast review. The target remains Windows 11 x64; one PC does not establish the supported matrix. #27 remains open, and #28's prerequisite has not been declared complete.
