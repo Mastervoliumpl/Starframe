@@ -485,6 +485,13 @@ try {
         restored.collections.find((c) => c.id === originalCollection).name,
       ).toBe('Default');
       await waitForDeployment(1);
+      // Direct IPC changed the collection; wait for the view's next refresh before opening a revision-bound dialog.
+      await expect(
+        page.getByRole('switch', {
+          name: 'Enable Native fixture 1',
+          exact: true,
+        }),
+      ).toBeChecked();
       expect(
         await readFile(
           join(engine, 'BepInEx/config/collection-fixture.cfg'),
@@ -510,6 +517,7 @@ try {
         .click();
       await expect(page.getByRole('dialog')).toContainText('Default');
       await page.getByRole('button', { name: 'Confirm uninstall' }).click();
+      await expect(page.getByRole('dialog')).not.toBeVisible();
       await waitForDeployment(0);
       expect((await list(page)).library).toHaveLength(1);
       expect(await exists(artifactRoot)).toBe(false);

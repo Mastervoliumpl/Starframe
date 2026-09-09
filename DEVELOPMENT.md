@@ -1,6 +1,6 @@
 # Starframe development and checks
 
-Status: milestone 0.5.0 is complete through PR #56, including #24–#26, #57 and #58. See [0.5.0 exit evidence](docs/verification/milestone-0.5.0.md) and [BepInEx acceptance](docs/verification/bepinex-plugins.md). Version `0.5.0` is an internal development build with no published installer or app release. Milestone 0.6.0 remains planned until the owner authorizes its start.
+Status: milestone 0.5.0 is complete through PR #56, including #24–#26, #57 and #58. See [0.5.0 exit evidence](docs/verification/milestone-0.5.0.md), [BepInEx acceptance](docs/verification/bepinex-plugins.md) and [verification on another Windows PC](docs/verification/pc-setup.md). Version `0.5.0` is an internal development build with no published installer or app release. Milestone 0.6.0 remains planned until the owner authorizes its start.
 
 Issue #24 adds local DLL/folder imports through the package worker and SQLite schema 11. [Local import verification](docs/verification/local-imports.md) records the metadata format, source retention, recovery and native checks. Issue #25 adds source watching and schema 12; [watcher verification](docs/verification/local-watching.md) records debounce, recovery and game-exit checks.
 
