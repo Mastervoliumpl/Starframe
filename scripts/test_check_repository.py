@@ -52,6 +52,37 @@ class RepositoryChecks(unittest.TestCase):
         errors = check(self.root, self.tracked + ["AGENTS.md"])
         self.assertTrue(any("must not be tracked" in error for error in errors))
 
+    def test_personal_home_paths_fail_in_text_and_code_examples(self):
+        paths = [
+            "/".join(["C:", "Users", "example-person", "project"]),
+            "\\".join(["C:", "Users", "example-person", "project"]),
+            "\\\\".join(["C:", "Users", "example-person", "project"]),
+            "/".join(["", "home", "example-person", "project"]),
+            "/".join(["", "Users", "example-person", "project"]),
+            "/".join(["file:", "", "", "home", "example-person", "project"]),
+            "%2F".join(["C%3A", "Users", "example-person", "project"]),
+        ]
+        for name in ["README.md", "fixture.json", "script.ps1"]:
+            for value in paths:
+                with self.subTest(name=name, value=value):
+                    (self.root / name).write_text(f"```text\n{value}\n```\n", encoding="utf-8")
+                    errors = check(self.root, ["VERSION", name])
+                    self.assertTrue(any("personal home-directory path" in error for error in errors))
+                    self.assertTrue(all("example-person" not in error for error in errors))
+
+    def test_portable_paths_and_binary_assets_are_allowed(self):
+        (self.root / "README.md").write_text(
+            "Use $env:USERPROFILE, %LOCALAPPDATA%, ~/project or path/to/project.\n"
+            "https://api.github.com/users/example-person\n",
+            encoding="utf-8",
+        )
+        (self.root / "asset.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+        self.assertEqual(check(self.root, self.tracked + ["asset.png"]), [])
+
+    def test_invalid_markdown_encoding_fails(self):
+        (self.root / "README.md").write_bytes(b"\xff")
+        self.assertTrue(any("UTF-8" in error for error in check(self.root, self.tracked)))
+
 
 if __name__ == "__main__":
     unittest.main()

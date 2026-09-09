@@ -1,8 +1,7 @@
 {
   "date": "2026-09-06",
-  "os": "Windows 11 Education 25H2, build 26200",
-  "cpu": "AMD Ryzen 7 7840HS, 8 cores / 16 logical processors",
-  "visible_memory_kib": 32807804,
+  "os": "Windows 11",
+  "hardware": "Withheld for privacy; both runs used the same machine.",
   "turso": {
     "commit": "e33dbef400d4708657643b4721f6d977ade59a5b",
     "toolchain": "cargo 1.98.1 (797e8a9bc 2026-08-05)",

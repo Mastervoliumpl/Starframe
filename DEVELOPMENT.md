@@ -1,6 +1,6 @@
 # Starframe development and checks
 
-Status: milestone 0.5.0 is in final PR checks; #24–#26 implementation and developer/game verification are complete. See [0.5.0 exit evidence](docs/verification/milestone-0.5.0.md). Version `0.5.0` is an internal development build with no published installer or app release. Milestone 0.4.1 is complete; see [0.4.1 exit evidence](docs/verification/milestone-0.4.1.md).
+Status: milestone 0.5.0 is complete through PR #56, including #24–#26, #57 and #58. See [0.5.0 exit evidence](docs/verification/milestone-0.5.0.md) and [BepInEx acceptance](docs/verification/bepinex-plugins.md). Version `0.5.0` is an internal development build with no published installer or app release. Milestone 0.6.0 remains planned until the owner authorizes its start.
 
 Issue #24 adds local DLL/folder imports through the package worker and SQLite schema 11. [Local import verification](docs/verification/local-imports.md) records the metadata format, source retention, recovery and native checks. Issue #25 adds source watching and schema 12; [watcher verification](docs/verification/local-watching.md) records debounce, recovery and game-exit checks.
 
@@ -12,7 +12,7 @@ Read [DESIGN.md](DESIGN.md) for behavior and presentation, [ARCHITECTURE.md](ARC
 
 ## Work one milestone at a time
 
-The design handoff and milestones through **0.4.1** are complete. Milestone **0.5.0** covers issues #24 through #26. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
+The design handoff and milestones through **0.5.0** are complete. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
 
 Work on an issue only when its milestone is active and its prerequisites are complete. Keep issue dependencies in a `Depends on` section with issue links. Each issue must state its scope, observable completion criteria and checks. Split an issue when it contains independently reviewable outcomes; avoid splitting one small change into tasks that cannot be tested separately.
 
@@ -36,7 +36,7 @@ Add useful tests with implementation, not at the end of the project. Each bug fi
 
 Prefer observable behavior over tests of private function shapes. Use unit tests for deterministic rules such as ordering, version comparison and validation. Use temporary-file integration tests for storage, deployment, archive handling and recovery. Use frontend interaction tests for stale replies, pending states, navigation and accessible controls. Avoid snapshots of entire screens, blanket coverage percentages, and tests that only repeat a constant or a CSS declaration.
 
-Run `python scripts/check_repository.py` and `python -m unittest discover -s scripts -p 'test_*.py'` for repository checks and their regression tests. The desktop commands below check Svelte/TypeScript and Rust. C# checks are listed below. Do not report absent language tests as passing.
+Run `python scripts/check_repository.py` and `python -m unittest discover -s scripts -p 'test_*.py'` for repository checks and their regression tests. The repository check rejects absolute home-directory paths in tracked UTF-8 text, including code examples. Use environment variables or relative placeholders in shared instructions. Review screenshots, logs, hardware details and Git author metadata for privacy before publishing; the path check does not inspect those. The desktop commands below check Svelte/TypeScript and Rust. C# checks are listed below. Do not report absent language tests as passing.
 
 | Area | Checks when that area is introduced |
 | --- | --- |
