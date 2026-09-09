@@ -1,6 +1,6 @@
 # Catalog authentication, issue 46
 
-The first implementation adds a TUF verification boundary using `tough` 0.24.0. It compiles with the pinned Windows toolchain and verifies a signed `catalog.json` target before parsing Starframe's catalog. It is not yet connected to the desktop refresh or download commands. No production keys or signed catalog have been published.
+The implementation adds a TUF verification boundary using `tough` 0.24.0. It compiles with the pinned Windows toolchain and verifies both `catalog.json` and `advisories.json` from the same signed repository before accepting either. SQLite schema 13 can commit the verified pair together. This path is not yet connected to the desktop refresh or download commands. No production keys or signed catalog have been published.
 
 ## Tooling decision
 
@@ -20,7 +20,7 @@ On 9 September 2026 the owner selected daily GitHub Actions renewal with thirty-
 
 The focused Rust fixtures create fresh Ed25519 keys in memory and sign real TUF metadata through tough's publisher API. No private key material is committed or logged. The tests verify:
 
-- Valid catalog bytes and their authenticated expiry.
+- Valid catalog/advisory bytes and their shared authenticated expiry; tampering with either target rejects the refresh.
 - Rejection of changed target bytes and signed-metadata tampering.
 - Rollback rejection after a newer signed version was retained.
 - Expired metadata rejection and subsequent valid recovery.
@@ -28,4 +28,14 @@ The focused Rust fixtures create fresh Ed25519 keys in memory and sign real TUF 
 - Rejection of an unrelated replacement root.
 - HTTP error/redirect rejection, missing-file classification, oversized and truncated responses, endpoint restrictions and the request budget.
 
-The focused Windows tests passed on 9 September 2026. This does not complete #46: signed refresh/cache migration, advisory identities and corrections, download/activation enforcement, reporting routes, publishing and full desktop acceptance still need implementation and verification.
+## Advisory records and saved state
+
+The [advisory validator](../../src-tauri/src/catalog/advisories.rs) accepts schema 1 documents up to 1 MiB, with a positive decimal revision and at most 256 advisories. Each advisory retains an ID, title, exact release/archive identities, optional known payload hashes, and chronological evidence, explanation, state and recommended-action entries. The states are `suspected`, `confirmed` and `cleared`. Matching uses archive or payload hashes, including local copies with different filenames or import identities. It does not classify a changed, unknown binary as safe.
+
+Corrections append history and increase the advisory revision. Previously received findings cannot disappear or have their history rewritten. A later `cleared` entry removes that finding from active matches. Affected identities remain fixed; additional affected artifacts need a new advisory. These records stay separate from ordinary withdrawal, maintenance and compatibility metadata.
+
+Schema 13 adds one bounded `catalog_security` record. Only a verifier-produced catalog can save this record through the storage API. Its advisory data, authenticated expiry and normalized catalog hash commit in the same transaction as the catalog cache. Existing unsigned caches migrate without acquiring authenticated status. Once authenticated, the ordinary cache writer may update refresh results but cannot replace catalog content or extend the signed expiry.
+
+The storage tests verify migration from schema 12, restart and backup/restore, failure of the second write rolling back both targets, rejection of omitted or rewritten findings, an appended correction, revision rollback, clock rollback, expiry at the exact boundary and mismatched catalog content. Expiry does not delete cached confirmed findings. These tests use freshly signed fixture repositories through the production verifier.
+
+The focused Windows tests passed on 9 September 2026. This does not complete #46: desktop signed refresh, download/activation enforcement, reporting routes, publishing and full desktop acceptance still need implementation and verification.

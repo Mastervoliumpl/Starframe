@@ -4,6 +4,8 @@ Status: the owner authorized milestone 0.6.0 on 9 September 2026. Version `0.6.0
 
 Issue #24 adds local DLL/folder imports through the package worker and SQLite schema 11. [Local import verification](docs/verification/local-imports.md) records the metadata format, source retention, recovery and native checks. Issue #25 adds source watching and schema 12; [watcher verification](docs/verification/local-watching.md) records debounce, recovery and game-exit checks.
 
+Issue #46 adds schema 13 for atomic storage of authenticated catalog and advisory data. [Catalog authentication verification](docs/verification/catalog-authentication.md) records signature, correction, migration and failure checks and the remaining desktop integration work.
+
 Issue #17 adds package preparation through the existing storage worker, with schema-7 operation history and immutable file manifests. [Package checks and recovery](docs/verification/packages.md) record the supported format and limits. Its native fixture runs with the existing native suite; [screen integration and checks](docs/verification/management.md) complete issue #19.
 
 Issue #18 extends that worker with saved mod membership, automatic stopped-game deployment and confirmed uninstall. Schema 8 retains pending cleanup. [Mod lifecycle verification](docs/verification/mods.md) records native restart checks, streamed recovery and space estimates.

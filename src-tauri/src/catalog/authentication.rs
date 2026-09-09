@@ -18,6 +18,7 @@ use tough::{
 #[derive(Debug)]
 pub struct VerifiedCatalog {
     catalog: Catalog,
+    advisories: super::advisories::Advisories,
     expires: u64,
 }
 
@@ -27,6 +28,9 @@ impl VerifiedCatalog {
     }
     pub fn expires(&self) -> u64 {
         self.expires
+    }
+    pub fn advisories(&self) -> &super::advisories::Advisories {
+        &self.advisories
     }
 }
 
@@ -170,29 +174,41 @@ async fn load<T: Transport + 'static>(
     .map(|time| time.as_second())
     .min()
     .unwrap();
-    let name = TargetName::new("catalog.json").map_err(|e| e.to_string())?;
+    let catalog = Catalog::read(&target_bytes(&repository, "catalog.json", MAX_BYTES).await?)?;
+    let advisories = super::advisories::Advisories::read(
+        &target_bytes(&repository, "advisories.json", super::advisories::MAX_BYTES).await?,
+    )?;
+    Ok(VerifiedCatalog {
+        catalog,
+        advisories,
+        expires: expires.try_into().map_err(|_| "Invalid catalog expiry.")?,
+    })
+}
+
+async fn target_bytes(
+    repository: &tough::Repository,
+    filename: &str,
+    limit: usize,
+) -> Result<Vec<u8>, String> {
+    let name = TargetName::new(filename).map_err(|e| e.to_string())?;
     let target = repository
         .targets()
         .signed
         .targets
         .get(&name)
-        .ok_or("Signed catalog target is missing.")?;
-    if target.length > MAX_BYTES as u64 {
-        return Err("Signed catalog target exceeds 2 MiB.".into());
+        .ok_or_else(|| format!("Signed target {filename} is missing."))?;
+    if target.length > limit as u64 {
+        return Err(format!("Signed target {filename} exceeds its size limit."));
     }
-    let bytes = repository
+    repository
         .read_target(&name)
         .await
         .map_err(|e| e.to_string())?
-        .ok_or("Signed catalog target is missing.")?
+        .ok_or_else(|| format!("Signed target {filename} is missing."))?
         .into_vec()
         .await
-        .map_err(|e| e.to_string())?;
-    Ok(VerifiedCatalog {
-        catalog: Catalog::read(&bytes)?,
-        expires: expires.try_into().map_err(|_| "Invalid catalog expiry.")?,
-    })
+        .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

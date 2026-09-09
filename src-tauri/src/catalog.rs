@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
+pub mod advisories;
 pub mod authentication;
 pub mod refresh;
 

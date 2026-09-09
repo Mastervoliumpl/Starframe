@@ -104,6 +104,24 @@ impl Fixture {
         serde_json::from_value(json!({"_type":"root","spec_version":"1.0.0","version":version,"expires":"2100-01-01T00:00:00Z","consistent_snapshot":false,"keys":public,"roles":roles})).unwrap()
     }
     async fn publish(&self, version: u64, expires: &str) {
+        self.publish_advisories(
+            version,
+            expires,
+            &json!({"schemaVersion":1,"revision":version.to_string(),"advisories":[]}),
+        )
+        .await;
+    }
+    async fn publish_advisories(
+        &self,
+        version: u64,
+        expires: &str,
+        advisories: &serde_json::Value,
+    ) {
+        fs::write(
+            self.targets.join("advisories.json"),
+            serde_json::to_vec(advisories).unwrap(),
+        )
+        .unwrap();
         fs::write(
             self.targets.join("catalog.json"),
             serde_json::to_vec(
@@ -123,6 +141,9 @@ impl Fixture {
             .timestamp_version(NonZeroU64::new(version).unwrap())
             .timestamp_expires(expires.parse().unwrap())
             .add_target_path(self.targets.join("catalog.json"))
+            .await
+            .unwrap()
+            .add_target_path(self.targets.join("advisories.json"))
             .await
             .unwrap();
         editor
@@ -174,6 +195,21 @@ impl Fixture {
     }
 }
 
+pub(crate) async fn verified(
+    version: u64,
+    advisories: &crate::catalog::advisories::Advisories,
+) -> VerifiedCatalog {
+    let fixture = Fixture::new().await;
+    fixture
+        .publish_advisories(
+            version,
+            "2100-01-01T00:00:00Z",
+            &serde_json::to_value(advisories).unwrap(),
+        )
+        .await;
+    fixture.read().await.unwrap()
+}
+
 #[tokio::test]
 async fn verified_bytes_expiry_and_rollback() {
     let fixture = Fixture::new().await;
@@ -181,6 +217,7 @@ async fn verified_bytes_expiry_and_rollback() {
     let verified = fixture.read().await.unwrap();
     assert_eq!(verified.catalog().catalog_revision, "2");
     assert_eq!(verified.expires(), 4_102_444_800);
+    assert_eq!(verified.advisories().revision, "2");
     fs::write(fixture.targets.join("catalog.json"), b"tampered").unwrap();
     assert!(fixture.read().await.is_err());
     fixture.publish(1, "2100-01-01T00:00:00Z").await;
@@ -193,6 +230,12 @@ async fn verified_bytes_expiry_and_rollback() {
         fixture.read().await.unwrap().catalog().catalog_revision,
         "4"
     );
+    fs::write(
+        fixture.targets.join("advisories.json"),
+        b"tampered advisory",
+    )
+    .unwrap();
+    assert!(fixture.read().await.is_err());
 }
 
 #[tokio::test]
