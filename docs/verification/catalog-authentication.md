@@ -1,6 +1,6 @@
 # Catalog authentication, issue 46
 
-The implementation adds a TUF verification boundary using `tough` 0.24.0. It compiles with the pinned Windows toolchain and verifies both `catalog.json` and `advisories.json` from the same signed repository before accepting either. SQLite schema 13 can commit the verified pair together. This path is not yet connected to the desktop refresh or download commands. No production keys or signed catalog have been published.
+The implementation adds a TUF verification boundary using `tough` 0.24.0. It compiles with the pinned Windows toolchain and verifies both `catalog.json` and `advisories.json` from the same signed repository before accepting either. SQLite schema 13 can commit the verified pair together. Download and activation checks enforce retained confirmed findings, but the desktop does not yet fetch signed advisories. No production keys or signed catalog have been published.
 
 ## Tooling decision
 
@@ -38,4 +38,14 @@ Schema 13 adds one bounded `catalog_security` record. Only a verifier-produced c
 
 The storage tests verify migration from schema 12, restart and backup/restore, failure of the second write rolling back both targets, rejection of omitted or rewritten findings, an appended correction, revision rollback, clock rollback, expiry at the exact boundary and mismatched catalog content. Expiry does not delete cached confirmed findings. These tests use freshly signed fixture repositories through the production verifier.
 
-The focused Windows tests passed on 9 September 2026. This does not complete #46: desktop signed refresh, download/activation enforcement, reporting routes, publishing and full desktop acceptance still need implementation and verification.
+## Enforcement
+
+Catalog downloads check confirmed archive and known cached payload findings before starting. Package completion checks again, so a finding received during preparation can reject completion. Enabling a mod also checks its required dependencies. Every requested activation checks all selected catalog and local payloads; the launch path makes this check before repairing or preparing game files. Changed findings advance the saved-data revision so the existing stopped-game preparation loop rechecks the active setup.
+
+Confirmed findings stop launch through Starframe until the affected selections are disabled or a signed correction clears the finding. They do not delete library files, settings or collection intent. A local import remains available for management, but matching confirmed payloads cannot be enabled or included in a Starframe launch. Suspected findings do not trigger these blocks. The desktop warning display remains unfinished. The checks cannot stop code already running in the game or prevent launches outside Starframe.
+
+Rust regression tests cover an already enabled dependency, a finding arriving during package preparation, restart/expiry retention, disabling blocked selections, signed correction and restored activation. A separate test imports the same payload under another mod identity and filename, verifies that suspected findings permit activation, then confirms that the same bytes remain blocked after confirmation. Source and managed files remain present. The full Rust suite, formatter and Clippy passed on 9 September 2026.
+
+The rebuilt Windows debug app passed the affected native saved-data, mod-management and local-import checks: legacy conversion and restart, navigation during held storage startup, collection controls, settings retention, game-exit application, ordering/Lua deployment, local folder selection, offline import and retained sources. These existing desktop fixtures do not yet establish the advisory warning display or signed network refresh.
+
+This does not complete #46: desktop signed refresh and warning display, freshness enforcement for downloads, reporting routes, publishing and full desktop acceptance still need implementation and verification.

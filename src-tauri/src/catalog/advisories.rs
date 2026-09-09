@@ -167,6 +167,7 @@ impl Advisories {
         Ok(())
     }
     pub fn findings_for(&self, archive_hash: &str, files: &[PreparedFile]) -> Vec<&Advisory> {
+        let hashes: HashSet<_> = files.iter().map(|file| file.sha256.as_str()).collect();
         self.advisories
             .iter()
             .filter(|advisory| {
@@ -176,9 +177,10 @@ impl Advisories {
                     .is_some_and(|finding| finding.state != State::Cleared)
                     && advisory.affected.iter().any(|affected| {
                         affected.sha256 == archive_hash
-                            || files
+                            || affected
+                                .payload_sha256
                                 .iter()
-                                .any(|file| affected.payload_sha256.contains(&file.sha256))
+                                .any(|hash| hashes.contains(hash.as_str()))
                     })
             })
             .collect()

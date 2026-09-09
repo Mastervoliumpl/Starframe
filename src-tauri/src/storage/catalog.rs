@@ -56,6 +56,25 @@ impl CatalogSecurity {
         self.expires
     }
 
+    pub fn require_allowed(
+        &self,
+        hash: &str,
+        files: &[crate::packages::PreparedFile],
+    ) -> Result<()> {
+        if let Some(finding) = self
+            .advisories
+            .findings_for(hash, files)
+            .into_iter()
+            .find(|finding| finding.current().state == crate::catalog::advisories::State::Confirmed)
+        {
+            return Err(Error::Invalid(format!(
+                "Blocked by confirmed security advisory {}: {}. Disable the affected mod before launch. Files and settings were retained.",
+                finding.id, finding.title
+            )));
+        }
+        Ok(())
+    }
+
     pub fn require_fresh(&self, catalog: &Catalog, now: u64) -> Result<()> {
         if now < self.received_at || now >= self.expires {
             return Err(Error::Invalid("Catalog security information has expired or the clock changed. New catalog downloads are paused until a signed refresh succeeds.".into()));
@@ -153,7 +172,8 @@ impl Storage {
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        if let Some(previous) = security(&tx)? {
+        let previous = security(&tx)?;
+        if let Some(previous) = &previous {
             if now < previous.received_at {
                 return Err(Error::Invalid(
                     "The clock moved backwards since the last authenticated catalog.".into(),
@@ -166,6 +186,12 @@ impl Storage {
         }
         write_cache(&tx, &value)?;
         tx.execute("INSERT INTO catalog_security (id, record) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET record=excluded.record", [record])?;
+        if previous.as_ref().map(|p| &p.advisories.advisories)
+            != Some(&candidate.advisories.advisories)
+            && (previous.is_some() || !candidate.advisories.advisories.is_empty())
+        {
+            super::bump(&tx)?;
+        }
         tx.commit()?;
         Ok(value)
     }

@@ -117,6 +117,21 @@ impl Fixture {
         expires: &str,
         advisories: &serde_json::Value,
     ) {
+        self.publish_contents(
+            version,
+            expires,
+            &json!({"schemaVersion":2,"catalogRevision":version.to_string(),"mods":[]}),
+            advisories,
+        )
+        .await;
+    }
+    async fn publish_contents(
+        &self,
+        version: u64,
+        expires: &str,
+        catalog: &serde_json::Value,
+        advisories: &serde_json::Value,
+    ) {
         fs::write(
             self.targets.join("advisories.json"),
             serde_json::to_vec(advisories).unwrap(),
@@ -124,10 +139,7 @@ impl Fixture {
         .unwrap();
         fs::write(
             self.targets.join("catalog.json"),
-            serde_json::to_vec(
-                &json!({"schemaVersion":2,"catalogRevision":version.to_string(),"mods":[]}),
-            )
-            .unwrap(),
+            serde_json::to_vec(catalog).unwrap(),
         )
         .unwrap();
         let mut editor = RepositoryEditor::new(&self.root_path).await.unwrap();
@@ -204,6 +216,22 @@ pub(crate) async fn verified(
         .publish_advisories(
             version,
             "2100-01-01T00:00:00Z",
+            &serde_json::to_value(advisories).unwrap(),
+        )
+        .await;
+    fixture.read().await.unwrap()
+}
+
+pub(crate) async fn verified_catalog(
+    catalog: &Catalog,
+    advisories: &crate::catalog::advisories::Advisories,
+) -> VerifiedCatalog {
+    let fixture = Fixture::new().await;
+    fixture
+        .publish_contents(
+            1,
+            "2100-01-01T00:00:00Z",
+            &serde_json::to_value(catalog).unwrap(),
             &serde_json::to_value(advisories).unwrap(),
         )
         .await;

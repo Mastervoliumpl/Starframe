@@ -4,6 +4,125 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use uuid::Uuid;
 
+#[tokio::test]
+async fn confirmed_findings_block_download_enable_and_existing_activation_until_corrected() {
+    use crate::catalog::{advisories::*, authentication::tests::verified_catalog};
+    let (root, mut store, entries) = fixture();
+    enable(&mut store, &entries[1], true);
+    requested(&store).unwrap();
+    let catalog = store.catalog_cache().unwrap().unwrap().catalog.unwrap();
+    let before = store.load().unwrap();
+    let mut queue = packages::Packages::open(&mut store).unwrap();
+    let in_flight = Uuid::new_v4().to_string();
+    queue
+        .start(&mut store, &in_flight, "fixture.core.1")
+        .unwrap();
+    let mut advisories = Advisories {
+        schema_version: 1,
+        revision: "1".into(),
+        advisories: vec![Advisory {
+            id: "synthetic.block".into(),
+            title: "Synthetic fixture finding".into(),
+            affected: vec![AffectedArtifact {
+                release_id: entries[0].reference.release_id.clone().unwrap(),
+                sha256: entries[0].reference.hash.clone(),
+                payload_sha256: vec![],
+            }],
+            history: vec![Finding {
+                recorded_at: 1,
+                state: State::Confirmed,
+                explanation: "Synthetic test evidence".into(),
+                evidence: vec!["https://example.invalid/evidence".into()],
+                recommended_action: "Disable the fixture".into(),
+            }],
+        }],
+    };
+    store
+        .save_verified_catalog(&verified_catalog(&catalog, &advisories).await, 100)
+        .unwrap();
+    assert!(store.load().unwrap().revision > before.revision);
+    assert_eq!(store.load().unwrap().library, before.library);
+    assert_eq!(store.load().unwrap().collections, before.collections);
+    assert!(requested(&store).unwrap_err().contains("synthetic.block"));
+    assert!(
+        queue
+            .start(&mut store, &Uuid::new_v4().to_string(), "fixture.core.1")
+            .unwrap_err()
+            .contains("synthetic.block")
+    );
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        queue.poll(&mut store).unwrap();
+        let operation = store.package_request(&in_flight).unwrap().unwrap();
+        if operation.status != Status::Preparing {
+            assert_eq!(operation.status, Status::Failed);
+            assert!(operation.message.contains("synthetic.block"));
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline);
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    enable(&mut store, &entries[1], false);
+    enable(&mut store, &entries[0], false);
+    assert!(
+        requested(&store).unwrap()["mods"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    let expected_revision = store.load().unwrap().revision.to_string();
+    assert!(
+        action(
+            &mut store,
+            Action::SetEnabled {
+                reference: entries[1].reference.clone(),
+                enabled: true,
+                expected_revision
+            }
+        )
+        .err()
+        .unwrap()
+        .contains("synthetic.block")
+    );
+    drop(queue);
+    drop(store);
+    let mut store = Storage::open(root.path()).unwrap();
+    let security = store.catalog_security().unwrap().unwrap();
+    assert!(
+        security
+            .require_fresh(&catalog, security.expires())
+            .is_err()
+    );
+    assert!(
+        security
+            .require_allowed(&entries[0].reference.hash, &[])
+            .is_err()
+    );
+    for entry in &entries {
+        assert!(
+            store
+                .artifact_directory(&entry.reference)
+                .unwrap()
+                .join("package/Fixture.dll")
+                .exists()
+        );
+    }
+    advisories.revision = "2".into();
+    let mut correction = advisories.advisories[0].current().clone();
+    correction.recorded_at = 2;
+    correction.state = State::Cleared;
+    correction.explanation = "Synthetic correction".into();
+    advisories.advisories[0].history.push(correction);
+    store
+        .save_verified_catalog(&verified_catalog(&catalog, &advisories).await, 101)
+        .unwrap();
+    enable(&mut store, &entries[1], true);
+    assert_eq!(
+        requested(&store).unwrap()["mods"].as_array().unwrap().len(),
+        2
+    );
+}
+
 fn shared(name: &str, entries: &[ModReference]) -> String {
     serde_json::to_string(&crate::sharing::Portable {
         format: "starframe-collection".into(),

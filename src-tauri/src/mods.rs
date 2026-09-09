@@ -280,6 +280,7 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
             let mut entries = collection.map_or(vec![], |c| c.entries.clone());
             if enabled {
                 let catalog = catalog(store)?;
+                let security = store.catalog_security().map_err(|e| e.to_string())?;
                 let locals = store.local_sources().map_err(|e| e.to_string())?;
                 let mut needed = Vec::new();
                 dependency_entries(
@@ -295,6 +296,11 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
                         .prepared_artifact(&reference.hash)
                         .map_err(|e| e.to_string())?
                         .ok_or("Prepared package inventory is missing.")?;
+                    if let Some(security) = &security {
+                        security
+                            .require_allowed(&prepared.hash, &prepared.files)
+                            .map_err(|e| e.to_string())?;
+                    }
                     packages::layout(
                         &prepared.files,
                         &metadata(catalog.as_ref(), &locals, &reference)?.layout,
@@ -511,6 +517,7 @@ pub fn requested(store: &Storage) -> Result<Value> {
         );
     }
     let catalog = catalog(store)?;
+    let security = store.catalog_security().map_err(|e| e.to_string())?;
     let locals = store.local_sources().map_err(|e| e.to_string())?;
     for reference in entries {
         if !records.library.iter().any(|e| &e.reference == reference) {
@@ -530,6 +537,11 @@ pub fn requested(store: &Storage) -> Result<Value> {
             .prepared_artifact(&reference.hash)
             .map_err(|e| e.to_string())?
             .ok_or("Prepared package inventory is missing.")?;
+        if let Some(security) = &security {
+            security
+                .require_allowed(&prepared.hash, &prepared.files)
+                .map_err(|e| e.to_string())?;
+        }
         packages::layout(&prepared.files, &release.layout)?;
         total_bytes += prepared.files.iter().map(|f| f.size_bytes).sum::<u64>();
         if total_bytes > runtime_contract::MAX_ACTIVATION_BYTES {
