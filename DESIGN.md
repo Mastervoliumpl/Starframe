@@ -1,6 +1,6 @@
 # Starframe: design direction
 
-Status: revision 0.10, 9 September 2026. Product name: Starframe. This revision records the owner's automatic runtime lifecycle, uninstall data default and deferred Windows certificate signing decisions. The accepted visual direction and session menu remain unchanged.
+Status: revision 0.10, 9 September 2026. Product name: Starframe. This revision records the owner's automatic runtime lifecycle, uninstall data default, deferred Windows certificate signing and catalog expiry decisions. The accepted visual direction and session menu remain unchanged.
 
 This is the accepted design handoff. The user authorized milestone 0.1.0 on 6 September 2026, including desktop navigation and live state in issue #8. Later feature screens remain planned. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
@@ -185,6 +185,8 @@ Use compact list entries with optional author-supplied artwork. A large thumbnai
 Details include description, author/source link, approved versions, dependencies, compatibility notes, and installation state. Put technical paths and diagnostics behind expandable sections. Download progress belongs beside the action it replaces and in Downloads. Keep labels stable in width as progress changes.
 
 Fetch catalog changes on startup and every five minutes while the app is open. A valid new catalog updates the list in place, preserving filters, focus and scroll position. Reuse cached data while offline and show when it was last checked. New approval metadata must not install a mod or update an installed release by itself.
+
+When signed catalog metadata expires, pause new catalog downloads until a valid signed refresh succeeds. Explain the unavailable download action and show that catalog information is stale. Installed mods and local collections remain usable offline, subject to cached confirmed security blocks. The owner approved this behavior for #46 on 9 September 2026; the renewal interval remains to be chosen.
 
 ### Collections
 
