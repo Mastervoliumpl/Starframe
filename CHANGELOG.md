@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add opt-in NSIS packaging with verified runtime staging, current-user installation and app-data retention. Require normal app shutdown before setup instead of force-terminating file work. Clarify separate game cleanup in Settings. [Installer checks and remaining distribution gates](docs/verification/windows-installer.md) keep #27 open.
+
 ## 0.5.0 - 2026-09-08
 
 - Show only current-session mods in the game's main Mods list, with names alone. Hide disabled library entries, redundant status/version text and the inherited checkmark; preserve failure details in a separate section (#58).

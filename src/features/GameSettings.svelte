@@ -128,11 +128,16 @@
     <button
       disabled={!canWrite}
       onclick={() => onaction({ kind: 'remove_runtime' })}
-      >Remove Starframe runtime</button
+      >Remove Starframe from game</button
     >
   </div>
   <p class="muted">
-    Removal retains mod settings and files Starframe does not own. Close the
-    game before changing its runtime.
+    Removal restores backed-up originals and removes only Starframe-owned game
+    integration. It keeps your library, collections, mod settings and source
+    folders. Close the game first; removal errors stay here so you can retry.
+  </p>
+  <p class="muted">
+    Uninstalling the desktop app through Windows leaves game integration in
+    place. Use this action first if you also want to remove it from Sanctuary.
   </p>
 </div>

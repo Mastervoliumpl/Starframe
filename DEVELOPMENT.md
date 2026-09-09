@@ -12,6 +12,8 @@ Read [DESIGN.md](DESIGN.md) for behavior and presentation, [ARCHITECTURE.md](ARC
 
 ## Work one milestone at a time
 
+For #27, use the opt-in [Windows installer recipe and verification](docs/verification/windows-installer.md). Packaging adds a local preflight and isolated install/uninstall fixture. It does not publish a release or replace the executable-only CI build. The [SignPath enquiry](docs/planning/signpath-request.md) remains an unsent draft for maintainer review.
+
 The design handoff and milestones through **0.5.0** are complete. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
 
 Work on an issue only when its milestone is active and its prerequisites are complete. Keep issue dependencies in a `Depends on` section with issue links. Each issue must state its scope, observable completion criteria and checks. Split an issue when it contains independently reviewable outcomes; avoid splitting one small change into tasks that cannot be tested separately.

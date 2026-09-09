@@ -14,7 +14,7 @@ Starframe is in internal development. There is no public installer release. Cura
 
 See [package evidence](docs/verification/packages.md), [mod lifecycle evidence](docs/verification/mods.md), [management screens](docs/verification/management.md), [bootstrap evidence](docs/verification/bootstrap.md) and [runtime evidence](docs/verification/runtime-activation.md). Tests establish the stated cases, not a complete security audit. The status distinctions below are implemented for the internal curated-mod workflow; security advisory delivery remains separate future work.
 
-## Current milestone: 0.3.0
+## Internal lifecycle delivered in 0.3.0
 
 Prioritize a working internal mod lifecycle. Extend existing issues rather than start a separate security overhaul.
 
@@ -43,7 +43,9 @@ Security advisories must identify exact release IDs and artifact hashes, evidenc
 
 The initial review/reporting process can use GitHub: record the reviewed artifact, available source revision, scope of review and test evidence; provide ordinary compatibility reports and a private route for security reports before public access. Reviewing source alone does not prove a published binary matches it. Never label approval as a safety certification. No private reporting route or response-time guarantee is currently advertised; do not post secrets or personal logs in public issues.
 
-## Distribution: planned 0.6.0
+## Distribution: active 0.6.0
+
+The local NSIS candidate and its [packaging checks](docs/verification/windows-installer.md) are in progress under #27. It is unsigned and has no publication approval. The [SignPath eligibility request](docs/planning/signpath-request.md) awaits maintainer review; no signing account or certificate has been selected.
 
 Issues #27–#29 own Windows Authenticode, Tauri updater signatures and hosted release approval. Sign executables and the installer, then sign the final update artifact. Verify signatures and identities before publishing. Keep catalog signing, updater signing and Windows publisher signing separately authorized; protect credentials from pull-request code and retain recovery/rotation instructions and encrypted backups where applicable. A Windows signature does not guarantee removal of SmartScreen warnings.
 
