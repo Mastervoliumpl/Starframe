@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add bounded mutation campaigns for catalogs, runtime contracts, ZIP extraction and paths, plus Windows directory-replacement stress checks. Keep longer campaigns separate from ordinary builds and retain reproducible failures (#47). See [results and limits](docs/verification/fuzzing.md).
+- Include desktop/runtime/installer dependency notices and exact source references in NSIS packaging; reject stale notices and mismatched third-party runtime DLLs before bundling.
 - Add opt-in NSIS packaging with verified runtime staging and current-user installation. Require normal app shutdown before setup instead of force-terminating file work. Prepare the game runtime automatically after selection and on startup, including updated runtime resources; keep repair/reinstall in Settings. Uninstall cleans all recorded game deployments before removing the app, deletes managed app data by default and offers explicit retention. Installs, upgrades and reinstall preserve data. [Installer checks and remaining distribution gates](docs/verification/windows-installer.md) keep #27 open.
 - Defer Windows publisher certificates to unscheduled #61. Keep installer/update artifact signatures and catalog authentication in 0.6.0; replace the SignPath enquiry with accurate application form notes.
 

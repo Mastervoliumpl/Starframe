@@ -3,6 +3,8 @@ use crate::catalog::refresh::Cache;
 use std::{io::Cursor, net::TcpListener, time::Instant};
 use zip::{ZipWriter, write::SimpleFileOptions};
 
+mod fuzz;
+
 fn zip(files: &[(&str, &[u8])]) -> Vec<u8> {
     let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
     for (name, bytes) in files {
