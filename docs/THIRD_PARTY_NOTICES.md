@@ -2,7 +2,7 @@
 
 The 0.1.1 application links rusqlite 0.40.2 and libsqlite3-sys 0.38.2 under the MIT license. The bundled SQLite 3.53.2 source is public domain. The notice below is copied from the pinned rusqlite source package. Turso is no longer linked; retained Turso-generated database fixtures contain synthetic Starframe records.
 
-This notice supplements the repository license. Installer inventories include the [desktop dependencies](notices/desktop-dependencies.txt), [runtime and installer components](notices/runtime-dependencies.txt) and [Rust standard library](notices/Rust-1.98.1-COPYRIGHT.html). See [inventory scope, source obligations and refresh checks](verification/distribution-notices.md). No installer has been published.
+This notice supplements the repository license. Installer inventories include the [desktop dependencies](notices/desktop-dependencies.txt), [runtime and installer components](notices/runtime-dependencies.txt) and [Rust standard library](notices/Rust-1.98.1-COPYRIGHT.html). See [inventory scope, source obligations and refresh checks](https://github.com/Mastervoliumpl/Starframe/blob/main/docs/verification/distribution-notices.md). No installer has been published.
 
 ## Tauri installer template
 
@@ -44,7 +44,7 @@ SQLite is in the public domain. Source: https://sqlite.org/copyright.html. Bundl
 
 ## Runtime build dependencies
 
-The runtime uses System.Text.Json 10.0.11 and its locked Microsoft .NET dependencies under MIT terms. The [runtime inventory](notices/runtime-dependencies.txt) retains their source licenses and NuGet third-party notices. The .NET Standard reference pack is used only for compilation. The test host uses Microsoft.NET.Test.Sdk 18.9.0 and MSTest 4.4.0 under MIT terms; they are not runtime payloads. See [runtime build and SDK limits](verification/runtime-contracts.md).
+The runtime uses System.Text.Json 10.0.11 and its locked Microsoft .NET dependencies under MIT terms. The [runtime inventory](notices/runtime-dependencies.txt) retains their source licenses and NuGet third-party notices. The .NET Standard reference pack is used only for compilation. The test host uses Microsoft.NET.Test.Sdk 18.9.0 and MSTest 4.4.0 under MIT terms; they are not runtime payloads. See [runtime build and SDK limits](https://github.com/Mastervoliumpl/Starframe/blob/main/docs/verification/runtime-contracts.md).
 
 Rust's contract reader uses sha2 0.10.9 under MIT OR Apache-2.0. It is included in the desktop inventory with the other Windows build dependencies.
 

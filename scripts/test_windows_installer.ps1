@@ -85,6 +85,15 @@ try {
                 throw "Installed notice differs: $taskRelative"
             }
         }
+        $taskNoticeIndex = Join-Path $taskInstall 'THIRD_PARTY_NOTICES.md'
+        if ((Get-FileHash -LiteralPath $taskNoticeIndex).Hash -ne (Get-FileHash -LiteralPath (Join-Path $taskRepository 'docs/THIRD_PARTY_NOTICES.md')).Hash) {
+            throw 'Installed notice index differs.'
+        }
+        foreach ($taskLink in [regex]::Matches([IO.File]::ReadAllText($taskNoticeIndex), '\]\((notices/[^)]+)\)')) {
+            if (!(Test-Path -LiteralPath (Join-Path $taskInstall $taskLink.Groups[1].Value) -PathType Leaf)) {
+                throw 'An installed notice link has no target.'
+            }
+        }
         if ($taskVersion -eq '0.6.0-dev.0') {
             New-Item -ItemType Directory -Path $taskData | Out-Null
             $taskInit = Start-Process -FilePath (Join-Path $taskInstall 'starframe.exe') -ArgumentList @('--installer-uninstall', $taskIdentifier, 'keep') -WindowStyle Hidden -PassThru -Wait

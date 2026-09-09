@@ -2,6 +2,8 @@
 
 The 0.6.0 installer includes the [desktop notices](../notices/desktop-dependencies.txt), [runtime and installer notices](../notices/runtime-dependencies.txt), [Rust standard-library notices](../notices/Rust-1.98.1-COPYRIGHT.html), existing font/artwork notices and Starframe's AGPL license. The JSON inventories record versions, source locations, license text hashes and runtime DLL identities. No installer has been published.
 
+The installer puts `THIRD_PARTY_NOTICES.md` beside the executable and its linked license files beneath `notices/`. Verification-document links point to the public repository. The ordinary-user installer fixture checks the installed index hash, each linked license target and every notice file hash. This catches the earlier packaging layout that placed the index one directory too deep. The full fixture passed with the corrected layout on 9 September 2026.
+
 ## Inventory scope
 
 The Windows x64 Cargo graph contains 311 non-development dependencies, including build dependencies. Keeping build dependencies accounts for generated code; it does not mean every listed package is linked into the executable. The production JavaScript source map identifies Svelte and `@tauri-apps/api`. Twelve Rust packages omit license files from their archives; [pinned upstream records](../notices/upstream-sources.json) supply those texts. The `selectors` archive declares MPL-2.0, with the full license copied from Mozilla's versioned license page.

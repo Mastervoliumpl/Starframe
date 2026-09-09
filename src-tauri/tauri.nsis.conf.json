@@ -14,7 +14,7 @@
     "resources": {
       "target/installer/integration/": "integration/",
       "../LICENSE": "LICENSE.txt",
-      "../docs/THIRD_PARTY_NOTICES.md": "notices/THIRD_PARTY_NOTICES.md",
+      "../docs/THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
       "../docs/notices/": "notices/"
     },
     "windows": {
