@@ -6,4 +6,4 @@ export type Snapshot = { sessionId: string, revision: string, appVersion: string
 export type CommandError = { code: string, message: string, affectedIds: Array<string>, recoverable: boolean, };
 export type SavedData = { "status": "loading" } | { "status": "ready", revision: string, libraryCount: number, collectionCount: number, activeCollectionName: string | null, } | { "status": "unavailable", message: string, };
 export type GameAction = { "kind": "discover" } | { "kind": "setup" } | { "kind": "launch" } | { "kind": "remove_runtime" } | { "kind": "choose_folder" } | { "kind": "select", id: string, };
-export type CatalogStatus = { revision: string | null, releaseCount: number, checking: boolean, lastChecked: string | null, lastSuccess: string | null, error: string | null, };
+export type CatalogStatus = { revision: string | null, releaseCount: number, checking: boolean, lastChecked: string | null, lastSuccess: string | null, expires: string | null, fresh: boolean, error: string | null, };

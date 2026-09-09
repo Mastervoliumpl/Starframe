@@ -407,13 +407,23 @@ fn accepted_import_is_idempotent_and_storage_failure_rolls_back_collection_and_p
     assert_eq!(store.load().unwrap(), before);
 }
 
-#[test]
-fn sharing_queues_missing_approved_content_after_one_acceptance_and_retains_cancelled_references() {
+#[tokio::test]
+async fn sharing_queues_missing_approved_content_after_one_acceptance_and_retains_cancelled_references()
+ {
     let (_source, source, entries) = fixture();
     let target = tempfile::tempdir().unwrap();
     let mut store = Storage::open(target.path()).unwrap();
+    let catalog = source.catalog_cache().unwrap().unwrap().catalog.unwrap();
+    let advisories = crate::catalog::advisories::Advisories {
+        schema_version: 1,
+        revision: "1".into(),
+        advisories: vec![],
+    };
     store
-        .save_catalog_cache(&source.catalog_cache().unwrap().unwrap())
+        .save_verified_catalog(
+            &crate::catalog::authentication::tests::verified_catalog(&catalog, &advisories).await,
+            100,
+        )
         .unwrap();
     let mut queue = packages::Packages::open(&mut store).unwrap();
     let id = import(

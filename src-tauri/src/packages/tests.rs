@@ -5,6 +5,69 @@ use zip::{ZipWriter, write::SimpleFileOptions};
 
 mod fuzz;
 
+#[tokio::test]
+async fn new_downloads_require_signed_freshness_at_start_and_completion() {
+    let root = tempfile::tempdir().unwrap();
+    let mut storage = Storage::open(root.path()).unwrap();
+    let bytes = zip(&[("package/Core.dll", b"inert fixture")]);
+    let approved = catalog(artifact(&bytes));
+    storage
+        .save_catalog_cache(&Cache {
+            catalog: Some(approved.clone()),
+            ..Default::default()
+        })
+        .unwrap();
+    let mut queue = Packages::open(&mut storage).unwrap();
+    let start = |queue: &mut Packages, storage: &mut Storage| {
+        queue.start(storage, &Uuid::new_v4().to_string(), "fixture.core.1")
+    };
+    assert!(
+        start(&mut queue, &mut storage)
+            .unwrap_err()
+            .contains("not been verified")
+    );
+    assert!(!queue.busy());
+    let advisories = crate::catalog::advisories::Advisories {
+        schema_version: 1,
+        revision: "1".into(),
+        advisories: vec![],
+    };
+    let verified =
+        crate::catalog::authentication::tests::verified_catalog(&approved, &advisories).await;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    storage.save_verified_catalog(&verified, now).unwrap();
+    let operation = start(&mut queue, &mut storage).unwrap();
+    let prepared = extract_fixture(&bytes).unwrap();
+    queue.active.get_mut(&operation.id).unwrap().ready = Some(Ok(PreparedImport {
+        prepared,
+        local: None,
+    }));
+    // Advance only the fixture's saved expiry to exercise completion without a clock bypass in the app.
+    let db = rusqlite::Connection::open(root.path().join("sqlite/state.db")).unwrap();
+    db.execute(
+        "UPDATE catalog_security SET record=json_set(record, '$.receivedAt', ?1, '$.expires', ?2)",
+        rusqlite::params![(now - 2) as i64, (now - 1) as i64],
+    )
+    .unwrap();
+    queue.poll(&mut storage).unwrap();
+    let failed = storage
+        .package_request(&operation.request_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(failed.status, Status::Failed);
+    assert!(failed.message.contains("expired"));
+    assert!(storage.load().unwrap().library.is_empty());
+    assert!(
+        start(&mut queue, &mut storage)
+            .unwrap_err()
+            .contains("expired")
+    );
+    assert!(!queue.busy());
+}
+
 fn zip(files: &[(&str, &[u8])]) -> Vec<u8> {
     let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
     for (name, bytes) in files {

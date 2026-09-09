@@ -56,6 +56,14 @@ impl CatalogSecurity {
         self.expires
     }
 
+    pub fn received_at(&self) -> u64 {
+        self.received_at
+    }
+
+    pub fn matches_catalog(&self, catalog: &Catalog) -> Result<bool> {
+        Ok(catalog_hash(catalog)? == self.catalog_sha256)
+    }
+
     pub fn require_allowed(
         &self,
         hash: &str,
@@ -79,7 +87,7 @@ impl CatalogSecurity {
         if now < self.received_at || now >= self.expires {
             return Err(Error::Invalid("Catalog security information has expired or the clock changed. New catalog downloads are paused until a signed refresh succeeds.".into()));
         }
-        if catalog_hash(catalog)? != self.catalog_sha256 {
+        if !self.matches_catalog(catalog)? {
             return Err(Error::Invalid("This catalog does not match the authenticated security information. Wait for a signed refresh.".into()));
         }
         Ok(())
@@ -124,6 +132,22 @@ fn write_cache(conn: &Connection, value: &Cache) -> Result<()> {
 }
 
 impl Storage {
+    pub(crate) fn catalog_trust_directory(&self) -> Result<std::path::PathBuf> {
+        let _root = crate::filesystem::pin(&self.root).map_err(Error::Invalid)?;
+        let path = self.root.join("catalog-trust");
+        match std::fs::create_dir(&path) {
+            Ok(()) => (),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => (),
+            Err(error) => return Err(error.into()),
+        }
+        crate::filesystem::pin(&path).map_err(Error::Invalid)?;
+        Ok(path)
+    }
+
+    pub fn require_catalog_download(&self, catalog: &Catalog, now: u64) -> Result<()> {
+        self.catalog_security()?.ok_or_else(|| Error::Invalid("Catalog security information has not been verified. New catalog downloads are paused until a signed refresh succeeds.".into()))?.require_fresh(catalog, now)
+    }
+
     pub fn catalog_cache(&self) -> Result<Option<Cache>> {
         cache(&self.conn)
     }

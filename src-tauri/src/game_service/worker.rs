@@ -192,6 +192,12 @@ impl Worker {
                     checking: refresh.checking,
                     last_checked: refresh.cache.last_checked.map(|t| t.to_string()),
                     last_success: refresh.cache.last_success.map(|t| t.to_string()),
+                    expires: refresh.expires().map(|t| t.to_string()),
+                    fresh: refresh.fresh(
+                        now.duration_since(SystemTime::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs(),
+                    ),
                     error: refresh.cache.error.clone(),
                 });
         }

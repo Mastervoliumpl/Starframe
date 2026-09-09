@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security concern privately
+    url: https://github.com/Mastervoliumpl/Starframe/security/advisories/new
+    about: Use this route for suspected malicious mods or vulnerabilities. Do not post exploits, secrets or private logs in public issues.

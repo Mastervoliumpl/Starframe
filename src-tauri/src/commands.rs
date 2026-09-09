@@ -143,11 +143,40 @@ pub fn external_url(page: &str) -> Result<&'static str, CommandError> {
     match page {
         "repository" => Ok("https://github.com/Mastervoliumpl/Starframe"),
         "releases" => Ok("https://github.com/Mastervoliumpl/Starframe/releases"),
+        "report" => {
+            Ok("https://github.com/Mastervoliumpl/Starframe/issues/new?template=mod-report.yml")
+        }
+        "security" => Ok("https://github.com/Mastervoliumpl/Starframe/security/advisories/new"),
         _ => Err(CommandError::new(
             "invalid_link",
             "This external page is not available.",
         )),
     }
+}
+
+fn advisory_url(
+    advisories: &starframe::catalog::advisories::Advisories,
+    identity: &str,
+) -> Result<String, CommandError> {
+    let resolve = || {
+        let (id, indexes) = identity.split_once(':')?;
+        let (history, evidence) = indexes.split_once(':')?;
+        advisories
+            .advisories
+            .iter()
+            .find(|a| a.id == id)?
+            .history
+            .get(history.parse::<usize>().ok()?)?
+            .evidence
+            .get(evidence.parse::<usize>().ok()?)
+            .cloned()
+    };
+    resolve().ok_or_else(|| {
+        CommandError::new(
+            "invalid_link",
+            "This evidence link is not in the retained security advisory.",
+        )
+    })
 }
 
 #[tauri::command]
@@ -190,7 +219,19 @@ pub async fn open_external(
                 )
             });
     }
-    let url = if let Some(id) = page.strip_prefix("mod:") {
+    let url = if let Some(identity) = page.strip_prefix("advisory:") {
+        let advisories = service
+            .mods(starframe::mods::Action::List)
+            .await?
+            .advisories
+            .ok_or_else(|| {
+                CommandError::new(
+                    "invalid_link",
+                    "No verified security advisories are available.",
+                )
+            })?;
+        advisory_url(&advisories, identity)?
+    } else if let Some(id) = page.strip_prefix("mod:") {
         service
             .mods(starframe::mods::Action::List)
             .await?
@@ -214,6 +255,31 @@ pub async fn open_external(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn evidence_links_resolve_only_retained_advisory_entries() {
+        let advisories = starframe::catalog::advisories::Advisories::read(br#"{
+          "schemaVersion":1,"revision":"1","advisories":[{
+            "id":"fixture.finding","title":"Synthetic finding",
+            "affected":[{"releaseId":"fixture.1","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","payloadSha256":[]}],
+            "history":[{"recordedAt":1,"state":"confirmed","explanation":"Synthetic evidence","evidence":["https://example.invalid/evidence"],"recommendedAction":"Disable fixture"}]
+          }]}
+        "#).unwrap();
+        assert_eq!(
+            advisory_url(&advisories, "fixture.finding:0:0").unwrap(),
+            "https://example.invalid/evidence"
+        );
+        for identity in [
+            "missing:0:0",
+            "fixture.finding:1:0",
+            "fixture.finding:0:1",
+            "fixture.finding:-1:0",
+            "fixture.finding:0:0:1",
+            "https://example.invalid/evidence",
+            "file:///C:/secret",
+        ] {
+            assert!(advisory_url(&advisories, identity).is_err());
+        }
+    }
     #[test]
     fn only_known_external_pages_can_be_opened() {
         assert!(

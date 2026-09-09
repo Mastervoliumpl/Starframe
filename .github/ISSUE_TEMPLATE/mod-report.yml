@@ -1,0 +1,35 @@
+name: Mod problem
+description: Report compatibility, installation or catalog information problems.
+title: '[Mod report] '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For suspected malicious code or vulnerabilities, use [private security reporting](https://github.com/Mastervoliumpl/Starframe/security/advisories/new).
+        This form creates a public issue. Remove usernames, personal file paths, tokens and private logs. Do not attach mod binaries.
+  - type: textarea
+    id: identity
+    attributes:
+      label: Exact mod and release
+      description: Copy the release ID and SHA-256 from Package details. Identify local imports as local.
+    validations:
+      required: true
+  - type: textarea
+    id: versions
+    attributes:
+      label: Starframe and game versions
+      description: Include the game build and the other enabled mods when relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the expected behavior, the observed behavior and steps to reproduce it.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Link the author release, existing discussion or a redacted error. Describe anything you have already tried.

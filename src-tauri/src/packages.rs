@@ -250,6 +250,15 @@ impl Packages {
             .prepared_artifact(&artifact.sha256)
             .map_err(|e| e.to_string())?;
         if previous.is_none() {
+            storage
+                .require_catalog_download(
+                    &catalog,
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
+                )
+                .map_err(|e| e.to_string())?;
             let reserved: u64 = self
                 .active
                 .values()
@@ -433,6 +442,21 @@ impl Packages {
                     != result.prepared.hash
                 {
                     return Err("Release identity changed during package preparation.".into());
+                }
+                if storage
+                    .prepared_artifact(&result.prepared.hash)
+                    .map_err(|e| e.to_string())?
+                    .is_none()
+                {
+                    storage
+                        .require_catalog_download(
+                            &catalog,
+                            std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_secs(),
+                        )
+                        .map_err(|e| e.to_string())?;
                 }
                 Ok(result)
             });

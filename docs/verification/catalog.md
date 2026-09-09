@@ -1,5 +1,7 @@
 # Catalog verification for issue #16
 
+The HTTP-validator evidence below records the earlier internal catalog client. Version 0.6.0 replaces that transport with authenticated TUF refresh; see [current authentication and advisory verification](catalog-authentication.md). Old cache fields remain readable for migration.
+
 Verified on Windows on 7 September 2026, on `codex/0.3.0-curated-mods` at app version `0.3.0-dev.1`. Main remains on completed 0.2.0. This work adds metadata validation and refresh; it does not download mod packages or deploy them to the game.
 
 ## Automated results

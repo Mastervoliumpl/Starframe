@@ -14,6 +14,8 @@ const snapshot = (revision: string, sessionId = 'session'): Snapshot => ({
     checking: false,
     lastChecked: null,
     lastSuccess: null,
+    expires: null,
+    fresh: false,
     error: null,
   },
   game: {

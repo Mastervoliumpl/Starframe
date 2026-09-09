@@ -1,4 +1,7 @@
-use super::{Catalog, ENDPOINT, MAX_BYTES};
+use super::{
+    Catalog, MAX_BYTES,
+    authentication::{self, VerifiedCatalog},
+};
 use crate::storage::Storage;
 use reqwest::{Client, header};
 use serde::{Deserialize, Serialize};
@@ -44,15 +47,6 @@ impl Cache {
     }
 }
 
-#[derive(Debug)]
-pub struct Response {
-    pub status: u16,
-    pub etag: Option<String>,
-    pub last_modified: Option<String>,
-    pub retry_after: Option<u64>,
-    pub bytes: Vec<u8>,
-}
-
 pub fn client() -> Result<Client, String> {
     Client::builder()
         .user_agent("Starframe catalog/1")
@@ -65,79 +59,16 @@ pub fn client() -> Result<Client, String> {
         .map_err(|e| e.to_string())
 }
 
-async fn fetch(client: &Client, endpoint: &str, cache: &Cache) -> Result<Response, String> {
-    let mut request = client
-        .get(endpoint)
-        .header(header::ACCEPT, "application/json");
-    if let Some(etag) = &cache.etag {
-        request = request.header(header::IF_NONE_MATCH, etag);
-    } else if let Some(modified) = &cache.last_modified {
-        request = request.header(header::IF_MODIFIED_SINCE, modified);
-    }
-    let mut response = request.send().await.map_err(|e| {
-        if e.is_timeout() {
-            "Catalog request timed out. Starframe will retry automatically.".to_owned()
-        } else {
-            "Catalog request failed. Check your connection; Starframe will retry automatically."
-                .to_owned()
-        }
-    })?;
-    let validator = |name| -> Result<Option<String>, String> {
-        response
-            .headers()
-            .get(name)
-            .map(|value: &header::HeaderValue| {
-                let value = value
-                    .to_str()
-                    .map_err(|_| "Invalid catalog HTTP validator.")?;
-                if value.len() > 1024 {
-                    return Err("Catalog HTTP validator is too long.".into());
-                }
-                Ok(value.to_owned())
-            })
-            .transpose()
-    };
-    let mut result = Response {
-        status: response.status().as_u16(),
-        etag: validator(header::ETAG)?,
-        last_modified: validator(header::LAST_MODIFIED)?,
-        retry_after: response
-            .headers()
-            .get(header::RETRY_AFTER)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.parse::<u64>().ok())
-            .map(|seconds| seconds.min(3600)),
-        bytes: Vec::new(),
-    };
-    if result.status != 200 {
-        return Ok(result);
-    }
-    if response
-        .content_length()
-        .is_some_and(|size| size > MAX_BYTES as u64)
-    {
-        return Err("Catalog response exceeds 2 MiB. The previous cache was retained.".into());
-    }
-    while let Some(chunk) = response.chunk().await.map_err(
-        |_| "Catalog transfer stopped before completion. Starframe will retry automatically.",
-    )? {
-        if result.bytes.len() + chunk.len() > MAX_BYTES {
-            return Err("Catalog response exceeds 2 MiB. The previous cache was retained.".into());
-        }
-        result.bytes.extend_from_slice(&chunk);
-    }
-    Ok(result)
-}
-
 type PendingResponse = (
     tokio::task::JoinHandle<()>,
-    mpsc::Receiver<Result<Response, String>>,
+    mpsc::Receiver<Result<VerifiedCatalog, String>>,
 );
 
 pub struct Refresh {
     pub cache: Cache,
     pub checking: bool,
     pub next_check: u64,
+    verified_window: Option<(u64, u64)>,
     failures: u32,
     pending: Option<PendingResponse>,
 }
@@ -152,16 +83,38 @@ impl Drop for Refresh {
 
 impl Refresh {
     pub fn load(storage: &Storage) -> Result<Self, String> {
+        let cache = storage
+            .catalog_cache()
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
+        let security = storage.catalog_security().map_err(|e| e.to_string())?;
+        let verified_window = match (&cache.catalog, security) {
+            (Some(catalog), Some(security))
+                if security
+                    .matches_catalog(catalog)
+                    .map_err(|e| e.to_string())? =>
+            {
+                Some((security.received_at(), security.expires()))
+            }
+            _ => None,
+        };
         Ok(Self {
-            cache: storage
-                .catalog_cache()
-                .map_err(|e| e.to_string())?
-                .unwrap_or_default(),
+            cache,
             checking: false,
             next_check: 0,
+            verified_window,
             failures: 0,
             pending: None,
         })
+    }
+
+    pub fn expires(&self) -> Option<u64> {
+        self.verified_window.map(|(_, expires)| expires)
+    }
+
+    pub fn fresh(&self, now: u64) -> bool {
+        self.verified_window
+            .is_some_and(|(received, expires)| now >= received && now < expires)
     }
 
     pub fn tick(&mut self, storage: &mut Storage, now: u64, shell_ready: bool, stopped: bool) {
@@ -185,18 +138,27 @@ impl Refresh {
         if !shell_ready || now < self.next_check {
             return;
         }
-        let client = match client() {
-            Ok(client) => client,
+        let datastore = match storage.catalog_trust_directory() {
+            Ok(path) => path,
             Err(error) => {
-                self.complete(storage, Err(error), now);
+                self.complete(storage, Err(error.to_string()), now);
                 return;
             }
         };
-        let cache = self.cache.clone();
         let (sender, receiver) = mpsc::sync_channel(1);
         self.checking = true;
         let task = tokio::spawn(async move {
-            let _ = sender.send(fetch(&client, ENDPOINT, &cache).await);
+            let _ = sender.send(
+                authentication::fetch(
+                    authentication::ROOT,
+                    &datastore,
+                    authentication::METADATA
+                        .parse()
+                        .expect("fixed metadata URL"),
+                    authentication::TARGETS.parse().expect("fixed targets URL"),
+                )
+                .await,
+            );
         });
         self.pending = Some((task, receiver));
     }
@@ -204,53 +166,20 @@ impl Refresh {
     pub fn complete(
         &mut self,
         storage: &mut Storage,
-        response: Result<Response, String>,
+        response: Result<VerifiedCatalog, String>,
         now: u64,
     ) {
         self.checking = false;
-        let retry_after = response
-            .as_ref()
-            .ok()
-            .and_then(|r| r.retry_after)
-            .unwrap_or(0);
-        let mut candidate = self.cache.clone();
-        candidate.last_checked = Some(now);
-        let result = response.and_then(|response| {
-            match response.status {
-                200 => {
-                    let catalog = Catalog::read(&response.bytes)?;
-                    if let Some(previous) = &candidate.catalog {
-                        catalog.accepts_after(previous)?;
-                    }
-                    candidate.catalog = Some(catalog);
-                    candidate.etag = response.etag;
-                    candidate.last_modified = response.last_modified;
-                }
-                304 if candidate.catalog.is_some()
-                    && (candidate.etag.is_some() || candidate.last_modified.is_some()) =>
-                {
-                    if response.etag.is_some() {
-                        candidate.etag = response.etag;
-                    }
-                    if response.last_modified.is_some() {
-                        candidate.last_modified = response.last_modified;
-                    }
-                }
-                status => {
-                    return Err(format!(
-                        "Catalog server returned HTTP {status}. Starframe will retry automatically."
-                    ));
-                }
-            }
-            candidate.last_success = Some(now);
-            candidate.error = None;
-            storage
-                .save_catalog_cache(&candidate)
-                .map_err(|e| e.to_string())
+        let result = response.and_then(|verified| {
+            let cache = storage
+                .save_verified_catalog(&verified, now)
+                .map_err(|e| e.to_string())?;
+            Ok((cache, verified.expires()))
         });
         match result {
-            Ok(()) => {
-                self.cache = candidate;
+            Ok((cache, expires)) => {
+                self.cache = cache;
+                self.verified_window = Some((now, expires));
                 self.failures = 0;
             }
             Err(error) => {
@@ -265,9 +194,7 @@ impl Refresh {
         let delay = if self.failures == 0 {
             300
         } else {
-            (30u64.saturating_mul(1u64 << self.failures.min(7).saturating_sub(1)))
-                .min(1800)
-                .max(retry_after)
+            (30u64.saturating_mul(1u64 << self.failures.min(7).saturating_sub(1))).min(1800)
         };
         self.next_check = now.saturating_add(delay);
     }

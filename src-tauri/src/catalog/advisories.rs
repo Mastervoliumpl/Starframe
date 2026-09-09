@@ -167,21 +167,24 @@ impl Advisories {
         Ok(())
     }
     pub fn findings_for(&self, archive_hash: &str, files: &[PreparedFile]) -> Vec<&Advisory> {
+        self.history_for(archive_hash, files)
+            .into_iter()
+            .filter(|advisory| advisory.current().state != State::Cleared)
+            .collect()
+    }
+
+    pub fn history_for(&self, archive_hash: &str, files: &[PreparedFile]) -> Vec<&Advisory> {
         let hashes: HashSet<_> = files.iter().map(|file| file.sha256.as_str()).collect();
         self.advisories
             .iter()
             .filter(|advisory| {
-                advisory
-                    .history
-                    .last()
-                    .is_some_and(|finding| finding.state != State::Cleared)
-                    && advisory.affected.iter().any(|affected| {
-                        affected.sha256 == archive_hash
-                            || affected
-                                .payload_sha256
-                                .iter()
-                                .any(|hash| hashes.contains(hash.as_str()))
-                    })
+                advisory.affected.iter().any(|affected| {
+                    affected.sha256 == archive_hash
+                        || affected
+                            .payload_sha256
+                            .iter()
+                            .any(|hash| hashes.contains(hash.as_str()))
+                })
             })
             .collect()
     }

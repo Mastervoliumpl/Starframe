@@ -11,6 +11,7 @@ import type {
   PackageAction,
   SharingAction,
   SharingReply,
+  Advisory,
 } from './generated/management';
 export type {
   Reference,
@@ -45,6 +46,24 @@ export const key = (reference: Reference) =>
   ]);
 export const transferring = (op: PackageOperation) =>
   op.status === 'preparing' || op.status === 'cancelling';
+export const findings = (
+  data: ModView | null,
+  hash: string | undefined,
+): Advisory[] => {
+  const ids = hash ? (data?.findings[hash] ?? []) : [];
+  return (
+    data?.advisories?.advisories.filter((advisory) =>
+      ids.includes(advisory.id),
+    ) ?? []
+  );
+};
+export const confirmedFinding = (
+  data: ModView | null,
+  hash: string | undefined,
+) =>
+  findings(data, hash).some(
+    (advisory) => advisory.history.at(-1)?.state === 'confirmed',
+  );
 export const bytes = (value: number) =>
   `${(value / 1024 / 1024).toLocaleString(undefined, { maximumFractionDigits: 1 })} MiB`;
 export function compatibility(

@@ -1,6 +1,8 @@
 # Catalog publication
 
-Issue #46 is in progress. The publisher and disposable-key checks work locally. The workflow is disabled until `CATALOG_PUBLICATION_ENABLED` is set to `true`; production credentials, the embedded trust root and desktop refresh integration are not configured yet. No signed catalog has been published.
+Issue #46 is in progress. The publisher, embedded trust root and desktop signed refresh are implemented. The workflow is disabled until `CATALOG_PUBLICATION_ENABLED` is set to `true`. Credential upload requires owner approval; no signed catalog has been published. The first hosted renewal and live client refresh remain acceptance checks before public distribution.
+
+The initial public root is [catalog/trust/root.json](../catalog/trust/root.json), version 1, with separate RSA-4096 recovery and online publishing keys. Its file SHA-256 is `2ab2812d4d89d4d37d2722b64c6e1902ee1dacb80f44de2bbcfd5206fc887345`, and it expires on 9 September 2027. The owner confirmed a secure backup of the recovery key and root on 9 September 2026. Private keys remain outside tracked files. A candidate signed with these keys passed local TUF target verification without publication.
 
 ## Authority and hosting
 
@@ -10,7 +12,7 @@ The `catalog` GitHub environment holds only `CATALOG_SIGNING_KEY`, containing th
 
 The [workflow](../.github/workflows/catalog.yml) runs daily at 03:17 UTC and after successful Checks runs on main. It also permits manual dispatch. Before and after preparation it confirms that the checked source commit is still current main. It serializes publication jobs and pushes normally to `codex/catalog-published`; it never force-pushes. A rejected push retains the previous publication. Versioned metadata and hashed target filenames remain on that branch so clients can finish a refresh across publication boundaries. Root history must remain available for older clients to rotate their trust.
 
-Daily renewal advances TUF metadata versions and gives targets, snapshot and timestamp metadata thirty days of validity. It does not change catalog or advisory revisions when their content is unchanged. A failed renewal leaves the previous signed publication in place. The desktop's required expiry behavior remains to pause new catalog downloads while retaining installed offline use and known confirmed findings.
+Daily renewal advances TUF metadata versions and gives targets, snapshot and timestamp metadata thirty days of validity. It does not change catalog or advisory revisions when their content is unchanged. A failed renewal leaves the previous signed publication in place. The desktop pauses new catalog downloads after expiry while retaining installed offline use and known confirmed findings.
 
 ## Preparation and verification
 
@@ -36,4 +38,4 @@ To replace an online key, retain the current public root, increase its version, 
 
 To replace the offline root key, sign the new root under both the old and new root authorities. `tuftool root sign` supports the old root through `--cross-sign`; keep both signatures. The client tests cover accepted cross-signing and rejection of an unrelated root. If the old root authority is lost and there is no usable backup, an app update carrying a new reviewed trust root is required. Do not reset retained metadata or silently accept an unsigned replacement.
 
-On compromise, stop the publishing workflow, revoke the affected online credential, review published target history and rotate the authority with the retained offline key. Append signed corrections to incorrect advisories; do not erase earlier findings. Review the separate app-release authority if evidence shows it was also exposed. No production recovery drill or owner backup has been recorded yet.
+On compromise, stop the publishing workflow, revoke the affected online credential, review published target history and rotate the authority with the retained offline key. Append signed corrections to incorrect advisories; do not erase earlier findings. Review the separate app-release authority if evidence shows it was also exposed. The owner backup is confirmed; rotation/recovery tests use disposable authorities. A production recovery drill has not been performed.

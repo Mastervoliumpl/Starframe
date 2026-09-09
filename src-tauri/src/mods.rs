@@ -65,6 +65,8 @@ pub enum Action {
 #[cfg_attr(test, ts(rename = "ModView"))]
 pub struct View {
     pub catalog: Option<Catalog>,
+    pub advisories: Option<crate::catalog::advisories::Advisories>,
+    pub findings: std::collections::BTreeMap<String, Vec<String>>,
     pub revision: String,
     pub library: Vec<LibraryEntry>,
     pub local_sources: Vec<crate::local_import::LocalSource>,
@@ -100,6 +102,48 @@ pub fn view(store: &Storage) -> Result<View> {
         .map_err(|e| e.to_string())?
         .and_then(|c| c.catalog);
     let locals = store.local_sources().map_err(|e| e.to_string())?;
+    let advisories = store
+        .catalog_security()
+        .map_err(|e| e.to_string())?
+        .map(|s| s.advisories().clone());
+    let mut findings = std::collections::BTreeMap::new();
+    if let Some(advisories) = &advisories
+        && !advisories.advisories.is_empty()
+    {
+        let installed: BTreeSet<_> = records
+            .library
+            .iter()
+            .map(|entry| &entry.reference.hash)
+            .collect();
+        let hashes: BTreeSet<_> = installed
+            .iter()
+            .copied()
+            .chain(
+                catalog
+                    .iter()
+                    .flat_map(|c| c.releases().map(|(_, r)| &r.artifact.sha256)),
+            )
+            .collect();
+        let has_payloads = advisories
+            .advisories
+            .iter()
+            .any(|a| a.affected.iter().any(|a| !a.payload_sha256.is_empty()));
+        for hash in hashes {
+            let prepared = if has_payloads && installed.contains(hash) {
+                store.prepared_artifact(hash).map_err(|e| e.to_string())?
+            } else {
+                None
+            };
+            let matches =
+                advisories.history_for(hash, prepared.as_ref().map_or(&[], |p| p.files.as_slice()));
+            if !matches.is_empty() {
+                findings.insert(
+                    hash.clone(),
+                    matches.into_iter().map(|a| a.id.clone()).collect(),
+                );
+            }
+        }
+    }
     let order = if let Some(error) = crate::sharing::active_error(store, &records)? {
         Err(error)
     } else if let Some(missing) = enabled
@@ -155,6 +199,8 @@ pub fn view(store: &Storage) -> Result<View> {
     Ok(View {
         imports: store.collection_imports().map_err(|e| e.to_string())?,
         catalog,
+        advisories,
+        findings,
         order,
         order_error,
         collisions,

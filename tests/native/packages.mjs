@@ -240,6 +240,111 @@ expect(
   reopened.prepare('SELECT count(*) AS count FROM library').get().count,
 ).toBe(1);
 reopened.close();
+// Seed retained state only; real signatures and corrected-history acceptance are covered by Rust TUF fixtures.
+const history = [];
+for (const state of ['suspected', 'confirmed', 'cleared']) {
+  const db = new DatabaseSync(join(root, 'sqlite', 'state.db'));
+  const cached = JSON.parse(
+    db.prepare('SELECT record FROM catalog_cache WHERE id=1').get().record,
+  );
+  history.push({
+    recordedAt: 1788819700 + history.length,
+    state,
+    explanation: `Synthetic ${state} evidence`,
+    evidence: ['https://example.invalid/evidence'],
+    recommendedAction:
+      state === 'confirmed' ? 'Disable this fixture.' : 'Use is permitted.',
+  });
+  const now = Math.floor(Date.now() / 1000);
+  db.prepare(
+    'INSERT INTO catalog_security (id, record) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET record=excluded.record',
+  ).run(
+    JSON.stringify({
+      catalogSha256: hash(JSON.stringify(cached.catalog)),
+      receivedAt: now - 100,
+      expires: now - 1,
+      advisories: {
+        schemaVersion: 1,
+        revision: String(history.length),
+        advisories: [
+          {
+            id: 'fixture.finding',
+            title: 'Synthetic native finding',
+            affected: [
+              {
+                releaseId: 'fixture.core.1',
+                sha256: archiveHash,
+                payloadSha256: [hash(bytes)],
+              },
+            ],
+            history,
+          },
+        ],
+      },
+    }),
+  );
+  db.close();
+  await withDesktop(
+    root,
+    async (page) => {
+      const enabled = page.getByRole('switch', {
+        name: 'Enable Native fixture 1',
+      });
+      if (state === 'confirmed') {
+        await expect(enabled).toBeDisabled();
+        await expect(
+          page.getByRole('alert').filter({ hasText: 'installed mod matches' }),
+        ).toBeVisible();
+        const blocked = await page.evaluate(
+          (requestId) =>
+            window.__TAURI_INTERNALS__
+              .invoke('package_action', {
+                action: {
+                  kind: 'prepare',
+                  requestId,
+                  releaseId: 'fixture.core.1',
+                },
+              })
+              .catch((error) => error),
+          randomUUID(),
+        );
+        expect(blocked.message).toContain('fixture.finding');
+        await page.screenshot({
+          path: 'test-results/native/security-confirmed.png',
+        });
+      } else {
+        await expect(enabled).toBeEnabled();
+      }
+      await expect(
+        page.getByRole('button', { name: 'Uninstall Native fixture 1' }),
+      ).toBeEnabled();
+      await page
+        .getByRole('button', { name: 'Native fixture', exact: true })
+        .click();
+      const details = page.getByRole('complementary', { name: 'Mod details' });
+      await expect(
+        details.getByRole('heading', { name: 'Synthetic native finding' }),
+      ).toBeVisible();
+      await details
+        .getByText('Evidence and correction history', { exact: true })
+        .click();
+      await expect(
+        details.getByText(`Synthetic ${state} evidence`, { exact: true }),
+      ).toHaveCount(2);
+      await page.getByRole('button', { name: 'Catalog', exact: true }).click();
+      await expect(
+        page.getByText(
+          'Catalog security information has expired or the clock changed.',
+          { exact: false },
+        ),
+      ).toBeVisible();
+    },
+    offline,
+  );
+}
+expect(await readFile(join(directory, 'Core.dll'), 'utf8')).toBe(
+  'changed native bytes',
+);
 console.log(
-  'Native packages passed: command permissions, verified reuse, duplicate requests, retained failure and restart.',
+  'Native packages passed: command permissions, offline reuse, retained failure, expired advisory controls, correction history and restart.',
 );

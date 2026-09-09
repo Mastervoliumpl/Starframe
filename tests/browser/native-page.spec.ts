@@ -3,7 +3,7 @@ import { createServer, type AddressInfo } from 'node:net';
 import { waitForDebugPortRelease } from '../native/port.mjs';
 import { waitForDesktopPage } from '../native/page.mjs';
 
-test('native connection waits for a page and also accepts an existing page', async ({
+test('native connection waits for the app document and also accepts an existing page', async ({
   browser,
 }) => {
   const context = await browser.newContext();
@@ -11,7 +11,17 @@ test('native connection waits for a page and also accepts an existing page', asy
     expect(context.pages()).toHaveLength(0);
     const connectedPage = waitForDesktopPage(browser);
     const page = await context.newPage();
+    await page.route('http://tauri.localhost/', (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<h1>Native document fixture</h1>',
+      }),
+    );
+    await page.goto('http://tauri.localhost/');
     expect(await connectedPage).toBe(page);
+    await expect(page.getByRole('heading')).toHaveText(
+      'Native document fixture',
+    );
     expect(await waitForDesktopPage(browser)).toBe(page);
   } finally {
     await context.close();

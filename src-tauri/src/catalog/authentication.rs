@@ -15,6 +15,12 @@ use tough::{
     TransportStream,
 };
 
+pub const ROOT: &[u8] = include_bytes!("../../../catalog/trust/root.json");
+pub const METADATA: &str =
+    "https://raw.githubusercontent.com/Mastervoliumpl/Starframe/codex/catalog-published/metadata/";
+pub const TARGETS: &str =
+    "https://raw.githubusercontent.com/Mastervoliumpl/Starframe/codex/catalog-published/targets/";
+
 #[derive(Debug)]
 pub struct VerifiedCatalog {
     catalog: Catalog,

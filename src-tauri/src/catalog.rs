@@ -5,8 +5,6 @@ pub mod advisories;
 pub mod authentication;
 pub mod refresh;
 
-pub const ENDPOINT: &str =
-    "https://raw.githubusercontent.com/Mastervoliumpl/Starframe/main/catalog/releases.json";
 pub const MAX_BYTES: usize = 2 * 1024 * 1024;
 type Result<T> = std::result::Result<T, String>;
 

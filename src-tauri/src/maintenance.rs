@@ -13,6 +13,7 @@ pub fn uninstall(root: &Path, keep_data: bool) -> Result<(), String> {
     let root_pin = pin(root)?;
     let mut directories: Vec<_> = [
         "artifacts",
+        "catalog-trust",
         "package-staging",
         "deployment-content",
         "backups",
@@ -125,6 +126,8 @@ mod tests {
         let store = Storage::open(&root).unwrap();
         fs::create_dir(root.join("artifacts")).unwrap();
         fs::write(root.join("artifacts/managed.dll"), b"managed copy").unwrap();
+        fs::create_dir(root.join("catalog-trust")).unwrap();
+        fs::write(root.join("catalog-trust/root.json"), b"retained trust").unwrap();
         fs::write(root.join("unowned.txt"), b"unowned").unwrap();
         let staging = root.join(format!("sqlite-staging-{}", uuid::Uuid::new_v4()));
         fs::create_dir(&staging).unwrap();
@@ -139,10 +142,12 @@ mod tests {
         uninstall(&root, true).unwrap();
         assert!(root.join("sqlite/state.db").exists());
         assert!(root.join("artifacts/managed.dll").exists());
+        assert!(root.join("catalog-trust/root.json").exists());
         uninstall(&root, false).unwrap();
         assert!(!root.join("sqlite").exists());
         assert!(!staging.exists());
         assert!(!root.join("artifacts").exists());
+        assert!(!root.join("catalog-trust").exists());
         assert_eq!(fs::read(root.join("unowned.txt")).unwrap(), b"unowned");
         assert_eq!(
             fs::read(temp.path().join("source.dll")).unwrap(),
