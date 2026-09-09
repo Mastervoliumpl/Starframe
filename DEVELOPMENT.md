@@ -1,6 +1,6 @@
 # Starframe development and checks
 
-Status: milestone 0.5.0 is complete through PR #56, including #24–#26, #57 and #58. See [0.5.0 exit evidence](docs/verification/milestone-0.5.0.md), [BepInEx acceptance](docs/verification/bepinex-plugins.md) and [verification on another Windows PC](docs/verification/pc-setup.md). Version `0.5.0` is an internal development build with no published installer or app release. Milestone 0.6.0 remains planned until the owner authorizes its start.
+Status: the owner authorized milestone 0.6.0 on 9 September 2026. Version `0.6.0-dev.1` is in development on `codex/0.6.0-windows-alpha`, starting with installer packaging (#27). No installer or app release is published. Milestone 0.5.0 is complete through PR #56; retain its [exit evidence](docs/verification/milestone-0.5.0.md), [BepInEx acceptance](docs/verification/bepinex-plugins.md) and [verification on another Windows PC](docs/verification/pc-setup.md).
 
 Issue #24 adds local DLL/folder imports through the package worker and SQLite schema 11. [Local import verification](docs/verification/local-imports.md) records the metadata format, source retention, recovery and native checks. Issue #25 adds source watching and schema 12; [watcher verification](docs/verification/local-watching.md) records debounce, recovery and game-exit checks.
 
@@ -81,7 +81,7 @@ Dependency auditing moves forward to 0.3.0 as a separate CI workflow for depende
 
 ## Versions and change history
 
-[VERSION](VERSION) is the source of the product version, currently `0.5.0`. No installer has been published. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
+[VERSION](VERSION) is the source of the product version, currently `0.6.0-dev.1`. No installer has been published. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
 
 Use three-part versions: `0.MINOR.PATCH` during initial development. A capability milestone advances the minor version; a corrective release advances the patch version. The planning handoff uses `0.0.1`. Published content is immutable; never replace a release with different bytes under the same version. The `0.x` series makes no stable public API promise, but format migrations and compatibility changes still need explicit notes. [Semantic Versioning](https://semver.org/)
 

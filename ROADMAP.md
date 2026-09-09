@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-**[0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6)** completes local imports (#24), watched rebuilds (#25), developer workflow verification (#26), BepInEx compatibility and Ladder Reporter (#57), and the current-session game menu (#58) through PR #56. See [exit evidence](docs/verification/milestone-0.5.0.md). Version `0.5.0` is an internal development build. Milestone 0.6.0 is next and has not started. No app release or installer is published.
+**[0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7)** is active from 9 September 2026. Version `0.6.0-dev.1` starts Windows alpha distribution on `codex/0.6.0-windows-alpha`. Work begins with installer packaging (#27); catalog authentication (#46) and bounded fuzzing (#47) are also in this milestone. Updates (#28), release automation (#29) and alpha acceptance (#30) follow their prerequisites. No app release or installer is published. Milestone 0.5.0 is complete; see its [exit evidence](docs/verification/milestone-0.5.0.md).
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -17,7 +17,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Complete |
 | [0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11) | Exact approval identities, package/runtime limits and maintenance | Complete |
 | [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Complete: #24–#26, #57–#58 verified |
-| [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Planned |
+| [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Active: installer packaging |
 | [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Native game integration | Blocked on official game API |
 
 AI-package support is deferred until the game provides suitable AI extension/selection facilities. Automated replacement of the shipped AI is outside the current scope. Assign that work to a future milestone after those facilities can be verified; it is not a promised 0.7.0 feature.
@@ -122,7 +122,7 @@ Complete through PR #56. Issue #24 adds local DLL/folder imports with normal man
 
 Pre-publication follow-ups: [#46: Catalog authentication and security advisory delivery](https://github.com/Mastervoliumpl/Starframe/issues/46) and [#47: Broader archive/path fuzzing](https://github.com/Mastervoliumpl/Starframe/issues/47). Move the relevant gate forward if public distribution starts earlier; neither blocks internal 0.3.0 implementation.
 
-Planned; starts after 0.5.0 closes. Deliver signed user-initiated updates, NSIS install/uninstall, release checks and user documentation. Exit: whole-app Windows verification passes and a draft installer release is reviewable. Publishing remains a maintainer action.
+Active. Deliver signed user-initiated updates, NSIS install/uninstall, release checks and user documentation. Exit: whole-app Windows verification passes and a draft installer release is reviewable. Publishing remains a maintainer action. Signing service enrollment, catalog freshness policy and lawful hosted acquisition of game build references must be resolved before their dependent release checks.
 
 - [#27: Package Windows installation and owned-file cleanup](https://github.com/Mastervoliumpl/Starframe/issues/27)
 - [#28: Check GitHub releases and install signed updates on request](https://github.com/Mastervoliumpl/Starframe/issues/28)
