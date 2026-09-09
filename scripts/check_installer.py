@@ -7,6 +7,7 @@ import stat
 
 from prepare_desktop_runtime import RUNTIME_FILES
 from versions import read_version
+from check_dependency_notices import check as check_notices
 
 
 def check(root: Path, integration: Path) -> None:
@@ -56,4 +57,5 @@ def check(root: Path, integration: Path) -> None:
 if __name__ == '__main__':
     repository = Path(__file__).resolve().parents[1]
     check(repository, repository / 'src-tauri/target/installer/integration')
+    check_notices(repository, repository / 'src-tauri/target/installer/integration')
     print('Installer runtime inventory and hashes verified. Signing and redistribution review remain separate checks.')

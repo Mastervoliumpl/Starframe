@@ -79,6 +79,12 @@ try {
                 throw "Installed resource differs: $taskRelative"
             }
         }
+        foreach ($taskSource in Get-ChildItem -LiteralPath (Join-Path $taskRepository 'docs/notices') -File -Recurse) {
+            $taskRelative = [IO.Path]::GetRelativePath((Join-Path $taskRepository 'docs/notices'), $taskSource.FullName)
+            if ((Get-FileHash -LiteralPath $taskSource.FullName).Hash -ne (Get-FileHash -LiteralPath (Join-Path $taskInstall "notices/$taskRelative")).Hash) {
+                throw "Installed notice differs: $taskRelative"
+            }
+        }
         if ($taskVersion -eq '0.6.0-dev.0') {
             New-Item -ItemType Directory -Path $taskData | Out-Null
             $taskInit = Start-Process -FilePath (Join-Path $taskInstall 'starframe.exe') -ArgumentList @('--installer-uninstall', $taskIdentifier, 'keep') -WindowStyle Hidden -PassThru -Wait
@@ -180,6 +186,7 @@ try {
         ordinaryUser = $true
         versions = @('0.6.0-dev.0', '0.6.0-dev.1')
         runtimeHashesMatched = $true
+        noticeHashesMatched = $true
         explicitAppDataRetention = $true
         defaultAppDataDeletion = $true
         reinstallRetainedData = $true

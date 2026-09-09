@@ -24,7 +24,7 @@ python scripts/check_installer.py
 npm run tauri -- build --config src-tauri/tauri.nsis.conf.json -- --locked
 ```
 
-Preparation requires a new staging directory. Preserve older staging under ignored build output before rebuilding. The [preflight](../../scripts/check_installer.py) checks exact runtime membership, hashes, limits, empty activation and rejection of links/unexpected files. It is not a signature, license review or protection against a hostile build host. The package includes 35 prepared integration files and existing notices. Redistribution review remains incomplete.
+Preparation requires a new staging directory. Preserve older staging under ignored build output before rebuilding. The [preflight](../../scripts/check_installer.py) checks exact runtime membership, hashes, limits, empty activation and rejection of links/unexpected files. It also checks dependency notice inputs, text and third-party DLL identities against the [reviewed inventories](distribution-notices.md). It is not a signature or protection against a hostile build host. The package includes 35 integration files and the desktop, runtime, installer and Rust standard-library notices. Corresponding source delivery remains a release-review requirement.
 
 ## Verification on 9 September 2026
 
@@ -49,6 +49,6 @@ The [fixture helper](../../scripts/installer_game_fixture.py) creates inert game
 
 ## Remaining acceptance
 
-Complete the transitive desktop/runtime/bootstrap notice and source inventory and review redistribution terms. Verify absent WebView2, prerequisite download failure, an actual packaged-version upgrade with populated data, and interactive installer/uninstaller keyboard, scaling and high-contrast behavior. Test actual process termination during installer cleanup/data removal in addition to the seeded journal and file-error retry checks above. A single PC does not establish the supported Windows matrix.
+The transitive notice/source inventory is recorded in [distribution notices](distribution-notices.md); verify required source delivery with #29 before publication. Verify absent WebView2, prerequisite download failure, an actual packaged-version upgrade with populated data, and interactive installer/uninstaller keyboard, scaling and high-contrast behavior. Test actual process termination during installer cleanup/data removal in addition to the seeded journal and file-error retry checks above. A single PC does not establish the supported Windows matrix; clean-Windows acceptance needs a disposable test environment.
 
 Windows Authenticode is deferred to [#61](https://github.com/Mastervoliumpl/Starframe/issues/61), with no milestone. Installer/update artifact signatures and catalog authentication remain required under #28, #29 and #46. [SignPath form notes](../planning/signpath-request.md) are retained for a future application; no application or consent has been submitted. No app release is authorized by this verification, and #27 remains open.
