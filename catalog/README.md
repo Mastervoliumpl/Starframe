@@ -42,6 +42,8 @@ Paths reuse the runtime's Windows alias/device/path checks. Artifact URLs have t
 
 ## Review and publication
 
+Milestone 0.6.0 adds `advisories.json` alongside the release catalog. The validator checks its schema and retained correction history against the same Git base. Revision 1 is empty; it asserts no security findings. [Authenticated publication](../docs/catalog-publishing.md) is implemented for testing but remains disabled pending production trust setup and desktop integration. The current internal desktop still uses the raw release endpoint described below.
+
 1. Review the exact author release, its archive layout, dependencies and redistribution/source links. Approval does not establish that code is free of malware.
 2. Add a new stable release ID for changed bytes, version labels, package layouts or dependency requirements. Existing identities cannot be reassigned to another mod. A mirror URL may change only for identical reviewed bytes.
 3. Retain every previous release. Set `withdrawn` to `true` and supply `withdrawalReason` to stop new downloads. One failed request does not withdraw a release. Withdrawal is permanent for that release ID; a new approval needs a new ID.

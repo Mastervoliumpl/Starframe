@@ -14,7 +14,7 @@ The Windows dependency graph adds 30 non-development packages, including the cli
 
 The caller supplies an embedded trusted root and an owned persistent TUF datastore. The module rejects reparse points in that directory, retains metadata versions for rollback checks and resumes from an accepted cached root. Retaining the root matters even if a later refresh stage fails; an old embedded root must not restore a revoked signing authority. This datastore assumes the same local integrity boundary as Starframe's existing saved data; it is not protection against a hostile process with the user's filesystem access.
 
-On 9 September 2026 the owner selected daily GitHub Actions renewal with thirty-day validity. Expired metadata pauses new catalog downloads. Installed offline use and cached confirmed security blocks remain effective. Catalog/advisory keys must be separate from app-release keys. The publishing workflow, credential provisioning, root backup procedure and desktop policy integration remain unfinished; the cadence here records the accepted behavior, not an already running renewal job.
+On 9 September 2026 the owner selected daily GitHub Actions renewal with thirty-day validity. Expired metadata pauses new catalog downloads. Installed offline use and cached confirmed security blocks remain effective. Catalog/advisory keys must be separate from app-release keys. The [publisher and disabled workflow](../catalog-publishing.md) implement renewal and checked publication; disposable RSA-key fixtures passed locally. Production credentials, root backup and desktop policy integration remain unfinished. No renewal job is active yet.
 
 ## Verification
 

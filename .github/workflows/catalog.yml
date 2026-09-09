@@ -1,0 +1,117 @@
+name: Catalog publication
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_run:
+    workflows: [Checks]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: catalog-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.repository == 'Mastervoliumpl/Starframe' &&
+      github.ref == 'refs/heads/main' &&
+      vars.CATALOG_PUBLICATION_ENABLED == 'true' &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    runs-on: windows-latest
+    timeout-minutes: 30
+    environment: catalog
+    permissions:
+      contents: write
+      actions: read
+    env:
+      CHECKED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.CHECKED_SHA }}
+          persist-credentials: false
+      - name: Require successful checks on the current main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $main = gh api "repos/$env:GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha
+          if ($LASTEXITCODE -ne 0 -or $main -ne $env:CHECKED_SHA) { throw 'Wait for checks on the current main commit.' }
+          $runs = gh run list --repo $env:GITHUB_REPOSITORY --workflow checks.yml --commit $env:CHECKED_SHA --status success --limit 1 --json databaseId | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $runs.Count -ne 1) { throw 'The current main commit has no successful Checks run.' }
+      - uses: actions/setup-node@94196ee1d15439c1b6651cd87ef14e88ec435966
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: 1.98.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: npm run build
+      - name: Build pinned publishing tools
+        run: |
+          cargo build --manifest-path src-tauri/Cargo.toml --locked --bin check_catalog --example sign_catalog
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo install tuftool --version 0.17.0 --locked --root "$env:RUNNER_TEMP/catalog-tools"
+      - name: Verify publication with disposable signing keys
+        run: >-
+          python scripts/verify_catalog_publishing.py
+          --tuftool "$env:RUNNER_TEMP/catalog-tools/bin/tuftool.exe"
+          --validator src-tauri/target/debug/check_catalog.exe
+          --signer src-tauri/target/debug/examples/sign_catalog.exe
+      - name: Prepare verified output and publish metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CATALOG_SIGNING_KEY: ${{ secrets.CATALOG_SIGNING_KEY }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:CATALOG_SIGNING_KEY)) { throw 'Catalog signing key is not configured.' }
+          gh auth setup-git
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $repository = "https://github.com/$env:GITHUB_REPOSITORY.git"
+          $branch = 'codex/catalog-published'
+          $published = Join-Path $env:RUNNER_TEMP 'catalog-published'
+          $output = Join-Path $env:RUNNER_TEMP 'catalog-candidate'
+          $existing = git ls-remote --heads $repository "refs/heads/$branch"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $previous = @()
+          if ($existing) {
+            git clone --depth 1 --single-branch --branch $branch $repository $published
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $previous = @('--previous', $published)
+          } else {
+            git init --initial-branch=$branch $published
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            git -C $published remote add origin $repository
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          $key = Join-Path $env:RUNNER_TEMP 'catalog-signing.pem'
+          try {
+            [IO.File]::WriteAllText($key, $env:CATALOG_SIGNING_KEY)
+            Remove-Item Env:CATALOG_SIGNING_KEY
+            python scripts/publish_catalog.py --root catalog/trust/root.json --key $key --output $output --tuftool "$env:RUNNER_TEMP/catalog-tools/bin/tuftool.exe" --validator src-tauri/target/debug/check_catalog.exe --signer src-tauri/target/debug/examples/sign_catalog.exe @previous
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Remove-Item -LiteralPath $key -ErrorAction SilentlyContinue
+          }
+          $main = gh api "repos/$env:GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha
+          if ($LASTEXITCODE -ne 0 -or $main -ne $env:CHECKED_SHA) { throw 'Main changed during preparation. Wait for its successful checks.' }
+          Copy-Item -LiteralPath "$output/metadata", "$output/targets" -Destination $published -Recurse -Force
+          git -C $published add -- metadata targets
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $published -c user.name=github-actions[bot] -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m "Renew catalog metadata from $env:CHECKED_SHA"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $published push origin "HEAD:refs/heads/$branch"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
