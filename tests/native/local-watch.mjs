@@ -74,7 +74,7 @@ try {
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
       await page.getByRole('button', { name: /^Use installation:/ }).click();
       await page
-        .getByRole('button', { name: 'Install or retry setup' })
+        .getByRole('button', { name: 'Repair or reinstall runtime' })
         .click();
       await expect
         .poll(

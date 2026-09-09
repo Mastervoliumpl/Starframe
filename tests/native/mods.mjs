@@ -33,7 +33,9 @@ await withDesktop(
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: /^Use installation:/ }).click();
     await expect.poll(async () => (await list(page)).library.length).toBe(0);
-    await page.getByRole('button', { name: 'Install or retry setup' }).click();
+    await page
+      .getByRole('button', { name: 'Repair or reinstall runtime' })
+      .click();
     await expect
       .poll(
         async () =>
@@ -183,15 +185,18 @@ db.close();
 let deployed;
 const activation = async () =>
   JSON.parse(await readFile(join(engine, 'Starframe/activation.json'), 'utf8'));
-const waitForDeployment = (count) =>
+const waitForDeployment = (page, count) =>
   expect
     .poll(
       async () => {
+        // The worker replies after file work; reading activation alone can see an unfinished deployment.
+        const confirmed = await list(page);
         const current = await activation();
         const mod = current.mods.find((m) => m.modId === reference.modId);
         if (mod)
           deployed = join(engine, 'Starframe', mod.root, mod.entryAssembly);
         return {
+          revisionMatches: current.deploymentRevision === confirmed.revision,
           mods: current.mods.length,
           payload: deployed
             ? await readFile(deployed).then(hash, (error) => {
@@ -203,7 +208,11 @@ const waitForDeployment = (count) =>
       },
       { timeout: 30000 },
     )
-    .toEqual({ mods: count, payload: count ? hash(bytes) : null });
+    .toEqual({
+      revisionMatches: true,
+      mods: count,
+      payload: count ? hash(bytes) : null,
+    });
 const exists = (path) =>
   access(path).then(
     () => true,
@@ -228,7 +237,7 @@ try {
           exact: true,
         }),
       ).toBeChecked();
-      await waitForDeployment(1);
+      await waitForDeployment(page, 1);
       originalCollection = (await list(page)).activeCollection;
       const nativeRow = page
         .getByRole('region', { name: 'My mods', exact: true })
@@ -277,12 +286,12 @@ try {
         kind: 'select_collection',
         id: spareCollection,
       });
-      await waitForDeployment(0);
+      await waitForDeployment(page, 0);
       await collectionAction(page, {
         kind: 'select_collection',
         id: originalCollection,
       });
-      await waitForDeployment(1);
+      await waitForDeployment(page, 1);
       expect(await readFile(keptSettings, 'utf8')).toBe(
         'settings survive collection edits',
       );
@@ -303,7 +312,7 @@ try {
       await expect
         .poll(() => running.exitCode !== null || running.signalCode !== null)
         .toBe(true);
-      await waitForDeployment(0);
+      await waitForDeployment(page, 0);
       expect((await activation()).deploymentRevision).toBe(
         pendingCollection.revision,
       );
@@ -311,7 +320,7 @@ try {
         kind: 'select_collection',
         id: originalCollection,
       });
-      await waitForDeployment(1);
+      await waitForDeployment(page, 1);
       expect(await readFile(deployed)).toEqual(bytes);
       await action(page, {
         kind: 'set_enabled',
@@ -324,7 +333,7 @@ try {
         enabled: true,
         expectedRevision: (await list(page)).revision,
       });
-      await waitForDeployment(2);
+      await waitForDeployment(page, 2);
       const beforeOrder = await list(page);
       const reordered = await action(page, {
         kind: 'reorder',
@@ -420,7 +429,7 @@ try {
         enabled: false,
         expectedRevision: (await list(page)).revision,
       });
-      await waitForDeployment(1);
+      await waitForDeployment(page, 1);
       await page.getByRole('button', { name: 'My mods', exact: true }).click();
       await page.screenshot({ path: 'test-results/native/my-mods-live.png' });
       await page
@@ -472,7 +481,7 @@ try {
   await withDesktop(
     data,
     async (page) => {
-      await waitForDeployment(0);
+      await waitForDeployment(page, 0);
       expect(await exists(deployed)).toBe(false);
       expect(await exists(join(artifactRoot, 'package/Fixture.dll'))).toBe(
         true,
@@ -484,7 +493,14 @@ try {
       expect(
         restored.collections.find((c) => c.id === originalCollection).name,
       ).toBe('Default');
-      await waitForDeployment(1);
+      await waitForDeployment(page, 1);
+      // Direct IPC changed the collection; wait for the view's next refresh before opening a revision-bound dialog.
+      await expect(
+        page.getByRole('switch', {
+          name: 'Enable Native fixture 1',
+          exact: true,
+        }),
+      ).toBeChecked();
       expect(
         await readFile(
           join(engine, 'BepInEx/config/collection-fixture.cfg'),
@@ -510,7 +526,8 @@ try {
         .click();
       await expect(page.getByRole('dialog')).toContainText('Default');
       await page.getByRole('button', { name: 'Confirm uninstall' }).click();
-      await waitForDeployment(0);
+      await expect(page.getByRole('dialog')).not.toBeVisible();
+      await waitForDeployment(page, 0);
       expect((await list(page)).library).toHaveLength(1);
       expect(await exists(artifactRoot)).toBe(false);
       expect(await readFile(settings, 'utf8')).toBe('retain user settings');

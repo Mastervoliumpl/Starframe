@@ -260,6 +260,7 @@ fn prepare(
     launch::prepare_latest(
         || starframe::mods::requested(&store.borrow()),
         |activation| {
+            deployment::repair_missing(&mut store.borrow_mut(), game)?;
             deployment::prepare_desktop(
                 &mut store.borrow_mut(),
                 game,

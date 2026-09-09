@@ -7,14 +7,17 @@ use std::{
 };
 use uuid::Uuid;
 
+mod catalog;
+pub use catalog::CatalogSecurity;
+
 mod local_import;
 mod mods;
 mod packages;
 mod sharing;
 
-const SCHEMA: i64 = 12;
+const SCHEMA: i64 = 13;
 const APPLICATION_ID: i64 = 0x53544652;
-const MIGRATIONS: [&str; 12] = [
+const MIGRATIONS: [&str; 13] = [
     "CREATE TABLE metadata (id INTEGER PRIMARY KEY CHECK(id = 1), engine TEXT NOT NULL CHECK(engine = 'sqlite'), revision INTEGER NOT NULL CHECK(revision >= 0));
      INSERT INTO metadata VALUES (1, 'sqlite', 0);
      CREATE TABLE library (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author) <= 200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(mod_id, hash), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL)));
@@ -31,6 +34,7 @@ const MIGRATIONS: [&str; 12] = [
     "CREATE TABLE library_new (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author) <= 200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(mod_id, hash, origin, release_id), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL))); INSERT INTO library_new SELECT * FROM library; DROP TABLE library; ALTER TABLE library_new RENAME TO library; CREATE UNIQUE INDEX local_library_identity ON library(mod_id, hash) WHERE origin = 'local_import';",
     "CREATE TABLE local_sources (mod_id TEXT NOT NULL, hash TEXT NOT NULL, record TEXT NOT NULL CHECK(length(record)<=131072 AND json_valid(record)), PRIMARY KEY(mod_id, hash));",
     "CREATE TABLE local_watches (mod_id TEXT PRIMARY KEY NOT NULL, hash TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'watching' CHECK(state IN ('watching','settling','error')), message TEXT NOT NULL DEFAULT 'Watching the source while Starframe is open.'); INSERT INTO local_watches(mod_id,hash) SELECT mod_id,min(hash) FROM local_sources GROUP BY mod_id HAVING count(*)=1;",
+    "CREATE TABLE catalog_security (id INTEGER PRIMARY KEY CHECK(id=1), record TEXT NOT NULL CHECK(length(record)<=1049600 AND json_valid(record)));",
 ];
 
 #[derive(Debug)]
@@ -178,54 +182,6 @@ fn finish<T>(tx: Transaction<'_>, result: Result<T>) -> Result<T> {
 }
 
 impl Storage {
-    pub fn catalog_cache(&self) -> Result<Option<crate::catalog::refresh::Cache>> {
-        use rusqlite::OptionalExtension;
-        let record: Option<String> = self
-            .conn
-            .query_row("SELECT record FROM catalog_cache WHERE id=1", [], |r| {
-                r.get(0)
-            })
-            .optional()?;
-        record
-            .map(|record| {
-                crate::catalog::refresh::Cache::read(record.as_bytes()).map_err(Error::Invalid)
-            })
-            .transpose()
-    }
-
-    pub fn save_catalog_cache(&mut self, cache: &crate::catalog::refresh::Cache) -> Result<()> {
-        let record = serde_json::to_vec(cache).map_err(|e| Error::Invalid(e.to_string()))?;
-        crate::catalog::refresh::Cache::read(&record).map_err(Error::Invalid)?;
-        let tx = self
-            .conn
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        {
-            use rusqlite::OptionalExtension;
-            let previous: Option<String> = tx
-                .query_row("SELECT record FROM catalog_cache WHERE id=1", [], |r| {
-                    r.get(0)
-                })
-                .optional()?;
-            if let Some(previous) = previous {
-                let previous = crate::catalog::refresh::Cache::read(previous.as_bytes())
-                    .map_err(Error::Invalid)?;
-                if let Some(old) = previous.catalog {
-                    cache
-                        .catalog
-                        .as_ref()
-                        .ok_or_else(|| {
-                            Error::Invalid("Cannot discard the validated catalog cache.".into())
-                        })?
-                        .accepts_after(&old)
-                        .map_err(Error::Invalid)?;
-                }
-            }
-        }
-        tx.execute("INSERT INTO catalog_cache (id, record) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET record=excluded.record", [String::from_utf8(record).map_err(|e| Error::Invalid(e.to_string()))?])?;
-        tx.commit()?;
-        Ok(())
-    }
-
     pub(crate) fn deployment_record(&self, root: &str) -> Result<Option<String>> {
         use rusqlite::OptionalExtension;
         Ok(self
@@ -236,6 +192,18 @@ impl Storage {
                 |row| row.get(0),
             )
             .optional()?)
+    }
+
+    pub(crate) fn deployment_roots(&self) -> Result<Vec<String>> {
+        Ok(self
+            .conn
+            .prepare("SELECT root FROM deployments ORDER BY root")?
+            .query_map([], |row| row.get(0))?
+            .collect::<std::result::Result<_, _>>()?)
+    }
+
+    pub(crate) fn close_for_removal(self) -> File {
+        self._lock
     }
 
     pub(crate) fn save_deployment(

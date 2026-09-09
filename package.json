@@ -1,7 +1,7 @@
 {
   "name": "starframe",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.6.0-dev.1",
   "description": "Desktop mod manager for Sanctuary: Shattered Sun",
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -22,7 +22,7 @@
     "check": "npm run format:check && npm run lint && npm run check:types && npm test && npm run build",
     "check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --check && cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml --locked",
     "test:browser": "playwright test",
-    "test:native": "node tests/native/desktop.mjs && node tests/native/storage.mjs && node tests/native/game.mjs && node tests/native/catalog.mjs && node tests/native/packages.mjs && node tests/native/mods.mjs && node tests/native/local-import.mjs && node tests/native/local-watch.mjs"
+    "test:native": "node tests/native/desktop.mjs && node tests/native/storage.mjs && node tests/native/game.mjs && node tests/native/catalog.mjs && node tests/native/packages.mjs && node tests/native/mods.mjs && node tests/native/local-import.mjs && node tests/native/local-watch.mjs && node tests/native/cleanup.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

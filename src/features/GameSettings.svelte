@@ -11,7 +11,9 @@
     onaction: (action: GameAction) => void;
   } = $props();
   const operationPending = $derived(
-    game?.busy || game?.launch.phase === 'launch_requested',
+    game?.busy ||
+      game?.launch.phase === 'launch_requested' ||
+      game?.launch.phase === 'preparing',
   );
   const canWrite = $derived(
     !unavailable &&
@@ -109,9 +111,9 @@
 <div class="settings-section game-settings">
   <h2>Game runtime</h2>
   <p>
-    Install the Starframe runtime to add the in-game Mods menu. Enable installed
-    releases in My mods. Saved changes apply automatically while the game is
-    closed.
+    Starframe installs and updates its game runtime automatically while the game
+    is closed. Enable installed releases in My mods; saved changes apply
+    automatically too.
   </p>
   <p>{game?.launch.message ?? 'Runtime setup requires the desktop app.'}</p>
   {#if game?.launch.details.length}
@@ -121,18 +123,18 @@
   {/if}
   <div class="game-actions">
     <button disabled={!canWrite} onclick={() => onaction({ kind: 'setup' })}
-      >{game?.launch.phase === 'ready'
-        ? 'Check setup'
-        : 'Install or retry setup'}</button
-    >
-    <button
-      disabled={!canWrite}
-      onclick={() => onaction({ kind: 'remove_runtime' })}
-      >Remove Starframe runtime</button
+      >Repair or reinstall runtime</button
     >
   </div>
   <p class="muted">
-    Removal retains mod settings and files Starframe does not own. Close the
-    game before changing its runtime.
+    Close the game before repair. Repair restores missing runtime files and
+    keeps your mods and settings. Files changed outside Starframe are retained
+    for inspection; any repair error appears here.
+  </p>
+  <p class="muted">
+    Uninstalling Starframe through Windows also removes its game integration.
+    The uninstaller lets you choose whether to keep your library, collections
+    and app settings. Original mod source folders and unowned game settings are
+    kept.
   </p>
 </div>

@@ -81,3 +81,7 @@ The dialog uses native buttons, a labelled text input and a modal `dialog` for k
 Review result: pass for this issue's desktop controls. The forced-colors dialog at 640 CSS pixels and native details at a 1280 by 800 CSS viewport fit without clipped controls. Keyboard opening, Escape, focus return, source selection and retained errors passed. The native WebView2 run used a device pixel ratio of 1.5. A repeated local-origin label found in the screenshot was removed and the related browser tests passed again.
 
 Native OS display/text scaling, screen-reader behavior and game loading of these imported builds are not established by the browser tests. The complete milestone workflow is recorded in [0.5.0 exit evidence](milestone-0.5.0.md).
+
+## 0.6.0 startup regression
+
+Hosted run 34390168865 reached the local-import test before its first management snapshot was available: the import button remained disabled beyond Playwright's default five-second assertion timeout. The native test now uses the existing debug-only storage gate to verify that import is unavailable during startup, releases the gate and waits up to 30 seconds for readiness. This matches the bounded startup waits in other native tests; interaction-latency checks remain unchanged. The focused Windows run passed the held-startup, folder picker, offline import, restart and source-retention checks after rebuilding the debug executable with its embedded frontend.

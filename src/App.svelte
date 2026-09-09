@@ -9,7 +9,7 @@
   import Collections from './features/Collections.svelte';
   import CollectionSelect from './features/CollectionSelect.svelte';
   import PackageDownloads from './features/PackageDownloads.svelte';
-  import { createManagement } from './lib/management';
+  import { createManagement, confirmedFinding } from './lib/management';
   import { createDesktop } from './lib/state';
   import { getTransport } from './lib/native';
 
@@ -31,6 +31,11 @@
   let fail = $state(false);
   const operations = $derived($desktop.snapshot?.operations ?? []);
   const catalog = $derived($desktop.snapshot?.catalog);
+  const affectedInstalled = $derived(
+    $manager.data?.library.filter((entry) =>
+      confirmedFinding($manager.data, entry.reference.hash),
+    ).length ?? 0,
+  );
   const managementError = $derived(
     $desktop.snapshot?.savedData.status === 'unavailable' ? '' : $manager.error,
   );
@@ -140,6 +145,15 @@
       </p>
     </header>
     <main id="workspace" tabindex="-1">
+      {#if affectedInstalled}<div class="error" role="alert">
+          <p>
+            {affectedInstalled} installed {affectedInstalled === 1
+              ? 'mod matches'
+              : 'mods match'} confirmed security findings. Affected selections block
+            launch through Starframe. Files and settings are retained.
+          </p>
+          <button onclick={() => navigate('mods')}>Review affected mods</button>
+        </div>{/if}
       {#if $desktop.snapshot?.savedData.status === 'unavailable'}
         <p class="error" role="alert">
           Saved data is unavailable. {$desktop.snapshot.savedData.message} No empty
@@ -164,6 +178,7 @@
           </p>{/if}
         <ModList
           mode="mods"
+          catalogFresh={catalog?.fresh ?? false}
           {manager}
           game={$desktop.snapshot?.game}
           unavailable={$desktop.connection !== 'connected'}
@@ -196,6 +211,18 @@
               ).toLocaleString()}
             </p>
           {/if}
+          {#if catalog?.fresh && catalog.expires}<p>
+              Security information verified. Valid until {new Date(
+                Number(catalog.expires) * 1000,
+              ).toLocaleString()}.
+            </p>
+          {:else}<p class="error">
+              {catalog?.expires
+                ? 'Catalog security information has expired or the clock changed.'
+                : 'Catalog security information has not been verified.'} New downloads
+              are paused until a signed refresh succeeds. Verified library copies
+              remain available offline; confirmed findings still apply.
+            </p>{/if}
           <p>
             Downloads come from authors. Curation does not guarantee that a
             binary is free of malware.
@@ -211,6 +238,7 @@
           </p>{/if}
         <ModList
           mode="catalog"
+          catalogFresh={catalog?.fresh ?? false}
           {manager}
           game={$desktop.snapshot?.game}
           unavailable={$desktop.connection !== 'connected'}
@@ -371,6 +399,16 @@
         <DiagnosticList />
         <div class="settings-section">
           <h2>Project help</h2>
+          <p>
+            For mod problems, include the exact release from Package details.
+            Remove personal paths and private logs before posting.
+          </p>
+          <button onclick={() => desktop.open('report')}
+            >Report a mod problem</button
+          >
+          <button onclick={() => desktop.open('security')}
+            >Report a security concern privately</button
+          >
           <details>
             <summary>Collection order and current limits</summary>
             <p>

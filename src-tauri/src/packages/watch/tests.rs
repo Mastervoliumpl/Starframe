@@ -114,8 +114,10 @@ fn migration_watches_unambiguous_sources_and_reimport_selects_an_ambiguous_sourc
         }
         drop(store);
         let db = rusqlite::Connection::open(root.path().join("data/sqlite/state.db")).unwrap();
-        db.execute_batch("DROP TABLE local_watches; PRAGMA user_version=11;")
-            .unwrap();
+        db.execute_batch(
+            "DROP TABLE catalog_security; DROP TABLE local_watches; PRAGMA user_version=11;",
+        )
+        .unwrap();
         drop(db);
         let mut store = Storage::open(&root.path().join("data")).unwrap();
         assert_eq!(store.local_watches().unwrap().len(), usize::from(!multiple));

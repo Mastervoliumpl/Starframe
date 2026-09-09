@@ -58,6 +58,8 @@ pub struct CatalogStatus {
     pub checking: bool,
     pub last_checked: Option<String>,
     pub last_success: Option<String>,
+    pub expires: Option<String>,
+    pub fresh: bool,
     pub error: Option<String>,
 }
 

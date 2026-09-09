@@ -4,6 +4,8 @@
   import {
     bytes,
     compatibility,
+    findings,
+    confirmedFinding,
     key,
     transferring,
     type Management,
@@ -17,12 +19,14 @@
     manager,
     game,
     unavailable,
+    catalogFresh,
     onsource,
   }: {
     mode: 'mods' | 'catalog';
     manager: Management;
     game: GameView | undefined;
     unavailable: boolean;
+    catalogFresh: boolean;
     onsource: (id: string) => void;
   } = $props();
   let search = $state('');
@@ -118,6 +122,15 @@
         key(w.source.reference) === key(row.installed.reference),
     );
   const busy = $derived(unavailable || $manager.pending.includes('membership'));
+  const hash = (row: Row) =>
+    row.installed?.reference.hash ?? row.release?.artifact.sha256;
+  const security = (row: Row) => findings($manager.data, hash(row));
+  const blocked = (row: Row) => confirmedFinding($manager.data, hash(row));
+  const suspected = (row: Row) =>
+    security(row).some(
+      (advisory) => advisory.history.at(-1)?.state === 'suspected',
+    );
+  const selectedBlocked = $derived(chosen.some(blocked));
   const enabled = (row: Row) =>
     !!row.installed &&
     !!$manager.data?.enabled.some(
@@ -129,11 +142,20 @@
     );
   function reason(row: Row) {
     if (unavailable) return 'Waiting for the desktop connection.';
+    if (blocked(row))
+      return 'Blocked by a confirmed security finding. Review the mod details.';
     if (row.installed)
       return 'Installed in your library. Enable it in My mods.';
     if (row.release?.withdrawn)
       return `Withdrawn: ${row.release.withdrawalReason ?? 'The catalog does not provide a reason.'}`;
     if (!row.release) return 'Release metadata is unavailable.';
+    if (
+      !catalogFresh &&
+      !$manager.data?.library.some(
+        (entry) => entry.reference.hash === hash(row),
+      )
+    )
+      return 'Catalog refresh required before downloading.';
     if (
       operation(row) ||
       $manager.pending.includes(`install:${row.release.id}`)
@@ -208,7 +230,10 @@
       >
       {#if mode === 'mods'}
         <button
-          disabled={busy || !chosen.length}
+          disabled={busy || !chosen.length || selectedBlocked}
+          aria-describedby={selectedBlocked
+            ? `${mode}-selected-security`
+            : undefined}
           onclick={() =>
             manager.membership(
               chosen.flatMap((r) => (r.installed ? [r.installed] : [])),
@@ -237,6 +262,14 @@
           >Clear selection</button
         >{:else}<span class="muted">Select rows to use bulk actions.</span>{/if}
     </div>
+    {#if mode === 'mods' && selectedBlocked}<p
+        class="error"
+        id={`${mode}-selected-security`}
+      >
+        Some selected mods have confirmed security findings. Review their
+        details before changing the selection. You can still remove them from
+        the collection.
+      </p>{/if}
     {#if unavailable}<p class="muted">
         Management actions require a desktop connection.
       </p>{:else if busy}<p role="status">Saving collection changes…</p>{/if}
@@ -299,10 +332,22 @@
                   {compatibility(row.release, game?.selected?.build)}
                 </p>{/if}
               {#if row.mod?.unmaintained}<p>Unmaintained</p>{/if}
+              {#if security(row).length}<p
+                  class:error={blocked(row)}
+                  id={`${mode}-security-${encodeURIComponent(row.id)}`}
+                >
+                  {blocked(row)
+                    ? 'Confirmed security finding · activation blocked'
+                    : suspected(row)
+                      ? 'Unconfirmed security finding · review details'
+                      : 'Previous security finding cleared'}
+                </p>{/if}
               {#if row.release?.withdrawn}<p>
                   Withdrawn · {row.release.withdrawalReason ??
                     'Reason not supplied in the catalog.'}{row.installed
-                    ? ' Installed copy remains usable.'
+                    ? blocked(row)
+                      ? ' A security finding blocks this copy.'
+                      : ' Installed copy remains usable.'
                     : ''}
                 </p>{/if}
               {#if operation(row)}<p>
@@ -319,8 +364,11 @@
                     type="checkbox"
                     role="switch"
                     aria-label={`Enable ${row.name} ${row.version}`}
+                    aria-describedby={security(row).length
+                      ? `${mode}-security-${encodeURIComponent(row.id)}`
+                      : undefined}
                     checked={enabled(row)}
-                    disabled={busy}
+                    disabled={busy || (!enabled(row) && blocked(row))}
                     onchange={(e) => {
                       const next = e.currentTarget.checked;
                       e.currentTarget.checked = enabled(row);
@@ -375,6 +423,42 @@
       <button onclick={back}>Back to list</button>
       <h2 bind:this={detailHeading} tabindex="-1">{opened.name}</h2>
       <p>{opened.author} · {opened.version}</p>
+      {#if security(opened).length}
+        <h3>Security findings</h3>
+        {#each security(opened) as advisory (advisory.id)}
+          {@const current = advisory.history.at(-1)!}
+          <h4>{advisory.title}</h4>
+          <p class:error={current.state === 'confirmed'}>
+            {current.state === 'confirmed'
+              ? 'Confirmed · downloads and activation blocked'
+              : current.state === 'suspected'
+                ? 'Unconfirmed · use is permitted'
+                : 'Cleared · this finding no longer blocks use'}
+          </p>
+          <p>{current.explanation}</p>
+          <p>{current.recommendedAction}</p>
+          <p>Library files and settings are retained.</p>
+          <details>
+            <summary>Evidence and correction history</summary>
+            {#each advisory.history as finding, historyIndex (finding.recordedAt)}
+              <p>
+                {new Date(finding.recordedAt * 1000).toLocaleString()} · {finding.state}
+              </p>
+              <p>{finding.explanation}</p>
+              <p>{finding.recommendedAction}</p>
+              {#each finding.evidence as url, evidenceIndex (url)}
+                <button
+                  onclick={() =>
+                    onsource(
+                      `advisory:${advisory.id}:${historyIndex}:${evidenceIndex}`,
+                    )}>Open evidence {evidenceIndex + 1}</button
+                >
+                <p class="technical">{url}</p>
+              {/each}
+            {/each}
+          </details>
+        {/each}
+      {/if}
       {#if opened.installed?.reference.origin === 'local_import'}
         <h3>Local source</h3>
         <p class="technical">

@@ -14,4 +14,4 @@ Targeted `cargo tree --target x86_64-pc-windows-msvc` inspection found no GLib d
 
 The first local Cargo run could not refresh its optional crates.io index because Cargo was absent from that shell's PATH; the RustSec advisory database was fetched and scanned. The CI toolchain places Cargo on PATH. Native Windows and Linux-hosted CI are separate environments; the new remote workflow has not run until the branch is pushed.
 
-Broader fuzzing is tracked in [#47](https://github.com/Mastervoliumpl/Starframe/issues/47). Catalog signing/advisory delivery is [#46](https://github.com/Mastervoliumpl/Starframe/issues/46). See [security scope](../../SECURITY.md) for release gates and review policy.
+Broader fuzzing is tracked in [#47](https://github.com/Mastervoliumpl/Starframe/issues/47), with [bounded campaign commands and limits](fuzzing.md). Catalog signing/advisory delivery is [#46](https://github.com/Mastervoliumpl/Starframe/issues/46). See [security scope](../../SECURITY.md) for release gates and review policy.

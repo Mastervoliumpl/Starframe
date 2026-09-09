@@ -192,6 +192,12 @@ impl Worker {
                     checking: refresh.checking,
                     last_checked: refresh.cache.last_checked.map(|t| t.to_string()),
                     last_success: refresh.cache.last_success.map(|t| t.to_string()),
+                    expires: refresh.expires().map(|t| t.to_string()),
+                    fresh: refresh.fresh(
+                        now.duration_since(SystemTime::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs(),
+                    ),
                     error: refresh.cache.error.clone(),
                 });
         }
@@ -278,7 +284,7 @@ impl Worker {
                 } else {
                     LaunchView::new(
                         Phase::SetupRequired,
-                        "Install the Starframe runtime to finish setup.",
+                        "Starframe will prepare the game runtime automatically.",
                     )
                 };
             }
@@ -316,7 +322,7 @@ impl Worker {
         if let (Some(store), Some(game)) = (self.storage.as_mut(), self.view.selected.as_ref()) {
             let revision = store.load().map(|r| r.revision).ok();
             let attempt = (game.executable.clone(), revision, self.view.running.clone());
-            let differs = self.session.prepared.as_ref().is_some_and(|activation| {
+            let differs = self.session.prepared.as_ref().is_none_or(|activation| {
                 activation["deploymentRevision"].as_str()
                     != revision.map(|r| r.to_string()).as_deref()
             });
@@ -329,15 +335,17 @@ impl Worker {
                     revision
                 )];
             }
-            if differs
+            if (differs || self.last_auto_attempt.is_none())
                 && self.view.running == Running::Stopped
                 && self.session.requested.is_none()
                 && self.last_auto_attempt.as_ref() != Some(&attempt)
             {
                 self.last_auto_attempt = Some(attempt);
                 self.writing.store(true, Ordering::SeqCst);
-                self.view.launch =
-                    LaunchView::new(Phase::Preparing, "Applying the saved mod setup…");
+                self.view.launch = LaunchView::new(
+                    Phase::Preparing,
+                    "Preparing the game runtime and saved mod setup…",
+                );
                 self.core
                     .lock()
                     .expect("state lock")

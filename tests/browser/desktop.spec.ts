@@ -198,7 +198,9 @@ test('setup enables launch and an accepted request leaves navigation usable', as
   ).toBeFocused();
   await page.getByRole('button', { name: 'Find in Steam' }).click();
   await page.getByRole('button', { name: /^Use installation:/ }).click();
-  await page.getByRole('button', { name: 'Install or retry setup' }).click();
+  await page
+    .getByRole('button', { name: 'Repair or reinstall runtime' })
+    .click();
   const launch = page.getByRole('button', {
     name: 'Launch Sanctuary Shattered Sun',
   });

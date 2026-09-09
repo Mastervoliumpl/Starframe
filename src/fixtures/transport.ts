@@ -16,6 +16,8 @@ export function fixtureTransport(): Transport {
       checking: false,
       lastChecked: null,
       lastSuccess: null,
+      expires: '4102444800',
+      fresh: true,
       error: null,
     },
     game: {
@@ -46,6 +48,9 @@ export function fixtureTransport(): Transport {
     snapshot.catalog.lastSuccess = '1788819700';
     snapshot.catalog.error =
       'Fixture connection failed. Starframe will retry automatically.';
+  } else if (catalogCase === 'expired' || catalogCase === 'unverified') {
+    snapshot.catalog.fresh = false;
+    snapshot.catalog.expires = catalogCase === 'expired' ? '1788819700' : null;
   } else if (catalogCase === 'update') {
     snapshot.catalog.checking = true;
   }

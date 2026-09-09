@@ -23,6 +23,39 @@ fn data_directory(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> 
 
 fn main() {
     let context = tauri::generate_context!();
+    if std::env::args().nth(1).as_deref() == Some("--installer-uninstall") {
+        let mut context = context;
+        context.config_mut().app.windows.clear();
+        let result = (|| -> Result<(), String> {
+            let args: Vec<_> = std::env::args().skip(2).collect();
+            if args.len() != 2 || !matches!(args[1].as_str(), "keep" | "delete") {
+                return Err("Invalid installer maintenance arguments.".into());
+            }
+            let identifier = &context.config().identifier;
+            if args[0] != *identifier && args[0] != format!("{identifier}.installer-test") {
+                return Err("Unexpected installer application identity.".into());
+            }
+            let app = tauri::Builder::default()
+                .build(context)
+                .map_err(|e| e.to_string())?;
+            let root = app
+                .path()
+                .local_data_dir()
+                .map_err(|e| e.to_string())?
+                .join(&args[0]);
+            #[cfg(debug_assertions)]
+            let root = std::env::var_os("STARFRAME_TEST_DATA_DIR")
+                .map(std::path::PathBuf::from)
+                .unwrap_or(root);
+            starframe::maintenance::uninstall(&root, args[1] == "keep")
+        })();
+        if let Err(error) = result {
+            eprintln!("Starframe removal stopped: {error}");
+            std::process::exit(2);
+        }
+        println!("Starframe game cleanup and selected data removal completed.");
+        std::process::exit(0);
+    }
     #[cfg(debug_assertions)]
     let context = {
         let mut context = context;
