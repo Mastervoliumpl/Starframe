@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Add opt-in NSIS packaging with verified runtime staging, current-user installation and app-data retention. Require normal app shutdown before setup instead of force-terminating file work. Clarify separate game cleanup in Settings. [Installer checks and remaining distribution gates](docs/verification/windows-installer.md) keep #27 open.
+- Add opt-in NSIS packaging with verified runtime staging and current-user installation. Require normal app shutdown before setup instead of force-terminating file work. Prepare the game runtime automatically after selection and on startup, including updated runtime resources; keep repair/reinstall in Settings. Uninstall cleans all recorded game deployments before removing the app, deletes managed app data by default and offers explicit retention. Installs, upgrades and reinstall preserve data. [Installer checks and remaining distribution gates](docs/verification/windows-installer.md) keep #27 open.
+- Defer Windows publisher certificates to unscheduled #61. Keep installer/update artifact signatures and catalog authentication in 0.6.0; replace the SignPath enquiry with accurate application form notes.
 
 ## 0.5.0 - 2026-09-08
 

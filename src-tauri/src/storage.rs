@@ -238,6 +238,18 @@ impl Storage {
             .optional()?)
     }
 
+    pub(crate) fn deployment_roots(&self) -> Result<Vec<String>> {
+        Ok(self
+            .conn
+            .prepare("SELECT root FROM deployments ORDER BY root")?
+            .query_map([], |row| row.get(0))?
+            .collect::<std::result::Result<_, _>>()?)
+    }
+
+    pub(crate) fn close_for_removal(self) -> File {
+        self._lock
+    }
+
     pub(crate) fn save_deployment(
         &mut self,
         root: &str,

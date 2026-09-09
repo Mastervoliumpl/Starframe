@@ -26,6 +26,7 @@
       "nsis": {
         "installMode": "currentUser",
         "languages": ["English"],
+        "template": "windows/installer.nsi",
         "installerIcon": "icons/icon.ico",
         "uninstallerIcon": "icons/icon.ico",
         "installerHooks": "windows/installer-hooks.nsh"

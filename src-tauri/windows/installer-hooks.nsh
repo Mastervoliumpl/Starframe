@@ -15,12 +15,30 @@
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
-  ; Upgrades invoke this uninstaller too; their handoff must stay unattended.
+  !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+  ; Upgrades retain the game integration and all data for the new app to prepare.
   ${If} $UpdateMode <> 1
-  ${AndIf} $PassiveMode <> 1
-  ${AndIfNot} ${Silent}
-    MessageBox MB_OKCANCEL|MB_ICONINFORMATION "This removes the Starframe desktop app. It leaves Sanctuary and its installed game integration unchanged.$\r$\n$\r$\nTo remove game integration first, cancel and open Starframe Settings > Remove Starframe from game while the game is closed.$\r$\n$\r$\nYour library, collections and settings are kept unless you selected the option to delete app data. Local mod source folders are always kept." IDOK starframe_remove_app
-    Abort
-    starframe_remove_app:
+    StrCpy $R1 "delete"
+    ${If} $DeleteAppDataCheckboxState = 1
+      StrCpy $R1 "keep"
+    ${EndIf}
+    ${GetOptions} $CMDLINE "/KEEPDATA" $R2
+    ${IfNot} ${Errors}
+      StrCpy $R1 "keep"
+    ${EndIf}
+    DetailPrint "Removing Starframe game integration. App data choice: $R1."
+    nsExec::ExecToStack '"$INSTDIR\${MAINBINARYNAME}.exe" --installer-uninstall "${BUNDLEID}" $R1'
+    Pop $R0
+    Pop $R2
+    ${If} $R0 != 0
+      DetailPrint "$R2"
+      SetErrorLevel 2
+      ${IfNot} ${Silent}
+        MessageBox MB_OK|MB_ICONEXCLAMATION "Starframe could not finish cleanup. The app was kept so you can retry.$\r$\n$R2"
+      ${EndIf}
+      Abort "Game cleanup or app data removal did not finish."
+    ${EndIf}
   ${EndIf}
+  ; The maintenance command owns deletion. Never run NSIS's recursive data removal.
+  StrCpy $DeleteAppDataCheckboxState 0
 !macroend

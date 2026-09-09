@@ -4,6 +4,10 @@ The 0.1.1 application links rusqlite 0.40.2 and libsqlite3-sys 0.38.2 under the 
 
 This storage notice supplements the repository license. A complete distribution notice inventory remains part of installer packaging; no installer has been published.
 
+## Tauri installer template
+
+The NSIS template derives from Tauri CLI 2.11.4, copyright (c) 2017 - Present Tauri Apps Contributors, under the [MIT license](notices/Tauri-MIT.txt). Starframe changes the uninstall checkbox to offer explicit retention and marks an app replacement as an update so it preserves data. Source: https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.11.4/crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi.
+
 ## Oxanium font
 
 Copyright 2019 The Oxanium Project Authors. The bundled, unchanged Oxanium variable font is used at weight 800 for the Starframe wordmark and launch control. It is licensed under the [SIL Open Font License 1.1](notices/OFL-Oxanium.txt). Source: https://github.com/google/fonts/tree/main/ofl/oxanium.

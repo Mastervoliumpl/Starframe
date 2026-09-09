@@ -194,8 +194,9 @@ impl Worker {
                         self.view.selected = Some(item);
                         self.view.launch = LaunchView::default();
                         self.session.reset();
+                        self.last_auto_attempt = None;
                         self.view.message =
-                            "Game location saved. Game files were not changed.".into();
+                            "Game location saved. Starframe will prepare its runtime when the game is closed.".into();
                         if let Some(store) = &self.storage {
                             self.core.lock().expect("state lock").saved_data(
                                 saved_status(store)

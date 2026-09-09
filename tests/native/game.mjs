@@ -52,12 +52,16 @@ await withDesktop(
     ).toBeEnabled();
     await page.getByRole('button', { name: /^Use installation:/ }).click();
     await expect(
-      page.getByText('Game location saved. Game files were not changed.'),
+      page.getByText(
+        'Game location saved. Starframe will prepare its runtime when the game is closed.',
+      ),
     ).toBeVisible();
     await expect(
       page.getByText('Game not running', { exact: true }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Install or retry setup' }).click();
+    await page
+      .getByRole('button', { name: 'Repair or reinstall runtime' })
+      .click();
     await expect(page.locator('#launch-reason')).toContainText(
       'does not include the game runtime',
     );

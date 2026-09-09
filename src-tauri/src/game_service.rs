@@ -256,6 +256,7 @@ fn prepare(
     if !resources.join("runtime/runtime-package.json").is_file() {
         return Err("This Starframe build does not include the game runtime. Use a build with runtime support to finish setup.".into());
     }
+    deployment::repair_missing(store, game)?;
     let store = std::cell::RefCell::new(store);
     launch::prepare_latest(
         || starframe::mods::requested(&store.borrow()),

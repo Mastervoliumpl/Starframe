@@ -11,6 +11,9 @@ from versions import read_version
 
 def check(root: Path, integration: Path) -> None:
     read_version(root)
+    lock = json.loads((root / 'package-lock.json').read_text(encoding='utf-8'))
+    if lock['packages']['node_modules/@tauri-apps/cli']['version'] != '2.11.4':
+        raise ValueError('Review the pinned NSIS template and hooks before changing the Tauri CLI')
     actual = set()
     pending = [integration]
     while pending:

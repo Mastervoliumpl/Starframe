@@ -33,7 +33,9 @@ await withDesktop(
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: /^Use installation:/ }).click();
     await expect.poll(async () => (await list(page)).library.length).toBe(0);
-    await page.getByRole('button', { name: 'Install or retry setup' }).click();
+    await page
+      .getByRole('button', { name: 'Repair or reinstall runtime' })
+      .click();
     await expect
       .poll(
         async () =>

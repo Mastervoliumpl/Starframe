@@ -15,6 +15,9 @@ class InstallerChecks(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
         (self.root / 'VERSION').write_text('0.6.0-dev.1', encoding='utf-8')
+        (self.root / 'package-lock.json').write_text(json.dumps({
+            'packages': {'node_modules/@tauri-apps/cli': {'version': '2.11.4'}}
+        }), encoding='utf-8')
         (self.root / 'runtime').mkdir()
         (self.root / 'runtime/bootstrap.json').write_text(json.dumps({'files': [
             {'path': 'winhttp.dll', 'sha256': hashlib.sha256(b'bootstrap fixture').hexdigest()}

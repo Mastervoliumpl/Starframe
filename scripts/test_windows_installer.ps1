@@ -20,10 +20,9 @@ $taskInstall = Join-Path $taskEvidence 'application'
 New-Item -ItemType Directory -Path $taskEvidence | Out-Null
 $taskConfig = Join-Path $taskEvidence 'fixture.json'
 $taskSentinels = @{
-    'sqlite/state.db' = 'saved database fixture'
     'sqlite/legacy-backup.db' = 'retained legacy fixture'
-    'library/imported.dll' = 'imported content fixture'
-    'settings.json' = 'saved settings fixture'
+    'artifacts/imported.dll' = 'imported content fixture'
+    'backups/settings-fixture.json' = 'saved settings fixture'
 }
 
 function Assert-Retained {
@@ -68,6 +67,9 @@ try {
             }
         }
         if ($taskVersion -eq '0.6.0-dev.0') {
+            New-Item -ItemType Directory -Path $taskData | Out-Null
+            $taskInit = Start-Process -FilePath (Join-Path $taskInstall 'starframe.exe') -ArgumentList @('--installer-uninstall', $taskIdentifier, 'keep') -WindowStyle Hidden -PassThru -Wait
+            if ($taskInit.ExitCode -ne 0 -or !(Test-Path -LiteralPath (Join-Path $taskData 'sqlite/state.db'))) { throw 'Fixture database initialization failed.' }
             foreach ($taskEntry in $taskSentinels.GetEnumerator()) {
                 $taskFile = Join-Path $taskData $taskEntry.Key
                 New-Item -ItemType Directory -Force -Path (Split-Path $taskFile) | Out-Null
@@ -99,7 +101,7 @@ try {
     }
     finally { if (!$taskRunning.HasExited) { $taskRunning.Kill(); $taskRunning.WaitForExit() } }
 
-    $taskProcess = Start-Process -FilePath $taskUninstaller -ArgumentList '/S' -WindowStyle Hidden -PassThru -Wait
+    $taskProcess = Start-Process -FilePath $taskUninstaller -ArgumentList @('/S', '/KEEPDATA') -WindowStyle Hidden -PassThru -Wait
     if ($taskProcess.ExitCode -ne 0) { throw "Fixture uninstall failed: $($taskProcess.ExitCode)" }
     if ((Test-Path -LiteralPath $taskUninstallKey) -or (Test-Path -LiteralPath (Join-Path $taskInstall 'starframe.exe'))) {
         throw 'App removal or registration cleanup did not finish.'
@@ -109,11 +111,20 @@ try {
     if ($taskRemaining.Count -ne 1 -or $taskRemaining[0].Name -ne 'unowned.txt') {
         throw 'Owned installation files remain after uninstall.'
     }
+    $taskReinstall = Start-Process -FilePath $taskInstaller -ArgumentList @('/S', '/NS', "/D=$taskInstall") -WindowStyle Hidden -PassThru -Wait
+    if ($taskReinstall.ExitCode -ne 0) { throw 'Reinstall over retained data failed.' }
+    Assert-Retained
+    $taskDelete = Start-Process -FilePath $taskUninstaller -ArgumentList '/S' -WindowStyle Hidden -PassThru -Wait
+    if ($taskDelete.ExitCode -ne 0 -or (Test-Path -LiteralPath $taskUninstallKey) -or (Test-Path -LiteralPath (Join-Path $taskInstall 'starframe.exe'))) { throw 'Default uninstall failed.' }
+    if (Test-Path -LiteralPath $taskData) { throw 'Default uninstall retained managed fixture data.' }
+    if ([IO.File]::ReadAllText((Join-Path $taskInstall 'unowned.txt')) -ne 'unowned fixture') { throw 'Default uninstall changed an unowned file.' }
     @{
         ordinaryUser = $true
         versions = @('0.6.0-dev.0', '0.6.0-dev.1')
         runtimeHashesMatched = $true
-        appDataRetained = $true
+        explicitAppDataRetention = $true
+        defaultAppDataDeletion = $true
+        reinstallRetainedData = $true
         unownedFileRetained = $true
         appAndRegistrationRemoved = $true
         runningAppRetained = $true
@@ -121,12 +132,6 @@ try {
         limitation = 'NSIS metadata upgrade over the same executable; no application/database migration or absent-WebView2 test.'
     } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $taskEvidence 'result.json')
 
-    # Delete only the synthetic files above; nonrecursive removal refuses unexpected contents.
-    foreach ($taskEntry in $taskSentinels.GetEnumerator()) {
-        Remove-Item -LiteralPath (Join-Path $taskData $taskEntry.Key)
-    }
-    foreach ($taskSubdir in @('sqlite', 'library')) { [IO.Directory]::Delete((Join-Path $taskData $taskSubdir), $false) }
-    [IO.Directory]::Delete($taskData, $false)
     Remove-Item -LiteralPath (Join-Path $taskProductKey $taskProduct)
     Remove-Item -LiteralPath $taskProductKey
     Write-Output "Installer fixture passed; evidence retained beneath test-results/0.6.0-packaging."
