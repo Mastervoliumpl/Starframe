@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
+pub mod authentication;
 pub mod refresh;
 
 pub const ENDPOINT: &str =

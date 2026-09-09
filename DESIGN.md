@@ -186,7 +186,7 @@ Details include description, author/source link, approved versions, dependencies
 
 Fetch catalog changes on startup and every five minutes while the app is open. A valid new catalog updates the list in place, preserving filters, focus and scroll position. Reuse cached data while offline and show when it was last checked. New approval metadata must not install a mod or update an installed release by itself.
 
-When signed catalog metadata expires, pause new catalog downloads until a valid signed refresh succeeds. Explain the unavailable download action and show that catalog information is stale. Installed mods and local collections remain usable offline, subject to cached confirmed security blocks. The owner approved this behavior for #46 on 9 September 2026; the renewal interval remains to be chosen.
+When signed catalog metadata expires, pause new catalog downloads until a valid signed refresh succeeds. Explain the unavailable download action and show that catalog information is stale. Installed mods and local collections remain usable offline, subject to cached confirmed security blocks. The owner approved daily renewal through GitHub Actions with thirty-day validity for #46 on 9 September 2026. Renewal does not require an app update or a new mod release.
 
 ### Collections
 
