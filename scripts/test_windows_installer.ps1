@@ -164,7 +164,10 @@ try {
     }
     finally { if (!$taskRunning.HasExited) { $taskRunning.Kill(); $taskRunning.WaitForExit() } }
 
-    Invoke-GameFixture 'interrupt'
+    Invoke-GameFixture 'kill-game'
+    foreach ($taskRetained in @($taskUninstallKey, (Join-Path $taskInstall 'starframe.exe'), (Join-Path $taskData 'sqlite/state.db'))) {
+        if (!(Test-Path -LiteralPath $taskRetained)) { throw 'Interrupted uninstall removed the app, registration or database.' }
+    }
     $taskProcess = Start-Process -FilePath $taskUninstaller -ArgumentList @('/S', '/KEEPDATA') -WindowStyle Hidden -PassThru -Wait
     if ($taskProcess.ExitCode -ne 0) { throw "Fixture uninstall failed: $($taskProcess.ExitCode)" }
     if ((Test-Path -LiteralPath $taskUninstallKey) -or (Test-Path -LiteralPath (Join-Path $taskInstall 'starframe.exe'))) {
@@ -186,6 +189,8 @@ try {
         if ([IO.File]::ReadAllText((Join-Path $taskData 'backups/settings-fixture.json')) -ne $taskSentinels['backups/settings-fixture.json']) { throw 'Locked data changed.' }
     }
     finally { $taskLockedData.Dispose() }
+    Invoke-GameFixture 'kill-data'
+    if (!(Test-Path -LiteralPath $taskUninstallKey)) { throw 'Interrupted data removal discarded uninstall registration.' }
     $taskDelete = Start-Process -FilePath $taskUninstaller -ArgumentList '/S' -WindowStyle Hidden -PassThru -Wait
     if ($taskDelete.ExitCode -ne 0 -or (Test-Path -LiteralPath $taskUninstallKey) -or (Test-Path -LiteralPath (Join-Path $taskInstall 'starframe.exe'))) { throw 'Default uninstall failed.' }
     if (Test-Path -LiteralPath $taskData) { throw 'Default uninstall retained managed fixture data.' }
@@ -203,12 +208,14 @@ try {
         unavailableGameReconnect = $true
         lockedGameFileRollback = $true
         interruptedJournalRecovery = $true
+        processTerminationDuringGameCleanup = $true
+        processTerminationDuringDataRemoval = $true
         partialDataRemovalRetry = $true
         unownedFileRetained = $true
         appAndRegistrationRemoved = $true
         runningAppRetained = $true
         gameLaunched = $false
-        limitation = 'NSIS metadata upgrade over the same executable; interrupted journal state is seeded, not a process-kill test. No application/database migration, interactive UI or absent-WebView2 test.'
+        limitation = 'NSIS metadata upgrade over the same executable. No application/database migration, interactive UI or absent-WebView2 test.'
     } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $taskEvidence 'result.json')
 
     Remove-Item -LiteralPath (Join-Path $taskProductKey $taskProduct)

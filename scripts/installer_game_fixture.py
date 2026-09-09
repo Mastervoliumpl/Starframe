@@ -5,8 +5,9 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import subprocess
 import sys
-import uuid
+import time
 
 
 def main() -> None:
@@ -63,23 +64,83 @@ def main() -> None:
                 "INSERT OR IGNORE INTO deployment_blobs(hash, bytes) VALUES (?, ?)",
                 [(hashlib.sha256(b).hexdigest(), b) for b in owned.values()],
             )
-    elif mode == "interrupt":
-        # State after a committed uninstall journal and its first file deletion.
-        with sqlite3.connect(database.as_uri() + "?mode=rw", uri=True) as connection:
-            root, value = connection.execute(
-                "SELECT root, record FROM deployments"
-            ).fetchone()
-            record = json.loads(value)
-            assert record["pending"] is None and len(record["owned"]) == 2
-            record["pending"] = {
-                "id": str(uuid.uuid4()), "next": {}, "borrowed": {}
-            }
-            connection.execute(
-                "UPDATE deployments SET record=? WHERE root=?",
-                (json.dumps(record), root),
+    elif mode in ("kill-game", "kill-data"):
+        directory = (
+            engine / "Starframe/interruption"
+            if mode == "kill-game"
+            else data / "backups/interruption"
+        )
+        directory.mkdir()
+        content = b"process interruption fixture"
+        digest = hashlib.sha256(content).hexdigest()
+        files = [directory / f"{index:04}.txt" for index in range(8192)]
+        for path in files:
+            path.write_bytes(content)
+        if mode == "kill-game":
+            with sqlite3.connect(database.as_uri() + "?mode=rw", uri=True) as connection:
+                root, value = connection.execute(
+                    "SELECT root, record FROM deployments"
+                ).fetchone()
+                record = json.loads(value)
+                assert record["pending"] is None and len(record["owned"]) == 2
+                record["owned"].update(
+                    {p.relative_to(engine).as_posix(): digest for p in files}
+                )
+                connection.execute(
+                    "UPDATE deployments SET record=? WHERE root=?",
+                    (json.dumps(record), root),
+                )
+                connection.execute(
+                    "INSERT OR IGNORE INTO deployment_blobs(hash, bytes) VALUES (?, ?)",
+                    (digest, content),
+                )
+        application = evidence / "application"
+        command = [str(application / "uninstall.exe"), "/S"]
+        if mode == "kill-game":
+            command.append("/KEEPDATA")
+        command.append(f"_?={application}")
+        process = subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW)
+        try:
+            deadline = time.monotonic() + 30
+            while (
+                files[0].exists()
+                and process.poll() is None
+                and time.monotonic() < deadline
+            ):
+                time.sleep(0.005)
+            if files[0].exists() or not files[-1].exists() or process.poll() is not None:
+                raise AssertionError("Installer did not reach observable partial removal")
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                check=True, capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
             )
-        (engine / "Starframe/fixture.txt").unlink()
+            process.wait(timeout=10)
+            remaining = sum(path.exists() for path in files)
+            assert 0 < remaining < len(files), "Termination missed partial removal"
+            assert (application / "starframe.exe").is_file() and database.is_file()
+            with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as connection:
+                record = json.loads(
+                    connection.execute("SELECT record FROM deployments").fetchone()[0]
+                )
+                assert (record["pending"] is not None) == (mode == "kill-game")
+            for relative, content in preserved.items():
+                assert (engine / relative).read_bytes() == content
+            print(
+                f"Terminated isolated NSIS process tree during {mode}: "
+                f"{len(files) - remaining} files removed, {remaining} retained; "
+                "app/database preserved."
+            )
+        finally:
+            if process.poll() is None:
+                subprocess.run(
+                    ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                    capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+                process.wait(timeout=10)
     elif mode in ("retained", "removed"):
+        if mode == "removed":
+            assert not any((engine / "Starframe/interruption").glob("*.txt"))
         for relative, content in preserved.items():
             assert (engine / relative).read_bytes() == content
         for relative, content in owned.items():
