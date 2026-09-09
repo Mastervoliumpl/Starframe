@@ -1,6 +1,6 @@
 # Catalog publication
 
-Issue #46 is in progress. The publisher, embedded trust root and desktop signed refresh are implemented. The workflow is disabled until `CATALOG_PUBLICATION_ENABLED` is set to `true`. Credential upload requires owner approval; no signed catalog has been published. The first hosted renewal and live client refresh remain acceptance checks before public distribution.
+Issue #46 is in progress. The publisher, embedded trust root and desktop signed refresh are implemented. The owner approved uploading the dedicated online key to the `catalog` GitHub environment on 9 September 2026. Its only allowed deployment branch is `main`, and `CATALOG_SIGNING_KEY` is configured. `CATALOG_PUBLICATION_ENABLED` is explicitly `false`; no signed catalog has been published. The first hosted renewal and live client refresh remain acceptance checks before public distribution.
 
 The initial public root is [catalog/trust/root.json](../catalog/trust/root.json), version 1, with separate RSA-4096 recovery and online publishing keys. Its file SHA-256 is `2ab2812d4d89d4d37d2722b64c6e1902ee1dacb80f44de2bbcfd5206fc887345`, and it expires on 9 September 2027. The owner confirmed a secure backup of the recovery key and root on 9 September 2026. Private keys remain outside tracked files. A candidate signed with these keys passed local TUF target verification without publication.
 
