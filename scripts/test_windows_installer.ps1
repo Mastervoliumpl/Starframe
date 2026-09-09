@@ -37,6 +37,19 @@ function Assert-Retained {
     }
 }
 
+function Invoke-GameFixture([string] $taskMode) {
+    & python scripts/installer_game_fixture.py $taskMode $taskEvidence
+    if ($LASTEXITCODE -ne 0) { throw "Game fixture failed: $taskMode" }
+}
+
+function Assert-FailedUninstall {
+    $taskFailed = Start-Process -FilePath $taskUninstaller -ArgumentList @('/S', "_?=$taskInstall") -WindowStyle Hidden -PassThru -Wait
+    if ($taskFailed.ExitCode -eq 0) { throw 'Uninstall unexpectedly succeeded.' }
+    foreach ($taskRetained in @($taskUninstallKey, (Join-Path $taskInstall 'starframe.exe'), (Join-Path $taskData 'sqlite/state.db'))) {
+        if (!(Test-Path -LiteralPath $taskRetained)) { throw 'Failed uninstall removed the app, registration or database.' }
+    }
+}
+
 Push-Location $taskRepository
 try {
     foreach ($taskVersion in @('0.6.0-dev.0', '0.6.0-dev.1')) {
@@ -82,6 +95,41 @@ try {
     }
 
     $taskUninstaller = Join-Path $taskInstall 'uninstall.exe'
+    Invoke-GameFixture 'seed'
+    $taskAppHash = (Get-FileHash -LiteralPath (Join-Path $taskInstall 'starframe.exe')).Hash
+    $taskMissing = Join-Path $taskInstall 'integration/runtime/BepInEx/plugins/Starframe/Starframe.Runtime.dll'
+    $taskRuntimeHash = (Get-FileHash -LiteralPath $taskMissing).Hash
+    Remove-Item -LiteralPath $taskMissing
+    [IO.File]::WriteAllText((Join-Path $taskInstall 'starframe.exe'), 'damaged app fixture')
+    $taskRepair = Start-Process -FilePath $taskInstaller -ArgumentList @('/S', '/NS', "/D=$taskInstall") -WindowStyle Hidden -PassThru -Wait
+    if ($taskRepair.ExitCode -ne 0 -or (Get-FileHash -LiteralPath (Join-Path $taskInstall 'starframe.exe')).Hash -ne $taskAppHash -or (Get-FileHash -LiteralPath $taskMissing).Hash -ne $taskRuntimeHash) {
+        throw 'Same-version reinstall did not restore damaged and missing packaged files.'
+    }
+    Assert-Retained
+    Invoke-GameFixture 'retained'
+
+    $taskGame = (Resolve-Path (Join-Path $taskEvidence 'game')).Path
+    $taskDisconnected = [IO.Path]::GetFullPath((Join-Path $taskEvidence 'game-disconnected'))
+    foreach ($taskMove in @($taskGame, $taskDisconnected)) {
+        if ([IO.Path]::GetDirectoryName($taskMove) -ne $taskEvidence) { throw 'Game fixture move escaped its evidence directory.' }
+    }
+    Move-Item -LiteralPath $taskGame -Destination $taskDisconnected
+    try {
+        Assert-FailedUninstall
+        Assert-Retained
+    }
+    finally { Move-Item -LiteralPath $taskDisconnected -Destination $taskGame }
+    Invoke-GameFixture 'retained'
+
+    $taskLockedLoader = [IO.File]::Open((Join-Path $taskGame 'engine/winhttp.dll'), 'Open', 'Read', 'Read')
+    try {
+        Assert-FailedUninstall
+        Assert-Retained
+        Invoke-GameFixture 'retained'
+    }
+    finally { $taskLockedLoader.Dispose() }
+    Write-Output 'Verified damaged-install reinstall, unavailable game reconnect and locked-file rollback.'
+
     $taskAppFixture = Join-Path $taskEvidence 'starframe.exe'
     Copy-Item -LiteralPath (Join-Path $env:SystemRoot 'System32/ping.exe') -Destination $taskAppFixture
     $taskRunning = Start-Process -FilePath $taskAppFixture -ArgumentList @('-t', '127.0.0.1') -WindowStyle Hidden -PassThru
@@ -101,12 +149,14 @@ try {
     }
     finally { if (!$taskRunning.HasExited) { $taskRunning.Kill(); $taskRunning.WaitForExit() } }
 
+    Invoke-GameFixture 'interrupt'
     $taskProcess = Start-Process -FilePath $taskUninstaller -ArgumentList @('/S', '/KEEPDATA') -WindowStyle Hidden -PassThru -Wait
     if ($taskProcess.ExitCode -ne 0) { throw "Fixture uninstall failed: $($taskProcess.ExitCode)" }
     if ((Test-Path -LiteralPath $taskUninstallKey) -or (Test-Path -LiteralPath (Join-Path $taskInstall 'starframe.exe'))) {
         throw 'App removal or registration cleanup did not finish.'
     }
     Assert-Retained
+    Invoke-GameFixture 'removed'
     $taskRemaining = @(Get-ChildItem -LiteralPath $taskInstall -File -Recurse)
     if ($taskRemaining.Count -ne 1 -or $taskRemaining[0].Name -ne 'unowned.txt') {
         throw 'Owned installation files remain after uninstall.'
@@ -114,10 +164,18 @@ try {
     $taskReinstall = Start-Process -FilePath $taskInstaller -ArgumentList @('/S', '/NS', "/D=$taskInstall") -WindowStyle Hidden -PassThru -Wait
     if ($taskReinstall.ExitCode -ne 0) { throw 'Reinstall over retained data failed.' }
     Assert-Retained
+    $taskLockedData = [IO.File]::Open((Join-Path $taskData 'backups/settings-fixture.json'), 'Open', 'Read', 'Read')
+    try {
+        Assert-FailedUninstall
+        if (Test-Path -LiteralPath (Join-Path $taskData 'artifacts')) { throw 'Fixture did not reach partial data deletion.' }
+        if ([IO.File]::ReadAllText((Join-Path $taskData 'backups/settings-fixture.json')) -ne $taskSentinels['backups/settings-fixture.json']) { throw 'Locked data changed.' }
+    }
+    finally { $taskLockedData.Dispose() }
     $taskDelete = Start-Process -FilePath $taskUninstaller -ArgumentList '/S' -WindowStyle Hidden -PassThru -Wait
     if ($taskDelete.ExitCode -ne 0 -or (Test-Path -LiteralPath $taskUninstallKey) -or (Test-Path -LiteralPath (Join-Path $taskInstall 'starframe.exe'))) { throw 'Default uninstall failed.' }
     if (Test-Path -LiteralPath $taskData) { throw 'Default uninstall retained managed fixture data.' }
     if ([IO.File]::ReadAllText((Join-Path $taskInstall 'unowned.txt')) -ne 'unowned fixture') { throw 'Default uninstall changed an unowned file.' }
+    Invoke-GameFixture 'removed'
     @{
         ordinaryUser = $true
         versions = @('0.6.0-dev.0', '0.6.0-dev.1')
@@ -125,11 +183,16 @@ try {
         explicitAppDataRetention = $true
         defaultAppDataDeletion = $true
         reinstallRetainedData = $true
+        sameVersionRestoredDamagedFiles = $true
+        unavailableGameReconnect = $true
+        lockedGameFileRollback = $true
+        interruptedJournalRecovery = $true
+        partialDataRemovalRetry = $true
         unownedFileRetained = $true
         appAndRegistrationRemoved = $true
         runningAppRetained = $true
         gameLaunched = $false
-        limitation = 'NSIS metadata upgrade over the same executable; no application/database migration or absent-WebView2 test.'
+        limitation = 'NSIS metadata upgrade over the same executable; interrupted journal state is seeded, not a process-kill test. No application/database migration, interactive UI or absent-WebView2 test.'
     } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $taskEvidence 'result.json')
 
     Remove-Item -LiteralPath (Join-Path $taskProductKey $taskProduct)

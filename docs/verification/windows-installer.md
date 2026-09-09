@@ -35,8 +35,20 @@ Preparation requires a new staging directory. Preserve older staging under ignor
 
 The installer fixture changes NSIS metadata around the same executable. It does not prove migration between released app/database versions. It invokes the same executable's maintenance command against the separate fixture data identity. Evidence stays under ignored `test-results/0.6.0-lifecycle` and `test-results/0.6.0-packaging`. Native screenshots/logs may contain private paths; do not publish them unchanged.
 
+### Reinstall and cleanup recovery
+
+The extended ordinary-user NSIS fixture passed these additional checks:
+
+- Same-version reinstall restored a deliberately damaged desktop executable and a deleted packaged runtime DLL to their original hashes. Managed data, unowned installation files and the recorded game deployment survived.
+- Uninstall with an unavailable recorded game folder returned failure and retained the executable, Windows uninstall registration and SQLite database. Restoring the fixture folder allowed cleanup to proceed.
+- A read-only shared handle allowed hashing an owned loader but prevented its deletion. Cleanup restored the earlier removed file, retained ownership and left the app/data installed. Releasing the handle allowed retry.
+- A seeded committed uninstall journal with its first owned file already removed recovered through the installed uninstaller. Both owned files were removed; unowned game settings and a save sentinel survived. This reproduces an interruption state, not an actual process termination.
+- A locked managed backup stopped data removal after the artifact directory had been deleted. The app, registration and database remained. Releasing the handle and repeating uninstall completed deletion without losing unowned files.
+
+The [fixture helper](../../scripts/installer_game_fixture.py) creates inert game-layout files and a synthetic ownership record for two files in the separate installer-test database. It accepts only an installer evidence directory. It neither launches a game nor reads the owner's game installation. These checks exercise silent NSIS execution; the interactive maintenance page remains unverified.
+
 ## Remaining acceptance
 
-Complete the transitive desktop/runtime/bootstrap notice and source inventory and review redistribution terms. Verify absent WebView2, prerequisite download failure, an actual packaged-version upgrade with populated data, and interactive installer/uninstaller keyboard, scaling and high-contrast behavior. Test interrupted cleanup/data removal and reconnecting an unavailable recorded installation through the installer. A single PC does not establish the supported Windows matrix.
+Complete the transitive desktop/runtime/bootstrap notice and source inventory and review redistribution terms. Verify absent WebView2, prerequisite download failure, an actual packaged-version upgrade with populated data, and interactive installer/uninstaller keyboard, scaling and high-contrast behavior. Test actual process termination during installer cleanup/data removal in addition to the seeded journal and file-error retry checks above. A single PC does not establish the supported Windows matrix.
 
 Windows Authenticode is deferred to [#61](https://github.com/Mastervoliumpl/Starframe/issues/61), with no milestone. Installer/update artifact signatures and catalog authentication remain required under #28, #29 and #46. [SignPath form notes](../planning/signpath-request.md) are retained for a future application; no application or consent has been submitted. No app release is authorized by this verification, and #27 remains open.
