@@ -47,7 +47,7 @@ def verify(tuftool: Path, validator: Path, signer: Path, work: Path) -> None:
         def rejected(**changes: object) -> None:
             candidate = fixture / "rejected"
             try:
-                publish(**(options | changes), output=candidate, previous=second)
+                publish(**(options | {"previous": second} | changes), output=candidate)
             except (ValueError, subprocess.CalledProcessError):
                 assert not candidate.exists()
             else:
@@ -70,7 +70,34 @@ def verify(tuftool: Path, validator: Path, signer: Path, work: Path) -> None:
         (inputs / "advisories.json").write_text(json.dumps(advisories))
         run(signer, root, online, inputs, expired, "1", "2000-01-01T00:00:00Z")
         publish(**options, output=fixture / "recovered", previous=expired)
-    print("Catalog publication passed: daily renewal with thirty-day expiry, increasing metadata versions, unchanged target revisions, wrong-key rejection, invalid/tampered input rejection and expired-repository recovery.")
+
+        previous_root = fixture / "previous-root.json"
+        previous_root.write_bytes(root.read_bytes())
+        old_online_id = metadata(root)["roles"]["targets"]["keyids"][0]
+        replacement = fixture / "replacement.pem"
+        run(tuftool, "root", "bump-version", root)
+        run(tuftool, "root", "remove-key", root, old_online_id)
+        run(tuftool, "root", "gen-rsa-key", root, replacement,
+            "--role", "targets", "--role", "snapshot", "--role", "timestamp")
+        run(tuftool, "root", "sign", root, "--key", offline)
+        rotated = fixture / "rotated"
+        rotated_options = options | {"key": replacement, "previous_root": previous_root}
+        publish(**rotated_options, output=rotated, previous=second)
+        assert (rotated / "metadata/1.root.json").read_bytes() == previous_root.read_bytes()
+        rejected(previous_root=previous_root)
+
+        second_root = fixture / "second-root.json"
+        second_root.write_bytes(root.read_bytes())
+        old_offline_id = metadata(root)["roles"]["root"]["keyids"][0]
+        replacement_offline = fixture / "replacement-offline.pem"
+        run(tuftool, "root", "bump-version", root)
+        run(tuftool, "root", "remove-key", root, old_offline_id)
+        run(tuftool, "root", "gen-rsa-key", root, replacement_offline, "--role", "root")
+        run(tuftool, "root", "sign", root, "--key", replacement_offline)
+        rejected(key=replacement, previous_root=previous_root, previous=rotated)
+        run(tuftool, "root", "sign", root, "--key", offline, "--cross-sign", second_root)
+        publish(**rotated_options, output=fixture / "rotated-again", previous=rotated)
+    print("Catalog publication passed: thirty-day renewal, increasing metadata versions, unchanged targets, wrong/revoked-key rejection, invalid/tampered input rejection, expired-repository recovery and online/offline key rotation from an older client root.")
 
 
 if __name__ == "__main__":

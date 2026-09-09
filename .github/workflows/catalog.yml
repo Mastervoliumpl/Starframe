@@ -98,10 +98,14 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           $key = Join-Path $env:RUNNER_TEMP 'catalog-signing.pem'
+          $previousRoot = @()
+          if (Test-Path -LiteralPath 'catalog/trust/previous-root.json') {
+            $previousRoot = @('--previous-root', 'catalog/trust/previous-root.json')
+          }
           try {
             [IO.File]::WriteAllText($key, $env:CATALOG_SIGNING_KEY)
             Remove-Item Env:CATALOG_SIGNING_KEY
-            python scripts/publish_catalog.py --root catalog/trust/root.json --key $key --output $output --tuftool "$env:RUNNER_TEMP/catalog-tools/bin/tuftool.exe" --validator src-tauri/target/debug/check_catalog.exe --signer src-tauri/target/debug/examples/sign_catalog.exe @previous
+            python scripts/publish_catalog.py --root catalog/trust/root.json --key $key --output $output --tuftool "$env:RUNNER_TEMP/catalog-tools/bin/tuftool.exe" --validator src-tauri/target/debug/check_catalog.exe --signer src-tauri/target/debug/examples/sign_catalog.exe @previous @previousRoot
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           } finally {
             Remove-Item -LiteralPath $key -ErrorAction SilentlyContinue
