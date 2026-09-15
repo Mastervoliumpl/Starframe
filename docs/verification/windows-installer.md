@@ -45,7 +45,7 @@ The extended ordinary-user NSIS fixture passed these additional checks:
 - A seeded committed uninstall journal with its first owned file already removed recovered through the installed uninstaller. Both owned files were removed; unowned game settings and a save sentinel survived. This reproduces an interruption state, not an actual process termination.
 - A locked managed backup stopped data removal after the artifact directory had been deleted. The app, registration and database remained. Releasing the handle and repeating uninstall completed deletion without losing unowned files.
 
-The [fixture helper](../../scripts/installer_game_fixture.py) creates inert game-layout files and synthetic ownership records in the separate installer-test database. It accepts only an installer evidence directory. It neither launches a game nor reads the owner's game installation. These checks exercise silent NSIS execution; the interactive maintenance page remains unverified.
+The [fixture helper](../../scripts/installer_game_fixture.py) creates inert game-layout files and synthetic ownership records in the separate installer-test database. It accepts only an installer evidence directory. It neither launches a game nor reads the owner's game installation. These checks exercise silent NSIS execution; the separate interactive checks are recorded below.
 
 ### Actual process interruption
 
@@ -56,10 +56,32 @@ The current release executable and NSIS package built from the #46 implementatio
 
 The helper no longer seeds an interrupted journal for this check; the installed executable writes it during the real operation. The same run also passed damaged same-version reinstall, unavailable-root retry, locked-file rollback, running-app refusal, retained-data reinstall, explicit retention and default deletion. All 27 Python checks passed. Evidence remains under ignored `test-results/0.6.0-packaging`; temporary files and logs are not committed.
 
+## Cross-build data migration
+
+The optional `-BaselineExecutable` argument to [the installer fixture](../../scripts/test_windows_installer.ps1) packages two different application builds. Its [populated-data helper](../../scripts/installer_upgrade_fixture.py) verifies the installed executable bytes, allowing only Tauri's known NSIS bundle-marker replacement, and compares retained records before and after migration.
+
+The baseline used on 15 September 2026 was built from `dfad58bcd854cbe796e0fc5f988be5ca6d816cd4`, whose storage schema is 12. An ignored source archive was synchronized to fixture version `0.6.0-dev.0`, its frontend was rebuilt, and its release executable was compiled with the locked dependencies and `tauri/custom-protocol`. The current branch's executable is `0.6.0-dev.1` with schema 13 and patched rustls 0.23.45. The baseline uses the current fixture's installer template and integration resources: this test isolates executable replacement and app-data migration, rather than claiming an upgrade between published installers or different runtime resources.
+
+```powershell
+./scripts/test_windows_installer.ps1 -BaselineExecutable "$env:STARFRAME_BASELINE_EXE"
+```
+
+The older installed executable creates schema 12, then opens a populated fixture containing two exact catalog/local references over shared content, two collections, a deliberately ordered active collection and saved revision. The new installed executable migrates that database to schema 13, preserves all existing table records, adds an empty security table without granting trust, and retains a complete schema-12 backup. A second invocation verifies reopening the migrated data. Managed artifact bytes, settings/backup sentinels and the original source fixture are checked separately. These finite maintenance invocations have no game deployment to remove and use only the installer-test identity; they do not launch a desktop window or touch a real game.
+
+The complete installer fixture passed with these two builds. It also passed damaged-file reinstall, retained-data reinstall, unavailable-game retry, locked-file rollback, running-app refusal, explicit retention and default deletion. Actual process termination interrupted game cleanup after 9 of 8,192 disposable files and data removal after 510 of 8,192 files; both retries completed with unowned content intact.
+
+## Interactive keyboard checks
+
+On 15 September 2026, the isolated installer passed keyboard cancellation from the welcome page and installation through the license, destination and completion pages. The destination was changed to an ignored fixture directory. Both completion checkboxes were cleared with Space/Tab; finishing did not launch Starframe or create a desktop shortcut. Windows registration pointed to the fixture installation.
+
+Starting setup again displayed **Already Installed**, with **Add/Reinstall components** selected and **Uninstall Starframe Installer Test** available. The Down key selected uninstall, and Enter started the installed uninstaller. Computer Use could not access that application, so the interactive retention checkbox and uninstall completion remain unverified. The automated fixture above verifies uninstall behavior separately.
+
+These observations cover the current display settings only. The accessibility provider reported focus on the outer dialog even when screenshots showed focus on a button, radio option or checkbox; they do not establish screen-reader acceptance. No real game or personal Starframe data was used.
+
 ## Remaining acceptance
 
-On 15 September 2026, follow-up validation found that hosted checks on `3077204` had stopped after the legacy storage fixture's default five-second assertion expired. The captured UI still showed opening saved data, with the desktop connected. Legacy conversion now uses the same bounded thirty-second wait as the existing delayed-startup fixture. The native storage script passed fresh/restarted data, corrupt/newer data retention, populated legacy schemas 1–3 and navigation during delayed conversion. No application behavior changed. Dependency audits on that commit passed; a new hosted run is required for the test adjustment.
+On 15 September 2026, follow-up validation found that hosted checks on `3077204` had stopped after the legacy storage fixture's default five-second assertion expired. The captured UI still showed opening saved data, with the desktop connected. Legacy conversion now uses the same bounded thirty-second wait as the existing delayed-startup fixture. The native storage script passed fresh/restarted data, corrupt/newer data retention, populated legacy schemas 1–3 and navigation during delayed conversion. No application behavior changed. All nine native scripts subsequently passed in hosted run `34998438792` on `a308d92`; its release-build result is tracked separately in the PR.
 
-The transitive notice/source inventory is recorded in [distribution notices](distribution-notices.md); verify required source delivery with #29 before publication. Verify absent WebView2, prerequisite download failure, an actual packaged-version upgrade with populated data, and interactive installer/uninstaller keyboard, scaling and high-contrast behavior. A single PC does not establish the supported Windows matrix; clean-Windows acceptance needs a disposable test environment.
+The transitive notice/source inventory is recorded in [distribution notices](distribution-notices.md); verify required source delivery with #29 before publication. Verify absent WebView2, prerequisite download failure, interactive uninstaller keyboard behavior, scaling and high-contrast behavior. The cross-build fixture above tests migration through the shared storage opening path; interactive desktop first-start acceptance remains separate. A single PC does not establish the supported Windows matrix; clean-Windows acceptance needs a disposable test environment.
 
 Windows Authenticode is deferred to [#61](https://github.com/Mastervoliumpl/Starframe/issues/61), with no milestone. Installer/update artifact signatures and catalog authentication remain required under #28, #29 and #46. [SignPath form notes](../planning/signpath-request.md) are retained for a future application; no application or consent has been submitted. No app release is authorized by this verification, and #27 remains open.
