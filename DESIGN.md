@@ -263,7 +263,7 @@ When a newer eligible version exists, show a persistent, quiet `Update available
 
 The user chooses when to install or restart. Background checking does not authorize automatic installation. An app update must wait for active file changes to reach a safe stopping point and, initially, for the game to close because the release can include a new in-game runtime. Explain that reason beside the action. Failure to reach GitHub leaves mod management usable and shows a nonblocking check status. Do not label a failed check as `Up to date`.
 
-Use Tauri's NSIS installer, generated Windows uninstaller, and signed updater as specified in [ARCHITECTURE.md](ARCHITECTURE.md). Preserve user data by default. Provide `Remove Starframe from game` in Settings to remove owned integration files safely, with the game closed. App removal and game cleanup must state their different effects. No custom installer framework or persistent update service is required.
+Use Tauri's NSIS installer, generated Windows uninstaller, and signed updater as specified in [ARCHITECTURE.md](ARCHITECTURE.md). Updates preserve user data and prepare the matching runtime automatically when the game is closed. Settings retains runtime repair/reinstall. Full uninstall performs owned game cleanup automatically and deletes managed app data unless the user selects retention, as specified under Installation, updates and removal. No custom installer framework or persistent update service is required.
 
 ## 8. Motion specification
 
