@@ -71,6 +71,9 @@ try {
         [IO.File]::WriteAllText($taskConfig, ($taskOverride | ConvertTo-Json -Depth 4))
         & npm.cmd run tauri -- bundle --config src-tauri/tauri.nsis.conf.json --config $taskConfig *> (Join-Path $taskEvidence "bundle-$taskVersion.log")
         if ($LASTEXITCODE -ne 0) { throw "Fixture bundling failed for $taskVersion; inspect the retained log." }
+        if ($taskVersion -eq '0.6.0-dev.0') {
+            & (Join-Path $PSScriptRoot 'test_installer_maintenance.ps1')
+        }
         $taskInstaller = Join-Path $taskRepository "src-tauri/target/release/bundle/nsis/${taskProduct}_${taskVersion}_x64-setup.exe"
         if ($BaselineExecutable -and $taskVersion -eq '0.6.0-dev.0') {
             $taskNsisDirectory = Join-Path $taskRepository 'src-tauri/target/release/nsis/x64'

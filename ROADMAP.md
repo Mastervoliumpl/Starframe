@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-**[0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7)** is active from 9 September 2026. Version `0.6.0-dev.1` starts Windows alpha distribution on `codex/0.6.0-windows-alpha`. Work begins with installer packaging (#27); catalog authentication (#46) and bounded fuzzing (#47) are also in this milestone. Updates (#28), release automation (#29) and alpha acceptance (#30) follow their prerequisites. No app release or installer is published. Milestone 0.5.0 is complete; see its [exit evidence](docs/verification/milestone-0.5.0.md).
+**[0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7)** is active from 9 September 2026. Version `0.6.0-dev.1` prepares Windows alpha distribution on `codex/0.6.0-windows-alpha`. Installer packaging (#27) has passed functional acceptance; final prerequisite and display checks remain in #30. Catalog authentication (#46) and bounded fuzzing (#47) are also in this milestone. Updates (#28), installer branding (#74), release automation (#29) and alpha acceptance (#30) follow their prerequisites. No app release or installer is published. Milestone 0.5.0 is complete; see its [exit evidence](docs/verification/milestone-0.5.0.md).
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -17,7 +17,7 @@ Work through one milestone at a time. Later milestones remain planned even thoug
 | [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Complete |
 | [0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11) | Exact approval identities, package/runtime limits and maintenance | Complete |
 | [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Complete: #24–#26, #57–#58 verified |
-| [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Active: installer packaging |
+| [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Active: installer functional checks passed |
 | [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Native game integration | Blocked on official game API |
 
 AI-package support is deferred until the game provides suitable AI extension/selection facilities. Automated replacement of the shipped AI is outside the current scope. Assign that work to a future milestone after those facilities can be verified; it is not a promised 0.7.0 feature.

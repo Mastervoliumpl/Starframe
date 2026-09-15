@@ -1,5 +1,5 @@
 ; Based on Tauri CLI 2.11.4 installer.nsi (MIT; see ../../docs/notices/Tauri-MIT.txt).
-; Starframe changes: preserve data on replacement; explicit keep-data checkbox.
+; Starframe changes: replacement data retention, keep-data choice and uninstall-only exit.
 Unicode true
 ManifestDPIAware true
 ; Add in `dpiAwareness` `PerMonitorV2` to manifest for Windows 10 1607+ (note this should not affect lower versions since they should be able to ignore this and pick up `dpiAware` `true` set by `ManifestDPIAware true`)
@@ -382,6 +382,11 @@ Function PageLeaveReinstall
       ; Other erros? show generic error message and return to select un/reinstall page
       MessageBox MB_ICONEXCLAMATION "$(unableToUninstall)"
       Abort
+    ${EndIf}
+    ; Same-version Uninstall ends setup; version replacement continues installation.
+    ${If} $R0 = 0
+    ${AndIf} $WixMode <> 1
+      Quit
     ${EndIf}
   reinst_done:
 FunctionEnd
