@@ -6,6 +6,8 @@ The owner accepted the artwork, palette and general direction, then requested co
 
 The welcome and license captures show the final thin borders. The maintenance, completed and finish captures record the earlier full-page review, before the shared drawing helper was added.
 
+The latest welcome/license captures include the fixed-width focus outlines and aligned header. The header backdrop no longer paints over the title on a return visit. The approved checkmark shape is unchanged.
+
 The owner accepted the installer and requested matching radio buttons and checkboxes on 16 September 2026. These now use thin borders, orange dots/checkmarks and a separate text focus indicator. The control-only fixture below exercises the production drawing helper; its empty header and NSIS footer are fixture scaffolding, not the packaged installer.
 
 ![Radio and checkbox states in the isolated control fixture](choices.jpg)

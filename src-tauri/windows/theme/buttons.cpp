@@ -29,7 +29,7 @@ static bool DrawButton(const NMCUSTOMDRAW& draw)
         : hovered ? RGB(51, 65, 85) : RGB(30, 41, 59);
     const int saved = SaveDC(draw.hdc);
     if (!saved) return false;
-    const int width = MulDiv(focused ? 2 : 1, static_cast<int>(dpi), 96);
+    const int width = MulDiv(1, static_cast<int>(dpi), 96);
     const HPEN pen = CreatePen(PS_SOLID, width > 0 ? width : 1, border);
     const HBRUSH brush = CreateSolidBrush(background);
     const HBRUSH canvas = CreateSolidBrush(RGB(15, 23, 42));
@@ -98,9 +98,10 @@ static bool DrawButton(const NMCUSTOMDRAW& draw)
     UINT flags = (choice ? DT_LEFT : DT_CENTER) | DT_VCENTER | DT_SINGLELINE;
     if (SendMessageW(button, WM_QUERYUISTATE, 0, 0) & UISF_HIDEACCEL) flags |= DT_HIDEPREFIX;
     DrawTextW(draw.hdc, caption, -1, &bounds, flags);
-    if (choice && focused) {
+    if (focused) {
         RECT focus = bounds;
         DrawTextW(draw.hdc, caption, -1, &focus, flags | DT_CALCRECT);
+        if (!choice) OffsetRect(&focus, (bounds.right - focus.right) / 2, 0);
         OffsetRect(&focus, 0, (bounds.bottom - focus.bottom) / 2);
         DrawFocusRect(draw.hdc, &focus);
     }
@@ -218,6 +219,25 @@ extern "C" void __cdecl Apply(HWND parent, int, wchar_t*, void*, void*)
     HMODULE module;
     if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
         reinterpret_cast<LPCWSTR>(&Apply), &module)) return;
+    const HWND header = GetDlgItem(parent, 1037);
+    const HWND subtitle = GetDlgItem(parent, 1038);
+    const HWND background = GetDlgItem(parent, 1034);
+    if (header && subtitle && background) {
+        RECT titleBounds;
+        RECT subtitleBounds;
+        GetWindowRect(header, &titleBounds);
+        GetWindowRect(subtitle, &subtitleBounds);
+        MapWindowPoints(nullptr, parent, reinterpret_cast<POINT*>(&titleBounds), 2);
+        MapWindowPoints(nullptr, parent, reinterpret_cast<POINT*>(&subtitleBounds), 2);
+        SetWindowPos(header, HWND_TOP, subtitleBounds.left, titleBounds.top,
+            titleBounds.right - subtitleBounds.left, titleBounds.bottom - titleBounds.top,
+            SWP_NOACTIVATE);
+        // The full-width static backdrop must not repaint over the header labels.
+        SetWindowLongW(background, GWL_STYLE,
+            GetWindowLongW(background, GWL_STYLE) | WS_CLIPSIBLINGS);
+        SetWindowPos(background, HWND_BOTTOM, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
     SetWindowSubclass(parent, DialogTheme, 1, 0);
     EnumChildWindows(parent, AttachDialog, 0);
 }
