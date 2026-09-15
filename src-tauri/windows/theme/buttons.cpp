@@ -16,10 +16,16 @@ static bool DrawButton(const NMCUSTOMDRAW& draw)
     const bool focused = GetFocus() == button;
     const bool pressed = (draw.uItemState & CDIS_SELECTED) != 0;
     const bool hovered = (draw.uItemState & CDIS_HOT) != 0;
-    const bool primary = (GetWindowLongW(button, GWL_STYLE) & BS_TYPEMASK) == BS_DEFPUSHBUTTON;
+    const LONG style = GetWindowLongW(button, GWL_STYLE) & BS_TYPEMASK;
+    const bool choice = style >= BS_CHECKBOX;
+    const bool radio = style == BS_RADIOBUTTON || style == BS_AUTORADIOBUTTON;
+    const LRESULT checked = choice ? SendMessageW(button, BM_GETCHECK, 0, 0) : BST_UNCHECKED;
+    const bool primary = style == BS_DEFPUSHBUTTON;
     const COLORREF border = disabled ? RGB(71, 85, 105)
         : focused || primary ? RGB(251, 146, 60) : RGB(148, 163, 184);
-    const COLORREF background = pressed ? RGB(15, 23, 42)
+    const COLORREF background = choice && !radio && checked != BST_UNCHECKED
+        ? disabled ? RGB(148, 163, 184) : RGB(251, 146, 60)
+        : pressed ? RGB(15, 23, 42)
         : hovered ? RGB(51, 65, 85) : RGB(30, 41, 59);
     const int saved = SaveDC(draw.hdc);
     if (!saved) return false;
@@ -40,17 +46,64 @@ static bool DrawButton(const NMCUSTOMDRAW& draw)
     RECT bounds = draw.rc;
     const int inset = width / 2;
     InflateRect(&bounds, -inset, -inset);
-    const int radius = MulDiv(6, static_cast<int>(dpi), 96);
-    RoundRect(draw.hdc, bounds.left, bounds.top, bounds.right, bounds.bottom, radius, radius);
+    if (choice) {
+        const int size = MulDiv(16, static_cast<int>(dpi), 96);
+        bounds.left += MulDiv(2, static_cast<int>(dpi), 96);
+        bounds.top = (draw.rc.top + draw.rc.bottom - size) / 2;
+        bounds.right = bounds.left + size;
+        bounds.bottom = bounds.top + size;
+    }
+    const int radius = MulDiv(choice ? 3 : 6, static_cast<int>(dpi), 96);
+    if (radio) Ellipse(draw.hdc, bounds.left, bounds.top, bounds.right, bounds.bottom);
+    else RoundRect(draw.hdc, bounds.left, bounds.top, bounds.right, bounds.bottom, radius, radius);
+    if (choice && checked != BST_UNCHECKED) {
+        SelectObject(draw.hdc, GetStockObject(DC_PEN));
+        SelectObject(draw.hdc, GetStockObject(DC_BRUSH));
+        const COLORREF mark = radio
+            ? disabled ? RGB(148, 163, 184) : RGB(251, 146, 60)
+            : RGB(15, 23, 42);
+        SetDCPenColor(draw.hdc, mark);
+        SetDCBrushColor(draw.hdc, mark);
+        const int size = bounds.right - bounds.left;
+        if (radio) {
+            RECT dot = bounds;
+            InflateRect(&dot, -size / 4, -size / 4);
+            Ellipse(draw.hdc, dot.left, dot.top, dot.right, dot.bottom);
+        } else if (checked == BST_INDETERMINATE) {
+            Rectangle(draw.hdc, bounds.left + size / 4, bounds.top + size * 2 / 5,
+                bounds.right - size / 4, bounds.bottom - size * 2 / 5);
+        } else {
+            POINT tick[6] = {
+                {bounds.left + size * 2 / 10, bounds.top + size * 5 / 10},
+                {bounds.left + size * 4 / 10, bounds.top + size * 7 / 10},
+                {bounds.left + size * 8 / 10, bounds.top + size * 3 / 10},
+                {bounds.left + size * 8 / 10, bounds.top + size * 5 / 10},
+                {bounds.left + size * 4 / 10, bounds.top + size * 9 / 10},
+                {bounds.left + size * 2 / 10, bounds.top + size * 7 / 10}
+            };
+            Polygon(draw.hdc, tick, ARRAYSIZE(tick));
+        }
+    }
+    if (choice) {
+        const int textLeft = bounds.right + MulDiv(7, static_cast<int>(dpi), 96);
+        bounds = draw.rc;
+        bounds.left = textLeft;
+    }
     const HFONT font = reinterpret_cast<HFONT>(SendMessageW(button, WM_GETFONT, 0, 0));
     if (font) SelectObject(draw.hdc, font);
     SetBkMode(draw.hdc, TRANSPARENT);
     SetTextColor(draw.hdc, disabled ? RGB(148, 163, 184) : RGB(248, 250, 252));
     wchar_t caption[256];
     GetWindowTextW(button, caption, ARRAYSIZE(caption));
-    UINT flags = DT_CENTER | DT_VCENTER | DT_SINGLELINE;
+    UINT flags = (choice ? DT_LEFT : DT_CENTER) | DT_VCENTER | DT_SINGLELINE;
     if (SendMessageW(button, WM_QUERYUISTATE, 0, 0) & UISF_HIDEACCEL) flags |= DT_HIDEPREFIX;
     DrawTextW(draw.hdc, caption, -1, &bounds, flags);
+    if (choice && focused) {
+        RECT focus = bounds;
+        DrawTextW(draw.hdc, caption, -1, &focus, flags | DT_CALCRECT);
+        OffsetRect(&focus, 0, (bounds.bottom - focus.bottom) / 2);
+        DrawFocusRect(draw.hdc, &focus);
+    }
     RestoreDC(draw.hdc, saved);
     DeleteObject(canvas);
     DeleteObject(brush);
@@ -67,7 +120,8 @@ static LRESULT CALLBACK DialogTheme(HWND window, UINT message, WPARAM wparam, LP
             wchar_t kind[32];
             GetClassNameW(notification->hwndFrom, kind, ARRAYSIZE(kind));
             const LONG style = GetWindowLongW(notification->hwndFrom, GWL_STYLE) & BS_TYPEMASK;
-            if (lstrcmpiW(kind, L"Button") == 0 && style <= BS_DEFPUSHBUTTON) {
+            if (lstrcmpiW(kind, L"Button") == 0
+                && (style <= BS_AUTO3STATE || style == BS_AUTORADIOBUTTON)) {
                 const auto* draw = reinterpret_cast<const NMCUSTOMDRAW*>(lparam);
                 if (draw->dwDrawStage == CDDS_PREPAINT && DrawButton(*draw)) {
                     return CDRF_SKIPDEFAULT;

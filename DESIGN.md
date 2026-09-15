@@ -41,6 +41,8 @@ The owner accepted the portrait/navy/orange direction on 15 September 2026 and r
 
 The subsequent uninstall review requested thin borders instead of raised, bright Windows bevels. Use thin neutral borders for ordinary controls and an orange focus outline, retaining the native controls and their keyboard behavior. Decorative divider lines should remain subdued. Custom drawing must yield to the system in high-contrast mode.
 
+Radio buttons and checkboxes also use thin borders, with orange radio dots and orange checkbox fills with dark checkmarks. Keep selection and keyboard focus distinguishable, preserve native checked/disabled states and radio-group navigation, and retain the unchecked data-retention default.
+
 Starframe manages the game integration automatically. Choosing a validated game installation authorizes preparation of the required bootstrap/runtime when the game is closed. App installation and upgrades include the required runtime resources; the desktop prepares the matching runtime automatically on first start and after updates. If a game location is not yet known, ask for the location, not a separate runtime installation. Show preparation, waiting and failure states accurately. Keep repair/reinstall available in Settings without making it part of ordinary setup.
 
 Uninstall automatically removes Starframe's recorded game integration and restores backed-up originals before removing the desktop app. Users must not have to visit Settings first. A running game, inaccessible installation or conflicting files must stop cleanup with an explanation and a retry path. Keep the app and its recovery records until cleanup succeeds; never force-close the game or erase another loader's files.

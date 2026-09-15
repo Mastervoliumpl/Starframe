@@ -126,8 +126,11 @@ Function ${PREFIX}StarframePageShow
         !insertmacro StarframeControlTheme $1
       ${ElseIf} $3 >= 2
       ${AndIf} $3 <= 9
-        ${If} $StarframeHighContrast = 0
+        ${If} $3 == 7
+        ${AndIf} $StarframeHighContrast = 0
           System::Call 'uxtheme::SetWindowTheme(p r1, w "", w "")'
+        ${Else}
+          System::Call 'uxtheme::SetWindowTheme(p r1, p 0, p 0)'
         ${EndIf}
         !insertmacro StarframeColors $1 F8FAFC
       ${EndIf}
