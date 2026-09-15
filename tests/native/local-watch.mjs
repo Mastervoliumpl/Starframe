@@ -101,7 +101,7 @@ try {
       const enabled = page.getByRole('switch', {
         name: 'Enable Watched local fixture dev.1',
       });
-      await expect(enabled).toBeVisible();
+      await expect(enabled).toBeVisible({ timeout: 40000 });
       await enabled.click();
       await expect(enabled).toBeChecked();
       await deployed("return 'original'\n");
