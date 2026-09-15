@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Update rustls to 0.23.45 to fix TLS handshake validation advisory RUSTSEC-2026-0285 in the catalog verifier's dependency graph; refresh the corresponding notice inventory.
 - Authenticate catalog refreshes through TUF, with expiry, rollback and retained key-rotation checks (#46). Schema 13 commits catalog and advisory targets together. Expired or unverified information pauses new downloads; verified library reuse remains available offline. Confirmed findings block matching downloads and activation, including local payloads, while preserving files/settings. Show evidence and correction history and add public problem/private security reporting routes. Daily renewal uses thirty-day validity; hosted publication remains disabled pending acceptance.
 - Add bounded mutation campaigns for catalogs, runtime contracts, ZIP extraction and paths, plus Windows directory-replacement stress checks. Keep longer campaigns separate from ordinary builds and retain reproducible failures (#47). See [results and limits](docs/verification/fuzzing.md).
 - Include desktop/runtime/installer dependency notices and exact source references in NSIS packaging; reject stale notices and mismatched third-party runtime DLLs before bundling.

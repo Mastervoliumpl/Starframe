@@ -1073,9 +1073,9 @@ Source: https://static.crates.io/crates/rustc_version/rustc_version-0.4.1.crate
 Notice: LICENSE-APACHE [text a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2]
 Notice: LICENSE-MIT [text c9a75f18b9ab2927829a208fc6aa2cf4e63b8420887ba29cdb265d6619ae82d5]
 
-cargo: rustls 0.23.44
+cargo: rustls 0.23.45
 License: Apache-2.0 OR ISC OR MIT
-Source: https://static.crates.io/crates/rustls/rustls-0.23.44.crate
+Source: https://static.crates.io/crates/rustls/rustls-0.23.45.crate
 Notice: LICENSE-APACHE [text a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2]
 Notice: LICENSE-ISC [text 7cfafc877eccc46c0e346ccbaa5c51bb6b894d2b818e617d970211e232785ad4]
 Notice: LICENSE-MIT [text 709e3175b4212f7b13aa93971c9f62ff8c69ec45ad8c6532a7e0c41d7a7d6f8c]

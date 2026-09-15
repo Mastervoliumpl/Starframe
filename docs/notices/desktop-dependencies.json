@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "scope": "Windows x64 Rust dependencies, including build dependencies; JavaScript identified in the production source map. Runtime, bootstrap, toolchain and assets have separate notices.",
   "inputs": {
-    "src-tauri/Cargo.lock": "e5865c168ab68dcf3c235ff93db0cec94a3d5ba40328f94debabaf18c17b8c0e",
+    "src-tauri/Cargo.lock": "8f955e5a11f7f51ee94c6036d32aec0433a245d621f50339327f1f31f2d97a81",
     "src-tauri/Cargo.toml": "a01fb2cb8a3dfade76aa6e52492c805e1f3679d95e9bad6a2a5593996d739ed9",
     "package-lock.json": "7b6356211ffb3783b9325b6ff102fa2bc75abc15d86cbe5fac9fe4ec5c4f3f2c",
     "package.json": "5dd30edc1731b677a3a1cd27dc1d92d27c930e4ad23b5c6401c1611b39fd30e9"
@@ -3526,24 +3526,24 @@
     {
       "ecosystem": "cargo",
       "name": "rustls",
-      "version": "0.23.44",
+      "version": "0.23.45",
       "license": "Apache-2.0 OR ISC OR MIT",
-      "source": "https://static.crates.io/crates/rustls/rustls-0.23.44.crate",
-      "sourceSha256": "6725596c3f2c3a0aef021139e145d4eafe314a6623e4680ca83852b2c67ab2ba",
+      "source": "https://static.crates.io/crates/rustls/rustls-0.23.45.crate",
+      "sourceSha256": "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634",
       "notices": [
         {
           "file": "LICENSE-APACHE",
-          "source": "https://static.crates.io/crates/rustls/rustls-0.23.44.crate",
+          "source": "https://static.crates.io/crates/rustls/rustls-0.23.45.crate",
           "text": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
         },
         {
           "file": "LICENSE-ISC",
-          "source": "https://static.crates.io/crates/rustls/rustls-0.23.44.crate",
+          "source": "https://static.crates.io/crates/rustls/rustls-0.23.45.crate",
           "text": "7cfafc877eccc46c0e346ccbaa5c51bb6b894d2b818e617d970211e232785ad4"
         },
         {
           "file": "LICENSE-MIT",
-          "source": "https://static.crates.io/crates/rustls/rustls-0.23.44.crate",
+          "source": "https://static.crates.io/crates/rustls/rustls-0.23.45.crate",
           "text": "709e3175b4212f7b13aa93971c9f62ff8c69ec45ad8c6532a7e0c41d7a7d6f8c"
         }
       ]
