@@ -1,6 +1,6 @@
 # Starframe: design direction
 
-Status: revision 0.10, 9 September 2026. Product name: Starframe. This revision records the owner's automatic runtime lifecycle, uninstall data default, deferred Windows certificate signing and catalog expiry decisions. The accepted visual direction and session menu remain unchanged.
+Status: revision 0.11, 15 September 2026. Product name: Starframe. This revision extends the accepted identity to the Windows installer and uninstaller. The automatic runtime lifecycle, uninstall data default, deferred Windows certificate signing and catalog expiry decisions remain in effect.
 
 This is the accepted design handoff. The user authorized milestone 0.1.0 on 6 September 2026, including desktop navigation and live state in issue #8. Later feature screens remain planned. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
@@ -34,6 +34,8 @@ Game compatibility and mod releases are separate concepts. Warn when a catalog m
 ## 2. Visual character
 
 ### Installation, updates and removal
+
+The installer and uninstaller must follow Starframe's navy/orange palette, typography and existing icon/wordmark identity, with familiar Windows controls and simpler wording. Replace the default blue computer illustration with a suitable composition from the approved social-preview artwork in the sibling `Starframe Assets/Social preview` directory. Preserve proportions, readable branding and asset provenance. Use the body and heading font rules below, with system fallbacks; do not require font installation or redistribute Windows font files. Preserve visible keyboard focus, readable disabled states and system high-contrast behavior. Review representative pages before completing [#74](https://github.com/Mastervoliumpl/Starframe/issues/74) in 0.6.0. Final display/accessibility acceptance belongs to #30 and remains required before public release.
 
 Starframe manages the game integration automatically. Choosing a validated game installation authorizes preparation of the required bootstrap/runtime when the game is closed. App installation and upgrades include the required runtime resources; the desktop prepares the matching runtime automatically on first start and after updates. If a game location is not yet known, ask for the location, not a separate runtime installation. Show preparation, waiting and failure states accurately. Keep repair/reinstall available in Settings without making it part of ordinary setup.
 

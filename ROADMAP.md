@@ -130,6 +130,9 @@ Active. Deliver signed user-initiated updates, NSIS install/uninstall, release c
 - [#28: Check GitHub releases and install signed updates on request](https://github.com/Mastervoliumpl/Starframe/issues/28)
 - [#29: Build and verify draft releases through GitHub Actions](https://github.com/Mastervoliumpl/Starframe/issues/29)
 - [#30: Complete Windows alpha acceptance and user documentation](https://github.com/Mastervoliumpl/Starframe/issues/30)
+- [#74: Brand the Windows installer and uninstaller with Starframe design](https://github.com/Mastervoliumpl/Starframe/issues/74)
+
+On 15 September 2026, the owner moved final clean-machine/prerequisite and display/accessibility acceptance from #27 to #30. These remain mandatory before public release; #27 can complete after its functional installer work passes. #74 follows #27 and supplies the branded installer for #30's final acceptance. Display/accessibility checks do not require a clean machine. The installer identity requirements are recorded in DESIGN.md revision 0.11.
 
 ### 0.7.0: Native game integration
 
