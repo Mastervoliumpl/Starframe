@@ -219,6 +219,21 @@ extern "C" void __cdecl Apply(HWND parent, int, wchar_t*, void*, void*)
     HMODULE module;
     if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
         reinterpret_cast<LPCWSTR>(&Apply), &module)) return;
+    const HWND back = GetDlgItem(parent, 3);
+    RECT backBounds;
+    RECT nextBounds;
+    RECT cancelBounds;
+    if (GetWindowRect(back, &backBounds)
+        && GetWindowRect(GetDlgItem(parent, 1), &nextBounds)
+        && GetWindowRect(GetDlgItem(parent, 2), &cancelBounds)) {
+        const int gap = (cancelBounds.left - nextBounds.right) / 2;
+        if (gap > 0) {
+            POINT position = {nextBounds.left - gap - (backBounds.right - backBounds.left), backBounds.top};
+            ScreenToClient(parent, &position);
+            SetWindowPos(back, nullptr, position.x, position.y, 0, 0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+    }
     const HWND header = GetDlgItem(parent, 1037);
     const HWND subtitle = GetDlgItem(parent, 1038);
     const HWND background = GetDlgItem(parent, 1034);

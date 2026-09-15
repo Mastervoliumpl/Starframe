@@ -96,7 +96,7 @@ The complete ordinary-user installer suite also passed with the schema-12 baseli
 
 ## Installer branding review
 
-The license page identifies Starframe's GNU AGPL v3 license and explains that bracketed names and years are examples. Those entries belong to the standard license's final author-guide section; they are not unfinished Starframe notices. The repository's complete `LICENSE` text remains unchanged.
+The license page identifies Starframe's GNU AGPL v3 license. At the owner's request, its introduction omits the explanation about example names and years. Those entries belong to the standard license's final author-guide section; the repository's complete `LICENSE` text remains unchanged. Back and Next are separated by half the measured Next–Cancel gap, preserving button sizes and keyboard order.
 
 Issue [#74](https://github.com/Mastervoliumpl/Starframe/issues/74) extends the existing NSIS installer with the accepted portrait artwork, Segoe UI body text, Bahnschrift headings with a system fallback, navy surfaces and orange headings/progress. A small Starframe-owned Win32 drawing helper gives the native buttons thin borders and orange keyboard focus; fields, group frames and divider lines also use thin borders. The title bar uses Windows dark styling. The license, destination field and details list use readable light text on navy. License URLs remain selectable plain text so RichEdit does not force blue links with insufficient contrast. No new installer framework, external plugin or redistributed Windows font was added.
 

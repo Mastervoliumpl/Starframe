@@ -178,7 +178,7 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 !if "${LICENSE}" != ""
   !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
   !define MUI_PAGE_CUSTOMFUNCTION_SHOW StarframePageShow
-  !define MUI_LICENSEPAGE_TEXT_TOP "Starframe uses GNU AGPL v3. Bracketed names and years are examples."
+  !define MUI_LICENSEPAGE_TEXT_TOP "Starframe uses GNU AGPL v3."
   !insertmacro MUI_PAGE_LICENSE "${LICENSE}"
 !endif
 
