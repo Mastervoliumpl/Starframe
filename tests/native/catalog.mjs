@@ -14,6 +14,10 @@ const offline = {
 await withDesktop(
   root,
   async (page) => {
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await expect(
+      page.getByText('Saved locally: 0 library entries and 0 collections.'),
+    ).toBeVisible({ timeout: 30000 });
     await page.getByRole('button', { name: 'Catalog', exact: true }).click();
     await expect(page.getByText('No catalog is cached yet.')).toBeVisible({
       timeout: 30000,
