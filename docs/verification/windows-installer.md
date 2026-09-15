@@ -58,6 +58,8 @@ The helper no longer seeds an interrupted journal for this check; the installed 
 
 ## Remaining acceptance
 
+On 15 September 2026, follow-up validation found that hosted checks on `3077204` had stopped after the legacy storage fixture's default five-second assertion expired. The captured UI still showed opening saved data, with the desktop connected. Legacy conversion now uses the same bounded thirty-second wait as the existing delayed-startup fixture. The native storage script passed fresh/restarted data, corrupt/newer data retention, populated legacy schemas 1–3 and navigation during delayed conversion. No application behavior changed. Dependency audits on that commit passed; a new hosted run is required for the test adjustment.
+
 The transitive notice/source inventory is recorded in [distribution notices](distribution-notices.md); verify required source delivery with #29 before publication. Verify absent WebView2, prerequisite download failure, an actual packaged-version upgrade with populated data, and interactive installer/uninstaller keyboard, scaling and high-contrast behavior. A single PC does not establish the supported Windows matrix; clean-Windows acceptance needs a disposable test environment.
 
 Windows Authenticode is deferred to [#61](https://github.com/Mastervoliumpl/Starframe/issues/61), with no milestone. Installer/update artifact signatures and catalog authentication remain required under #28, #29 and #46. [SignPath form notes](../planning/signpath-request.md) are retained for a future application; no application or consent has been submitted. No app release is authorized by this verification, and #27 remains open.

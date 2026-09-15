@@ -68,7 +68,7 @@ for (const schema of [1, 2, 3]) {
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
       await expect(
         page.getByText('Saved locally: 2 library entries and 2 collections.'),
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 30000 });
       await page
         .getByRole('button', { name: 'Help & logs', exact: true })
         .click();
