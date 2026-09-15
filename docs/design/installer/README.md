@@ -1,8 +1,10 @@
 # Installer review
 
-Issue [#74](https://github.com/Mastervoliumpl/Starframe/issues/74), 15 September 2026. These are native NSIS captures from the separate **Starframe Installer Test** identity. They contain no personal paths. The application identity in the normal candidate is **Starframe**.
+Issue [#74](https://github.com/Mastervoliumpl/Starframe/issues/74), 15 September 2026. These are native NSIS captures from **Starframe** and the separate **Starframe Installer Test** identity. They contain no personal paths.
 
-The owner accepted the artwork, palette and general direction, then requested consistent styling for the remaining controls. The candidate now uses native dark navigation buttons and title bar, navy inputs/license/details, orange progress and headings, and readable checkbox/radio labels. Windows controls retain their input behavior; high-contrast mode selects system colors. Windows common dialogs keep their platform appearance.
+The owner accepted the artwork, palette and general direction, then requested consistent styling for the remaining controls. After successful uninstall and keyboard review, the owner requested thin borders. A small native drawing helper now gives the existing buttons navy surfaces, thin borders and orange keyboard focus; field/group borders and dividers are also simplified. Windows controls retain their input behavior; high-contrast mode selects system colors and bypasses custom drawing. Windows common dialogs keep their platform appearance.
+
+The welcome and license captures show the final thin borders. The maintenance, completed and finish captures record the earlier full-page review, before the shared drawing helper was added.
 
 ![Welcome page](welcome.jpg)
 

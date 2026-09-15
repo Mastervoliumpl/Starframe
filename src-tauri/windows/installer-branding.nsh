@@ -1,6 +1,7 @@
 !include Util.nsh
 !pragma warning error 6000
 !define /ifndef EM_SETCHARFORMAT 0x444
+!addplugindir /x86-unicode "${__FILEDIR__}\..\target\installer\theme"
 
 SetFont "Segoe UI" 10
 Var StarframeHighContrast
@@ -30,6 +31,23 @@ Var StarframePageOverride
   System::Free $0
   System::Call 'user32::SetWindowPos(p r9, p 0, i r1, i r2, i r3, i r4, i 0x14)'
   System::Store "L"
+!macroend
+
+!macro StarframeSeparator CONTROL
+  ${If} $StarframeHighContrast = 0
+    System::Store "S"
+    StrCpy $9 ${CONTROL}
+    System::Call 'user32::GetWindowLong(p r9, i -16) i.r8'
+    IntOp $8 $8 & 0xFFFFFFE0
+    System::Call 'user32::SetWindowLong(p r9, i -16, i r8)'
+    System::Call 'user32::GetClientRect(p r9, @r0)'
+    System::Call '*$0(i, i, i.r1, i)'
+    System::Call 'user32::GetDpiForWindow(p r9) i.r2'
+    System::Call 'kernel32::MulDiv(i 1, i r2, i 96) i.r2'
+    System::Call 'user32::SetWindowPos(p r9, p 0, i 0, i 0, i r1, i r2, i 0x16)'
+    SetCtlColors $9 334155 334155
+    System::Store "L"
+  ${EndIf}
 !macroend
 
 !macro StarframeControlTheme CONTROL
@@ -65,6 +83,7 @@ Function ${PREFIX}StarframeGuiInit
 FunctionEnd
 
 Function ${PREFIX}StarframePageShow
+  StarframeTheme::Apply /NOUNLOAD
   Push $0
   Push $1
   Push $2
@@ -84,6 +103,10 @@ Function ${PREFIX}StarframePageShow
   SendMessage $mui.Header.Text ${WM_SETFONT} $StarframeHeadingFont 1
   !insertmacro StarframeColors $mui.Branding.Background F8FAFC
   !insertmacro StarframeColors $mui.Branding.Text F8FAFC
+  !insertmacro StarframeSeparator $mui.Line.Standard
+  !insertmacro StarframeSeparator $mui.Line.FullWindow
+  GetDlgItem $0 $HWNDPARENT 1036
+  !insertmacro StarframeSeparator $0
   ${If} $StarframePageOverride != ""
     StrCpy $0 $StarframePageOverride
     StrCpy $StarframePageOverride ""

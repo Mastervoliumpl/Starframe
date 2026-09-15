@@ -8,6 +8,8 @@ This notice supplements the repository license. Installer inventories include th
 
 The NSIS template derives from Tauri CLI 2.11.4, copyright (c) 2017 - Present Tauri Apps Contributors, under the [MIT license](notices/Tauri-MIT.txt). Starframe changes the uninstall checkbox to offer explicit retention and marks an app replacement as an update so it preserves data. Source: https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.11.4/crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi.
 
+The native control drawing helper in `src-tauri/windows/theme` is Starframe source covered by the repository license. It links Windows system libraries and adds no third-party runtime or font redistribution.
+
 ## Oxanium font
 
 Copyright 2019 The Oxanium Project Authors. The bundled, unchanged Oxanium variable font is used at weight 800 for the Starframe wordmark and launch control. It is licensed under the [SIL Open Font License 1.1](notices/OFL-Oxanium.txt). Source: https://github.com/google/fonts/tree/main/ofl/oxanium.

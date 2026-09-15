@@ -91,6 +91,8 @@ jobs:
         env:
           CATALOG_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
         run: cargo run --manifest-path src-tauri/Cargo.toml --locked --bin check_catalog -- catalog/releases.json --git-base $env:CATALOG_BASE
+      - name: Compile native installer controls
+        run: ./scripts/prepare_windows_installer.ps1 -ThemeOnly
       - run: npm run tauri -- build --debug --no-bundle -- --locked
       - run: npm run test:native
       - run: npm run tauri -- build --no-bundle -- --locked

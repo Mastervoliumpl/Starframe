@@ -138,6 +138,8 @@ The build icons were generated from [the approved SVG](docs/design/starframe-mar
 
 ## Tool references
 
+The NSIS packaging preflight also compiles the small native control painter in `src-tauri/windows/theme` using the installed Visual Studio C++ x86 tools. The installer host is 32-bit even though Starframe is 64-bit. `scripts/prepare_windows_installer.ps1` runs the existing runtime/notices preflight, then builds the helper with compiler warnings treated as errors. CI uses `-ThemeOnly` to compile it without game integration resources. The helper links Windows system libraries and requires no separate C runtime installation. Button input remains in the standard Windows controls; the helper handles drawing and falls back to native rendering in high-contrast mode.
+
 - [Svelte tooling](https://svelte.dev/packages)
 - [Clippy usage](https://doc.rust-lang.org/stable/clippy/usage.html)
 - [.NET formatting checks](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-format)
