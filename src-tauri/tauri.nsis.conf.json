@@ -28,8 +28,12 @@
         "languages": ["English"],
         "template": "windows/installer.nsi",
         "installerIcon": "icons/icon.ico",
+        "sidebarImage": "windows/assets/installer-sidebar.bmp",
         "uninstallerIcon": "icons/icon.ico",
-        "installerHooks": "windows/installer-hooks.nsh"
+        "installerHooks": "windows/installer-hooks.nsh",
+        "customLanguageFiles": {
+          "English": "windows/English.nsh"
+        }
       }
     }
   }

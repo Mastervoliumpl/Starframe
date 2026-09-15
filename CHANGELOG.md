@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Brand the Windows installer with Starframe portrait artwork, navy surfaces, orange headings and progress, native dark controls and clearer maintenance/uninstall wording (#74). Preserve keyboard controls, system high-contrast fallback and the unchecked data-retention default; owner review and final display acceptance remain in progress.
 - Exit setup after a successful same-version maintenance uninstall instead of returning to installation pages. Preserve reinstall, version replacement and cancellation behavior (#27).
 - Update rustls to 0.23.45 to fix TLS handshake validation advisory RUSTSEC-2026-0285 in the catalog verifier's dependency graph; refresh the corresponding notice inventory.
 - Authenticate catalog refreshes through TUF, with expiry, rollback and retained key-rotation checks (#46). Schema 13 commits catalog and advisory targets together. Expired or unverified information pauses new downloads; verified library reuse remains available offline. Confirmed findings block matching downloads and activation, including local payloads, while preserving files/settings. Show evidence and correction history and add public problem/private security reporting routes. Daily renewal uses thirty-day validity; hosted publication remains disabled pending acceptance.

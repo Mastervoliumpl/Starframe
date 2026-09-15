@@ -1,5 +1,6 @@
 ; Tauri's default macro kills running apps in silent/passive mode. File recovery
 ; needs normal Starframe shutdown, so replace that macro through the hook include.
+!include "${__FILEDIR__}\installer-branding.nsh"
 !macroundef CheckIfAppIsRunning
 !macro CheckIfAppIsRunning executableName productName
   nsis_tauri_utils::FindProcessCurrentUser "${executableName}"

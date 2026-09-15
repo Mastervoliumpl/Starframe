@@ -1,5 +1,5 @@
 ; Based on Tauri CLI 2.11.4 installer.nsi (MIT; see ../../docs/notices/Tauri-MIT.txt).
-; Starframe changes: replacement data retention, keep-data choice and uninstall-only exit.
+; Starframe changes: branding, replacement data retention, keep-data choice and uninstall-only exit.
 Unicode true
 ManifestDPIAware true
 ; Add in `dpiAwareness` `PerMonitorV2` to manifest for Windows 10 1607+ (note this should not affect lower versions since they should be able to ignore this and pick up `dpiAware` `true` set by `ManifestDPIAware true`)
@@ -79,7 +79,7 @@ Var WixMode
 Var OldMainBinaryName
 
 Name "${PRODUCTNAME}"
-BrandingText "${COPYRIGHT}"
+BrandingText " "
 OutFile "${OUTFILE}"
 
 ; We don't actually use this value as default install path,
@@ -168,12 +168,17 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 
 ; Installer pages, must be ordered as they appear
 ; 1. Welcome Page
+!define MUI_WELCOMEPAGE_TITLE "Install Starframe"
+!define MUI_WELCOMEPAGE_TEXT "Mod manager for Sanctuary: Shattered Sun.$\r$\n$\r$\nSetup installs Starframe for your Windows account. Your library, collections and settings stay in place when you reinstall or update.$\r$\n$\r$\nSelect Next to continue."
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW StarframeWelcomeShow
 !insertmacro MUI_PAGE_WELCOME
 
 ; 2. License Page (if defined)
 !if "${LICENSE}" != ""
   !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+  !define MUI_PAGE_CUSTOMFUNCTION_SHOW StarframePageShow
+  !define MUI_LICENSEPAGE_TEXT_TOP "Starframe is free software under the GNU AGPL v3. Review the license below."
   !insertmacro MUI_PAGE_LICENSE "${LICENSE}"
 !endif
 
@@ -298,6 +303,8 @@ Function PageReinstall
     ${EndIf}
 
     ${NSD_SetFocus} $R2
+    StrCpy $StarframePageOverride $R4
+    Call StarframePageShow
     nsDialogs::Show
   ${EndIf}
 FunctionEnd
@@ -393,6 +400,8 @@ FunctionEnd
 
 ; 5. Choose install directory page
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW StarframePageShow
+!define MUI_DIRECTORYPAGE_TEXT_TOP "Choose where to install Starframe. Your library and settings are stored separately in your Windows account."
 !insertmacro MUI_PAGE_DIRECTORY
 
 ; 6. Start menu shortcut page
@@ -406,6 +415,11 @@ Var AppStartMenuFolder
 !insertmacro MUI_PAGE_STARTMENU Application $AppStartMenuFolder
 
 ; 7. Installation page
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW StarframePageShow
+!define MUI_INSTFILESPAGE_FINISHHEADER_TEXT "Installation complete"
+!define MUI_INSTFILESPAGE_FINISHHEADER_SUBTEXT "Starframe is installed. Select Next to finish."
+!define MUI_INSTFILESPAGE_ABORTHEADER_TEXT "Installation stopped"
+!define MUI_INSTFILESPAGE_ABORTHEADER_SUBTEXT "Review the details below before trying again."
 !insertmacro MUI_PAGE_INSTFILES
 
 ; 8. Finish page
@@ -413,14 +427,18 @@ Var AppStartMenuFolder
 ; Don't auto jump to finish page after installation page,
 ; because the installation page has useful info that can be used debug any issues with the installer.
 !define MUI_FINISHPAGE_NOAUTOCLOSE
+!define MUI_FINISHPAGE_TITLE "Starframe is installed"
+!define MUI_FINISHPAGE_TEXT "Open Starframe to choose your game installation and manage mods.$\r$\n$\r$\nStarframe prepares its game integration automatically when the game is closed."
 ; Use show readme button in the finish page as a button create a desktop shortcut
 !define MUI_FINISHPAGE_SHOWREADME
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "$(createDesktop)"
 !define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateOrUpdateDesktopShortcut
 ; Show run app after installation.
 !define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_TEXT "Open Starframe"
 !define MUI_FINISHPAGE_RUN_FUNCTION RunMainBinary
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW StarframeFinishShow
 !insertmacro MUI_PAGE_FINISH
 
 Function RunMainBinary
@@ -459,20 +477,37 @@ Function un.ConfirmShow ; Add add a `Delete app data` check box
   IntOp $7 $7 / 96
   System::Call 'user32::CreateWindowEx(i r3, w "${__NSD_CheckBox_CLASS}", w "Keep my library, collections and settings", i ${__NSD_CheckBox_STYLE}, i r4, i r5, i r6, i r7, p r1, i0, i0, i0) i .s'
   Pop $DeleteAppDataCheckbox
+  GetDlgItem $0 $1 1006
+  !insertmacro StarframePlaceControl $0 0 0 300 65
+  GetDlgItem $0 $1 1029
+  !insertmacro StarframePlaceControl $0 0 74 60 10
+  GetDlgItem $0 $1 1000
+  !insertmacro StarframePlaceControl $0 65 72 234 14
+  !insertmacro StarframePlaceControl $DeleteAppDataCheckbox 0 100 300 16
   SendMessage $HWNDPARENT ${WM_GETFONT} 0 0 $1
   SendMessage $DeleteAppDataCheckbox ${WM_SETFONT} $1 1
+  Call un.StarframePageShow
 FunctionEnd
 !define MUI_PAGE_CUSTOMFUNCTION_LEAVE un.ConfirmLeave
 Function un.ConfirmLeave
   SendMessage $DeleteAppDataCheckbox ${BM_GETCHECK} 0 0 $DeleteAppDataCheckboxState
 FunctionEnd
 !define MUI_PAGE_CUSTOMFUNCTION_PRE un.SkipIfPassive
+!define MUI_UNCONFIRMPAGE_TEXT_TOP "Remove Starframe and its owned game integration.$\r$\n$\r$\nYour library, collections and settings will also be deleted unless you choose to keep them. Original import sources and unowned game files stay in place."
 !insertmacro MUI_UNPAGE_CONFIRM
 
 ; 2. Uninstalling Page
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW un.StarframePageShow
+!define MUI_INSTFILESPAGE_FINISHHEADER_TEXT "Starframe removed"
+!define MUI_INSTFILESPAGE_FINISHHEADER_SUBTEXT "Removal completed. Select Close to exit."
+!define /redef MUI_INSTFILESPAGE_ABORTHEADER_TEXT "Removal stopped"
+!define /redef MUI_INSTFILESPAGE_ABORTHEADER_SUBTEXT "The app and recovery records are kept so you can retry."
 !insertmacro MUI_UNPAGE_INSTFILES
 
 ;Languages
+!insertmacro StarframeBrandingFunctions ""
+!insertmacro StarframeBrandingFunctions "un."
+!insertmacro StarframeInstallerPageFunctions
 {{#each languages}}
 !insertmacro MUI_LANGUAGE "{{this}}"
 {{/each}}
@@ -482,6 +517,7 @@ FunctionEnd
 {{/each}}
 
 Function .onInit
+  Call StarframeInitializeBranding
   ${GetOptions} $CMDLINE "/P" $PassiveMode
   ${IfNot} ${Errors}
     StrCpy $PassiveMode 1
@@ -761,6 +797,7 @@ Function .onInstSuccess
 FunctionEnd
 
 Function un.onInit
+  Call un.StarframeInitializeBranding
   !insertmacro SetContext
 
   !if "${INSTALLMODE}" == "both"

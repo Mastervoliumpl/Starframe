@@ -1,4 +1,4 @@
-# Sanctuary launch artwork
+# Sanctuary artwork
 
 `src/assets/sanctuary-sphere.jpg` is an unchanged copy of Enhearten Media's `Art_Sphere01.jpg` (7680 × 4320, 1,441,216 bytes). CSS supplies the crop, navy fade and orange tint. The original is retained in the external Sanctuary Artwork collection.
 
@@ -17,3 +17,7 @@ On 7 September 2026, the project owner supplied a Discord exchange with FoneE [S
 The typo is preserved. This is a user-supplied permission record, not an independently retrieved Discord message or a general-purpose asset license. The preceding exchange says public promotional resources include logos and faction icons, with a Sanctuary Google Drive link to follow. That link has not been supplied.
 
 The owner supplied this exchange specifically in response to the question about artwork inside the distributed Starframe app. The current use is the free Starframe game launcher, with credit in Help & logs and this notice. Do not claim the artwork as Starframe's or use it for profit. Review these conditions before any commercial distribution or other use outside that context. Preserve this notice with copies of the asset; it does not change the AGPL terms for Starframe's code.
+
+## Installer derivative
+
+`src-tauri/windows/assets/installer-sidebar.bmp` is a generated portrait adaptation of Starframe's existing social-preview composition, which drew on the same Sanctuary sphere artwork. It is used in the free Starframe Windows installer. Preserve the credit and permission conditions above with this derivative; generation does not establish ownership of the underlying artwork. [Asset records](../design/ASSETS.md#windows-installer-artwork) identify the source, preparation and hashes. The original Sanctuary image and original Starframe SVG identity remain unchanged.
