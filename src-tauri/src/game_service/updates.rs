@@ -58,10 +58,11 @@ impl Updates {
             .as_ref()
             .is_some_and(|r| self.saved.dismissed.as_ref() == Some(&r.version));
     }
-    fn save(&mut self, storage: &mut Storage) -> Result<(), String> {
+    fn save(&mut self, storage: &mut Storage, saved: Saved) -> Result<(), String> {
         storage
-            .save_update_preferences(&self.saved)
+            .save_update_preferences(&saved)
             .map_err(|e| e.to_string())?;
+        self.saved = saved;
         self.publish_saved();
         Ok(())
     }
@@ -108,8 +109,9 @@ impl Updates {
                 {
                     return Err("The available release changed. Review it again.".into());
                 }
-                self.saved.dismissed = Some(version);
-                self.save(storage)?;
+                let mut saved = self.saved.clone();
+                saved.dismissed = Some(version);
+                self.save(storage, saved)?;
             }
             Action::Channel { channel } => {
                 if matches!(
@@ -118,15 +120,16 @@ impl Updates {
                 ) {
                     return Err("Cancel this update before changing channels.".into());
                 }
+                let mut saved = self.saved.clone();
+                saved.channel = channel;
+                saved.release = None;
+                saved.last_success = None;
+                self.save(storage, saved)?;
                 if let Some((task, _)) = self.pending.take() {
                     task.abort();
                 }
                 self.schedule.in_flight = false;
                 self.schedule.next = 0;
-                self.saved.channel = channel;
-                self.saved.release = None;
-                self.saved.last_success = None;
-                self.save(storage)?;
                 self.view.phase = Phase::Idle;
                 self.check(now, true);
             }
@@ -235,15 +238,19 @@ impl Updates {
                     );
                     match result {
                         Ok(release) => {
-                            self.saved.release = release;
-                            self.saved.last_success = Some(now);
+                            let mut saved = self.saved.clone();
+                            saved.release = release;
+                            saved.last_success = Some(now);
+                            self.view.error = self.save(storage, saved).err();
                             self.view.message = if self.saved.release.is_some() {
                                 "An update is available."
                             } else {
                                 "No newer release is available on this channel."
                             }
                             .into();
-                            self.view.error = self.save(storage).err();
+                            if self.view.error.is_some() {
+                                self.view.message = "Update information could not be saved. The previous notice was retained.".into();
+                            }
                         }
                         Err(error) => {
                             self.view.error = Some(error.message);
@@ -279,5 +286,35 @@ impl Updates {
         update
             .install(bytes)
             .map_err(|e| format!("Could not start the installer: {e}"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn failed_preference_save_keeps_the_confirmed_channel_and_notice() {
+        let root = tempfile::tempdir().unwrap();
+        let mut store = Storage::open(root.path()).unwrap();
+        let mut updates = Updates::new(&store).unwrap();
+        let previous = updates.view.clone();
+        let mut candidate = updates.saved.clone();
+        candidate.channel = updates::Channel::Stable;
+        candidate.release = Some(updates::Release {
+            version: "0.9.0".into(),
+            notes: "Fixture".into(),
+        });
+        candidate.dismissed = Some("0.9.0".into());
+        let other = rusqlite::Connection::open(root.path().join("sqlite/state.db")).unwrap();
+        other.execute_batch("BEGIN IMMEDIATE").unwrap();
+        assert!(updates.save(&mut store, candidate.clone()).is_err());
+        assert_eq!(updates.view, previous);
+        assert_eq!(updates.saved, store.update_preferences().unwrap());
+        other.execute_batch("ROLLBACK").unwrap();
+        updates.save(&mut store, candidate.clone()).unwrap();
+        assert_eq!(updates.saved, candidate);
+        assert!(updates.view.dismissed);
+        assert_eq!(updates.view.channel, updates::Channel::Stable);
     }
 }
