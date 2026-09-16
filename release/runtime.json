@@ -2,6 +2,8 @@
   "schemaVersion": 1,
   "version": "0.6.0-dev.1",
   "inputs": {
+    "LICENSE": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+    "docs/notices/runtime-dependencies.txt": "906d2fefe23861ce724a3d7d81a99e19563323916370f238219c443e8c63c9ef",
     "runtime/Directory.Build.props": "80fbece83b92ce0f11957b3c48aaf1d9ea74435b44557ba8bac65bf30553241f",
     "runtime/NuGet.Config": "aec93b5637ab6d62470979a008990a4a336a287ab83a3f2541849ae735674055",
     "runtime/Starframe.BepInExFixtures/Plugins.cs": "9d8866a13e0be822eb52b022e52240b1dc7869efced6bc886062db78ae09898d",
@@ -34,13 +36,13 @@
     "runtime/Starframe.Runtime/packages.lock.json": "deaeccdd73459083d103124ccd3d23a8d2c57b015f37c43f427706085e2f9610",
     "runtime/bootstrap.json": "40d86b6e274e0c7b8215f8e7558042262d185ceed50bb61bfc6c20e6ddc24e62",
     "runtime/global.json": "c0671c628fde8e60dc3447e54ade6280230a68e1c84b4329a24327ba05e0545f",
-    "scripts/build_release_runtime.ps1": "3725be5e74b4edf3d6e27679e34624030410ae480d35dce41e2c34672e85913a",
+    "scripts/build_release_runtime.ps1": "345108c64184d51b79e7644df7edf38092009c90e8e49d4fea2fab894f5b43c1",
     "scripts/prepare_desktop_runtime.py": "f0c6c0ed1c9487bc2f12a6f5e5100b36cf4e726c865c8be34f35fcc063235039",
-    "scripts/release_runtime.py": "a19967a6cd3806082d49cc79497613e817eb3622146a15468c8ea7ad70a1219c"
+    "scripts/release_runtime.py": "3665257c9578f32b48d87571bfe99b96690f55b8a91ae6237a950a629d83ebdc"
   },
-  "archiveSha256": "e5f9c071e555577bfc983879ff95c153b9c5263ab0e607455a845ebc84fcb878",
+  "archiveSha256": "8b1d3476b5ac4985394fd19a8d2bd885816dd3d970b960b92b7896ca66e25923",
   "files": {
-    "Starframe.Bootstrap.dll": "4dcace1379e9fe349ae3e87793dccc7ae6fca8b6c60a246170308ee1427bd19a",
+    "Starframe.Bootstrap.dll": "581f409c88fd9c025b0b4092fa19e26f95ee9360dd4c80154b57c71b4b896e4e",
     "Starframe.Runtime.dll": "b5fd79d586cdd462853f7142e065e7c019bd4e7528df3dad0367d7fd167301d3",
     "Microsoft.Bcl.AsyncInterfaces.dll": "1d7e3f6055d22c9cf78c3caab7519f413a67875eed25ee515299ff444e23c471",
     "System.Buffers.dll": "aa4d023d710b7dab42ccce349491a4f5e2cee51ee858fac5e4856a72f174d433",
@@ -50,7 +52,9 @@
     "System.Runtime.CompilerServices.Unsafe.dll": "fd67abc4c4af10affbcd42fd68a2a7bc361b26714afe6965d4d0d139459d8297",
     "System.Text.Encodings.Web.dll": "bbdce383c857b2abfcdf9ef5d27f4fe6406c316a58c491bdc5a92fb380dea8a0",
     "System.Text.Json.dll": "cb053873acf8905ceb27147351a6c18340eb89e50a1cb931c4d1416133fd903b",
-    "System.Threading.Tasks.Extensions.dll": "bb1655039bad6141a4739e39793e787545380f8cb59de6c431d1c92a67bd351b"
+    "System.Threading.Tasks.Extensions.dll": "bb1655039bad6141a4739e39793e787545380f8cb59de6c431d1c92a67bd351b",
+    "LICENSE.txt": "6f1e622c82a380075843bb084a7ec3b1f1d12a4a02526d75e78b0924a860aa75",
+    "runtime-notices.txt": "81d9da9caec13cca6c8524dbf6856e60f8742d713c1cbc66d832d38149bbf925"
   },
-  "inputTag": "runtime-input-e5f9c071e555577b"
+  "inputTag": "runtime-input-8b1d3476b5ac4985"
 }
