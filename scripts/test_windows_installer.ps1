@@ -266,7 +266,7 @@ try {
         appAndRegistrationRemoved = $true
         runningAppRetained = $true
         gameLaunched = $false
-        limitation = $(if ($BaselineExecutable) { 'Different app builds and populated schema 12-to-13 migration through the finite maintenance entry point. No desktop first-start, interactive UI or absent-WebView2 test.' } else { 'NSIS metadata upgrade over the same executable. No application/database migration, interactive UI or absent-WebView2 test.' })
+        limitation = $(if ($BaselineExecutable) { 'Different app builds and populated schema 12-to-14 migration through the finite maintenance entry point. No desktop first-start, interactive UI or absent-WebView2 test.' } else { 'NSIS metadata upgrade over the same executable. No application/database migration, interactive UI or absent-WebView2 test.' })
     } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $taskEvidence 'result.json')
 
     Remove-Item -LiteralPath (Join-Path $taskProductKey $taskProduct)

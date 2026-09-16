@@ -18,7 +18,7 @@ def records(connection):
             key=repr,
         )
         for (name,) in tables
-        if name != "catalog_security"
+        if name not in ("catalog_security", "app_updates")
     }
 
 
@@ -77,6 +77,7 @@ def main():
             expected = json.loads(snapshot.read_text(encoding="utf-8"))
             assert records(connection) == expected, "Upgrade changed existing records"
             assert connection.execute("SELECT count(*) FROM catalog_security").fetchone()[0] == 0
+            assert connection.execute("SELECT count(*) FROM app_updates").fetchone()[0] == 0
             backups = list((data / "backups").glob("*/state.db"))
             assert backups, "Migration did not retain a database backup"
             for backup in backups:
