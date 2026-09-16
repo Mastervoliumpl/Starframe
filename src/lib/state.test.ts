@@ -2,12 +2,14 @@ import { get } from 'svelte/store';
 import { afterEach, expect, test, vi } from 'vitest';
 import { createDesktop, type Transport } from './state';
 import type { Snapshot } from './generated/model';
+import { emptyUpdates } from '../fixtures/updates';
 
 const snapshot = (revision: string, sessionId = 'session'): Snapshot => ({
   sessionId,
   revision,
   appVersion: '0.1.0-dev.1',
   operations: [],
+  updates: emptyUpdates(),
   catalog: {
     revision: null,
     releaseCount: 0,
@@ -60,6 +62,7 @@ test('a successful reconnect clears its connection error', async () => {
     cancel: vi.fn(),
     open: vi.fn(),
     game: vi.fn(),
+    update: vi.fn(),
   };
   const state = createDesktop(transport);
   await state.reconnect();
@@ -85,6 +88,7 @@ test('stale revisions, sessions and retired subscriptions cannot overwrite curre
     cancel: vi.fn(),
     open: vi.fn(),
     game: vi.fn(),
+    update: vi.fn(),
   };
   const state = createDesktop(transport);
   const stop = state.startWatching();
@@ -122,6 +126,7 @@ test('a lost acknowledgement can be retried with the same request ID', async () 
     cancel: vi.fn(),
     open: vi.fn(),
     game: vi.fn(),
+    update: vi.fn(),
   };
   const state = createDesktop(transport);
   const stop = state.startWatching();
@@ -171,6 +176,7 @@ test('cancellation acknowledgement does not mark an operation cancelled and repe
     ),
     open: vi.fn(),
     game: vi.fn(),
+    update: vi.fn(),
   };
   const state = createDesktop(transport);
   const stop = state.startWatching();
@@ -209,6 +215,7 @@ test('silent channels reconnect and pending actions do not duplicate or claim su
     cancel: vi.fn(),
     open: vi.fn(),
     game: vi.fn(),
+    update: vi.fn(),
   };
   const state = createDesktop(transport);
   const stop = state.startWatching();

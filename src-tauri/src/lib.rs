@@ -11,6 +11,7 @@ pub mod runtime_contract;
 pub mod sharing;
 pub mod space;
 pub mod storage;
+pub mod updates;
 #[cfg(windows)]
 pub mod windows_game;
 

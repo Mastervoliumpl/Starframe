@@ -4,6 +4,7 @@
   import { version } from '../package.json';
   import DiagnosticList from './features/DiagnosticList.svelte';
   import GameSettings from './features/GameSettings.svelte';
+  import AppUpdates from './features/AppUpdates.svelte';
   import LaunchBar from './features/LaunchBar.svelte';
   import ModList from './features/ModList.svelte';
   import Collections from './features/Collections.svelte';
@@ -109,6 +110,11 @@
       >
     {/each}
   </nav>
+  {#if $desktop.snapshot?.updates.release && !$desktop.snapshot.updates.dismissed}
+    <button class="update-notice" onclick={() => navigate('settings')}
+      >Update available · {$desktop.snapshot.updates.release.version}</button
+    >
+  {/if}
 {/snippet}
 
 <a class="skip-link" href="#workspace">Skip to content</a>
@@ -345,13 +351,12 @@
             $desktop.gameRequest}
           onaction={(action) => desktop.game(action)}
         />
-        <div class="settings-section">
-          <h2>Starframe {version}</h2>
-          <p>Automatic update checks are not available yet.</p>
-          <button onclick={() => desktop.open('releases')}
-            >View releases in browser</button
-          >
-        </div>
+        <AppUpdates
+          view={$desktop.snapshot?.updates}
+          {version}
+          unavailable={$desktop.connection !== 'connected'}
+          onaction={(action) => desktop.update(action)}
+        />
       </section>
       <section class="page" hidden={page !== 'help'} aria-label="Help and logs">
         <div class="settings-section">

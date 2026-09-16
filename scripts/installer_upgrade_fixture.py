@@ -73,7 +73,7 @@ def main():
             source.write_bytes(payload)
             snapshot.write_text(json.dumps(records(connection), sort_keys=True), encoding="utf-8")
         elif mode == "verify":
-            assert schema == 13, "The new installed executable must migrate to schema 13"
+            assert schema == 14, "The new installed executable must migrate to schema 14"
             expected = json.loads(snapshot.read_text(encoding="utf-8"))
             assert records(connection) == expected, "Upgrade changed existing records"
             assert connection.execute("SELECT count(*) FROM catalog_security").fetchone()[0] == 0

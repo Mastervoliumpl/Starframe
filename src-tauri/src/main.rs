@@ -82,6 +82,7 @@ fn main() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let state: app::Shared = Arc::new(Mutex::new(app::Core::default()));
             app.manage(state.clone());
@@ -112,6 +113,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::watch_state,
+            commands::update_action,
             commands::start_diagnostic,
             commands::cancel_operation,
             commands::open_external,

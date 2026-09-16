@@ -1,6 +1,6 @@
 # Starframe: design direction
 
-Status: revision 0.11, 15 September 2026. Product name: Starframe. This revision extends the accepted identity to the Windows installer and uninstaller. The automatic runtime lifecycle, uninstall data default, deferred Windows certificate signing and catalog expiry decisions remain in effect.
+Status: revision 0.12, 16 September 2026. Product name: Starframe. This revision records the accepted app-update channel defaults. The installer identity, automatic runtime lifecycle, uninstall data default, deferred Windows certificate signing and catalog expiry decisions remain in effect.
 
 This is the accepted design handoff. The user authorized milestone 0.1.0 on 6 September 2026, including desktop navigation and live state in issue #8. Later feature screens remain planned. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
@@ -260,6 +260,8 @@ Open the app shell and available local data before waiting for network checks. M
 Target smooth motion at 60 frames per second on the agreed baseline hardware. Input and useful state updates take priority over animation. Validate this behavior under slow downloads and file operations; choosing a framework alone does not establish responsiveness.
 
 ### App updates from GitHub
+
+Fresh prerelease builds default to Preview updates; stable builds default to Stable. Settings provides a labeled channel selector and remembers the user's choice. Preview includes stable releases. Switching channels does not downgrade the installed app. The owner approved these defaults on 16 September 2026.
 
 Run the startup check after the shell is usable, then check every five minutes while the app is open. Five minutes is the selected default within the user's suggested range. Checks also continue while the window is minimized. After sleep or connectivity returns, run one check if due, with no burst of missed checks. Keep requests from overlapping and delay retries if the server requests it. Settings also provides `Check for updates`, the installed version, and the last successful check time.
 

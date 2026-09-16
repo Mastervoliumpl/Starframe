@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Check official app releases after startup and every five minutes, retain quiet update notices and channel preferences, and install Tauri-verified updates only on request (#28). Wait for game exit and file work, preserve app data and reopen with automatic runtime preparation. Add separate application signing authority and documented key-recovery limits. See [update verification](docs/verification/app-updates.md).
+
 - Brand the Windows installer with Starframe portrait artwork, navy surfaces, orange headings and progress, thin control borders and clearer maintenance/uninstall wording (#74). Preserve native keyboard controls, system high-contrast fallback and the unchecked data-retention default. Owner review and installer regressions passed; final display/accessibility acceptance remains in #30.
 - Exit setup after a successful same-version maintenance uninstall instead of returning to installation pages. Preserve reinstall, version replacement and cancellation behavior (#27).
 - Update rustls to 0.23.45 to fix TLS handshake validation advisory RUSTSEC-2026-0285 in the catalog verifier's dependency graph; refresh the corresponding notice inventory.

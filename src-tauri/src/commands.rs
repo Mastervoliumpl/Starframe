@@ -7,6 +7,16 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
+pub async fn update_action(
+    app: tauri::AppHandle,
+    action: starframe::updates::Action,
+) -> Result<(), CommandError> {
+    app.state::<crate::game_service::GameService>()
+        .update(action)
+        .await
+}
+
+#[tauri::command]
 pub async fn pick_local_source(
     app: tauri::AppHandle,
     folder: bool,

@@ -33,7 +33,9 @@ async fn migration_restart_and_expiry_retain_confirmed_findings() {
     let store = Storage::open(root.path()).unwrap();
     store
         .conn
-        .execute_batch("DROP TABLE catalog_security; PRAGMA user_version=12;")
+        .execute_batch(
+            "DROP TABLE app_updates; DROP TABLE catalog_security; PRAGMA user_version=12;",
+        )
         .unwrap();
     drop(store);
     let mut store = Storage::open(root.path()).unwrap();

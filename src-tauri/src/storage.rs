@@ -14,10 +14,11 @@ mod local_import;
 mod mods;
 mod packages;
 mod sharing;
+mod updates;
 
-const SCHEMA: i64 = 13;
+const SCHEMA: i64 = 14;
 const APPLICATION_ID: i64 = 0x53544652;
-const MIGRATIONS: [&str; 13] = [
+const MIGRATIONS: [&str; 14] = [
     "CREATE TABLE metadata (id INTEGER PRIMARY KEY CHECK(id = 1), engine TEXT NOT NULL CHECK(engine = 'sqlite'), revision INTEGER NOT NULL CHECK(revision >= 0));
      INSERT INTO metadata VALUES (1, 'sqlite', 0);
      CREATE TABLE library (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author) <= 200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(mod_id, hash), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL)));
@@ -35,6 +36,7 @@ const MIGRATIONS: [&str; 13] = [
     "CREATE TABLE local_sources (mod_id TEXT NOT NULL, hash TEXT NOT NULL, record TEXT NOT NULL CHECK(length(record)<=131072 AND json_valid(record)), PRIMARY KEY(mod_id, hash));",
     "CREATE TABLE local_watches (mod_id TEXT PRIMARY KEY NOT NULL, hash TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'watching' CHECK(state IN ('watching','settling','error')), message TEXT NOT NULL DEFAULT 'Watching the source while Starframe is open.'); INSERT INTO local_watches(mod_id,hash) SELECT mod_id,min(hash) FROM local_sources GROUP BY mod_id HAVING count(*)=1;",
     "CREATE TABLE catalog_security (id INTEGER PRIMARY KEY CHECK(id=1), record TEXT NOT NULL CHECK(length(record)<=1049600 AND json_valid(record)));",
+    "CREATE TABLE app_updates (id INTEGER PRIMARY KEY CHECK(id=1), record TEXT NOT NULL CHECK(length(record)<=70000 AND json_valid(record)));",
 ];
 
 #[derive(Debug)]

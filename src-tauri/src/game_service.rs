@@ -23,9 +23,14 @@ use std::{
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
+mod updates;
 mod worker;
 
 enum Request {
+    Update(
+        starframe::updates::Action,
+        tokio::sync::oneshot::Sender<Result<(), String>>,
+    ),
     Sharing(
         starframe::sharing::Action,
         tokio::sync::oneshot::Sender<Result<starframe::sharing::Reply, String>>,
@@ -51,6 +56,20 @@ pub struct GameService {
     writing: Arc<AtomicBool>,
 }
 impl GameService {
+    pub async fn update(&self, action: starframe::updates::Action) -> Result<(), CommandError> {
+        let (reply, result) = tokio::sync::oneshot::channel();
+        self.sender
+            .try_send(Request::Update(action, reply))
+            .map_err(|_| {
+                CommandError::new("update_busy", "The storage worker is busy. Retry shortly.")
+            })?;
+        result
+            .await
+            .map_err(|_| {
+                CommandError::new("update_unavailable", "The update worker is unavailable.")
+            })?
+            .map_err(|e| CommandError::new("update_failed", &e))
+    }
     pub async fn sharing(
         &self,
         action: starframe::sharing::Action,

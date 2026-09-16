@@ -24,6 +24,7 @@ struct Worker {
     recovery_observation: Option<Observation>,
     session: Session,
     last_auto_attempt: Option<(String, Option<i64>, Running)>,
+    updates: Option<super::updates::Updates>,
 }
 
 pub(super) fn run(
@@ -87,6 +88,20 @@ pub(super) fn run(
     discover(&mut view);
     revalidate(&mut view, &selected);
     busy.store(false, Ordering::SeqCst);
+    let updates = storage
+        .as_ref()
+        .and_then(|store| match super::updates::Updates::new(store) {
+            Ok(value) => Some(value),
+            Err(error) => {
+                core.lock()
+                    .expect("state lock")
+                    .updates(starframe::updates::View {
+                        error: Some(error),
+                        ..Default::default()
+                    });
+                None
+            }
+        });
     let mut worker = Worker {
         app,
         core,
@@ -103,6 +118,7 @@ pub(super) fn run(
         recovery_observation: None,
         session: Session::default(),
         last_auto_attempt: None,
+        updates,
     };
     loop {
         if worker.core.lock().expect("state lock").stopped {
@@ -114,6 +130,7 @@ pub(super) fn run(
         if worker.tick() {
             break;
         }
+        worker.update_tick();
         worker.view.busy = worker.busy.load(Ordering::SeqCst);
         worker
             .core
@@ -129,6 +146,93 @@ pub(super) fn run(
 }
 
 impl Worker {
+    fn update_tick(&mut self) {
+        let Some(updates) = self.updates.as_mut() else {
+            return;
+        };
+        let Some(store) = self.storage.as_mut() else {
+            return;
+        };
+        let (ready, stopped) = {
+            let core = self.core.lock().expect("state lock");
+            (core.shell_ready(), core.stopped)
+        };
+        if stopped {
+            self.updates.take();
+            return;
+        }
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        updates.tick(store, now, ready);
+        if !updates.waiting()
+            && self
+                .local_watcher
+                .as_mut()
+                .is_some_and(|w| w.stopping() && w.stop())
+        {
+            self.local_watcher = Some(packages::watch::Watcher::new(store));
+        }
+        if updates.waiting()
+            && self
+                .catalog
+                .as_ref()
+                .is_none_or(|catalog| !catalog.checking)
+            && !self.busy.load(Ordering::SeqCst)
+            && self
+                .packages
+                .as_ref()
+                .ok()
+                .and_then(|p| p.as_ref())
+                .is_none_or(|p| !p.busy())
+            && self.session.requested.is_none()
+            && windows_game::observe().is_ok_and(|processes| processes.is_empty())
+        {
+            // Stop the local copier and wait for its last write before launching an installer.
+            if self
+                .local_watcher
+                .as_mut()
+                .is_none_or(|watcher| watcher.stop())
+            {
+                self.local_watcher.take();
+                self.writing.store(true, Ordering::SeqCst);
+                updates.view.phase = starframe::updates::Phase::Installing;
+                updates.view.message =
+                    "Starting the installer. Starframe will reopen after the update.".into();
+                self.core
+                    .lock()
+                    .expect("state lock")
+                    .updates(updates.view.clone());
+                let result = store.flush().map_err(|e| e.to_string()).and_then(|_| {
+                    if self.core.lock().expect("state lock").stopped {
+                        return Err("Starframe closed before installation started.".into());
+                    }
+                    if !windows_game::observe().is_ok_and(|p| p.is_empty()) {
+                        return Err(
+                            "The game started before installation. Update again after it closes."
+                                .into(),
+                        );
+                    }
+                    updates.install()
+                });
+                if let Err(error) = result {
+                    updates.view.phase = starframe::updates::Phase::Idle;
+                    updates.view.error = Some(error);
+                    self.local_watcher = Some(packages::watch::Watcher::new(store));
+                }
+                self.writing.store(false, Ordering::SeqCst);
+                if self.core.lock().expect("state lock").stopped {
+                    self.app.exit(0);
+                }
+            }
+        }
+        self.core
+            .lock()
+            .expect("state lock")
+            .updates(updates.view.clone());
+    }
+
     fn tick(&mut self) -> bool {
         let now = SystemTime::now();
         if let (Some(watcher), Some(store)) = (&mut self.local_watcher, &mut self.storage) {

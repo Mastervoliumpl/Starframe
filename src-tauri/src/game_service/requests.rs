@@ -2,6 +2,30 @@ use super::*;
 
 impl Worker {
     pub(super) fn handle(&mut self, request: Request) {
+        if let Request::Update(action, reply) = request {
+            let result = (|| {
+                if self.core.lock().expect("state lock").stopped {
+                    return Err("Starframe is closing.".into());
+                }
+                let updates = self
+                    .updates
+                    .as_mut()
+                    .ok_or("Update settings are unavailable.")?;
+                let store = self.storage.as_mut().ok_or("Saved data is unavailable.")?;
+                let now = SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                let result = updates.action(action, &self.app, store, now);
+                self.core
+                    .lock()
+                    .expect("state lock")
+                    .updates(updates.view.clone());
+                result
+            })();
+            let _ = reply.send(result);
+            return;
+        }
         if let Request::Sharing(action, reply) = request {
             let result = (|| {
                 if self.core.lock().expect("state lock").stopped {
@@ -157,6 +181,7 @@ impl Worker {
             | Request::Mod(..)
             | Request::Sharing(..)
             | Request::Package(..) => unreachable!(),
+            Request::Update(..) => unreachable!(),
             Request::Discover => {
                 discover(&mut self.view);
                 revalidate(&mut self.view, &self.selected);

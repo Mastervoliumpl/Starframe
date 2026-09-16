@@ -32,6 +32,7 @@ pub struct Watcher {
     events: mpsc::Receiver<Event>,
     cancel: Cancel,
     resume_pending: bool,
+    worker: std::thread::JoinHandle<()>,
 }
 
 impl Watcher {
@@ -45,16 +46,32 @@ impl Watcher {
         let (sender, events) = mpsc::sync_channel(1);
         let cancel = Cancel::default();
         let worker_cancel = cancel.clone();
-        std::thread::spawn(move || run(root, receiver, sender, worker_cancel, notifications));
+        let worker =
+            std::thread::spawn(move || run(root, receiver, sender, worker_cancel, notifications));
         Self {
             input,
             events,
             cancel,
             resume_pending: false,
+            worker,
         }
     }
 
+    pub fn stop(&mut self) -> bool {
+        self.cancel.cancel();
+        // Drain a completed result so a sender blocked on the bounded queue can exit.
+        while self.events.try_recv().is_ok() {}
+        self.worker.is_finished()
+    }
+
+    pub fn stopping(&self) -> bool {
+        self.cancel.check().is_err()
+    }
+
     pub fn poll(&mut self, store: &mut Storage, paused: bool, resume: bool) -> Result<bool> {
+        if self.stopping() {
+            return Ok(false);
+        }
         self.resume_pending |= resume;
         let watches = store.local_watches().map_err(|e| e.to_string())?;
         for watch in watches.iter().skip(MAX_WATCHES) {

@@ -34,6 +34,21 @@ fn fallback_scan_and_resume_reconcile_without_native_notifications() {
     );
 }
 
+#[test]
+fn stopping_a_watcher_drains_queued_results_and_waits_for_its_writer() {
+    let (_root, mut store, _) = setup();
+    let mut watcher = Watcher::start(&store, false);
+    watcher.poll(&mut store, false, true).unwrap();
+    std::thread::sleep(Duration::from_millis(150));
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !watcher.stop() {
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(watcher.stopping());
+    assert!(!watcher.poll(&mut store, false, true).unwrap());
+}
+
 fn setup() -> (tempfile::TempDir, Storage, LocalSource) {
     let root = tempfile::tempdir().unwrap();
     let source = root.path().join("source");
@@ -115,7 +130,7 @@ fn migration_watches_unambiguous_sources_and_reimport_selects_an_ambiguous_sourc
         drop(store);
         let db = rusqlite::Connection::open(root.path().join("data/sqlite/state.db")).unwrap();
         db.execute_batch(
-            "DROP TABLE catalog_security; DROP TABLE local_watches; PRAGMA user_version=11;",
+            "DROP TABLE app_updates; DROP TABLE catalog_security; DROP TABLE local_watches; PRAGMA user_version=11;",
         )
         .unwrap();
         drop(db);
