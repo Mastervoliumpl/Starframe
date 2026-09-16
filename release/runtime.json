@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "version": "0.6.0-dev.1",
+  "version": "0.6.0-dev.2",
   "inputs": {
     "LICENSE": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
     "docs/notices/runtime-dependencies.txt": "906d2fefe23861ce724a3d7d81a99e19563323916370f238219c443e8c63c9ef",
-    "runtime/Directory.Build.props": "80fbece83b92ce0f11957b3c48aaf1d9ea74435b44557ba8bac65bf30553241f",
+    "runtime/Directory.Build.props": "0fdb256cafd0db4271815dc42a88b56420e8917726270836f5574c65f81f20e5",
     "runtime/NuGet.Config": "aec93b5637ab6d62470979a008990a4a336a287ab83a3f2541849ae735674055",
     "runtime/Starframe.BepInExFixtures/Plugins.cs": "9d8866a13e0be822eb52b022e52240b1dc7869efced6bc886062db78ae09898d",
     "runtime/Starframe.BepInExFixtures/Starframe.BepInExFixtures.csproj": "f0a9f780d40bdd22016110f0ff116632c82dfab96e7a350cb06c2ed40c7d8f8c",
@@ -40,9 +40,9 @@
     "scripts/prepare_desktop_runtime.py": "f0c6c0ed1c9487bc2f12a6f5e5100b36cf4e726c865c8be34f35fcc063235039",
     "scripts/release_runtime.py": "3665257c9578f32b48d87571bfe99b96690f55b8a91ae6237a950a629d83ebdc"
   },
-  "archiveSha256": "8b1d3476b5ac4985394fd19a8d2bd885816dd3d970b960b92b7896ca66e25923",
+  "archiveSha256": "d6cde02f97f3d611c594b474ecf02d33afc245856df11a23d22e1f48447ff032",
   "files": {
-    "Starframe.Bootstrap.dll": "581f409c88fd9c025b0b4092fa19e26f95ee9360dd4c80154b57c71b4b896e4e",
+    "Starframe.Bootstrap.dll": "a5ffe708e5b6c292bbacefcf477eece0a0c2ae774d0fd2c499cf2a79c350a1ef",
     "Starframe.Runtime.dll": "b5fd79d586cdd462853f7142e065e7c019bd4e7528df3dad0367d7fd167301d3",
     "Microsoft.Bcl.AsyncInterfaces.dll": "1d7e3f6055d22c9cf78c3caab7519f413a67875eed25ee515299ff444e23c471",
     "System.Buffers.dll": "aa4d023d710b7dab42ccce349491a4f5e2cee51ee858fac5e4856a72f174d433",
@@ -56,5 +56,5 @@
     "LICENSE.txt": "6f1e622c82a380075843bb084a7ec3b1f1d12a4a02526d75e78b0924a860aa75",
     "runtime-notices.txt": "81d9da9caec13cca6c8524dbf6856e60f8742d713c1cbc66d832d38149bbf925"
   },
-  "inputTag": "runtime-input-8b1d3476b5ac4985"
+  "inputTag": "runtime-input-d6cde02f97f3d611"
 }
