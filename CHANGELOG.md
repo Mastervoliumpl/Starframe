@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add checked-commit draft-release preparation, source-bound local runtime inputs, retained component sources and independent verification of signed release inventories (#29). Keep hosted signing behind maintainer approval and publication manual.
+
 - Check official app releases after startup and every five minutes, retain quiet update notices and channel preferences, and install Tauri-verified updates only on request (#28). Wait for game exit and file work, preserve app data and reopen with automatic runtime preparation. Add separate application signing authority and documented key-recovery limits. See [update verification](docs/verification/app-updates.md).
 
 - Brand the Windows installer with Starframe portrait artwork, navy surfaces, orange headings and progress, thin control borders and clearer maintenance/uninstall wording (#74). Preserve native keyboard controls, system high-contrast fallback and the unchecked data-retention default. Owner review and installer regressions passed; final display/accessibility acceptance remains in #30.

@@ -81,6 +81,8 @@ Use read-only permissions by default, immutable action commit pins, and isolated
 
 Continuous delivery first creates reviewable artifacts and draft releases. Publishing a release remains a maintainer action. Build and sign only from trusted repository revisions after required checks pass. Add the release workflow with the installer/updater milestone; no placeholder workflow should claim to publish a working app now.
 
+The [Windows draft-release procedure](docs/releasing.md) separates a hosted desktop/installer build from approved signing. The owner approved a locally built in-game plugin as a hash- and source-bound input; proprietary game references remain local. Hosted rehearsal and secret setup are tracked in #29. No draft is permission to publish.
+
 Dependency auditing moves forward to 0.3.0 as a separate CI workflow for dependency changes, scheduled checks and manual release checks. It does not run from ordinary local build commands. Keep scanner failures visible, triage findings and record expiring exceptions. Signing and wider security work follow [SECURITY.md](SECURITY.md); internal 0.3.0 does not open the catalog to general users.
 
 ## Versions and change history

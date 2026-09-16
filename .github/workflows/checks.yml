@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      draft_release_commit:
+        description: Optional checked SHA for the maintainer-approved 0.6.0 draft rehearsal
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -14,6 +19,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  draft-rehearsal:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'Mastervoliumpl/Starframe' &&
+      github.ref == 'refs/heads/codex/0.6.0-windows-alpha' &&
+      inputs.draft_release_commit != ''
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/release.yml
+    with:
+      commit: ${{ inputs.draft_release_commit }}
+      rehearsal: true
   repository:
     name: Repository checks
     runs-on: ubuntu-latest
@@ -87,6 +105,11 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run check:rust
+      - name: Verify draft signatures and artifact rejection with disposable keys
+        run: |
+          cargo build --manifest-path src-tauri/Cargo.toml --locked --example verify_release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/verify_release_fixture.py --verifier src-tauri/target/debug/examples/verify_release.exe
       - name: Validate catalog and retained release identities
         env:
           CATALOG_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}

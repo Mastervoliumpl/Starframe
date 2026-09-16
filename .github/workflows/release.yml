@@ -1,0 +1,162 @@
+name: Draft Windows release
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Full checked commit SHA at the current main head
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      commit:
+        required: true
+        type: string
+      rehearsal:
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: windows-draft-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: >-
+      github.repository == 'Mastervoliumpl/Starframe' &&
+      github.event_name == 'workflow_dispatch' &&
+      (github.ref == 'refs/heads/main' ||
+      (inputs.rehearsal && github.ref == 'refs/heads/codex/0.6.0-windows-alpha'))
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      CHECKED_SHA: ${{ inputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+      - name: Require checked identity and an unused release version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ($env:CHECKED_SHA -cne $env:GITHUB_SHA) { throw 'Dispatch the exact checked revision.' }
+          New-Item -ItemType Directory release-work | Out-Null
+          $pages = gh api --paginate --slurp "repos/$env:GITHUB_REPOSITORY/actions/runs?head_sha=$env:CHECKED_SHA&per_page=100" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          @($pages.workflow_runs | Where-Object { "$($_.id)" -ne $env:GITHUB_RUN_ID }) | ConvertTo-Json -Depth 15 | Set-Content -Encoding utf8 release-work/runs.json
+          python scripts/release_checks.py --commit $env:CHECKED_SHA --branch $env:GITHUB_REF_NAME --runs release-work/runs.json --output release-work/identity.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/release_github.py preflight --release release-work/identity.json --branch $env:GITHUB_REF_NAME
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/setup-node@94196ee1d15439c1b6651cd87ef14e88ec435966
+        with:
+          node-version-file: .node-version
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: 1.98.1
+      - name: Download the reviewed local runtime and pinned bootstrap
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $runtime = Get-Content -Raw release/runtime.json | ConvertFrom-Json
+          gh release download $runtime.inputTag --repo $env:GITHUB_REPOSITORY --pattern runtime.zip --dir release-work
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/release_runtime.py verify --archive release-work/runtime.zip --manifest release/runtime.json --runtime release-work/runtime
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $bootstrap = Get-Content -Raw runtime/bootstrap.json | ConvertFrom-Json
+          Invoke-WebRequest -Uri $bootstrap.url -OutFile release-work/bootstrap.zip
+          python scripts/prepare_desktop_runtime.py src-tauri/target/installer/integration --runtime release-work/runtime --archive release-work/bootstrap.zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - run: npm ci
+      - name: Build the installer without signing credentials
+        run: npm run tauri -- build --ci --config src-tauri/tauri.nsis.conf.json -- --locked
+      - name: Retain corresponding sources and prepare an exact artifact inventory
+        run: |
+          $release = Get-Content -Raw release-work/identity.json | ConvertFrom-Json
+          $installer = "src-tauri/target/release/bundle/nsis/Starframe_$($release.version)_x64-setup.exe"
+          python scripts/release_sources.py --release release-work/identity.json --output release-work/sources
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/release_artifacts.py prepare --release release-work/identity.json --installer $installer --sources release-work/sources --output release-work/unsigned
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-FileHash -Algorithm SHA256 release-work/unsigned/* | Select-Object @{Name='File';Expression={Split-Path $_.Path -Leaf}},Hash | Format-Table | Out-String | Add-Content $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unsigned-release-${{ github.run_id }}
+          path: release-work/unsigned/
+          if-no-files-found: error
+          retention-days: 7
+
+  sign-and-draft:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@94196ee1d15439c1b6651cd87ef14e88ec435966
+        with:
+          node-version-file: .node-version
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: 1.98.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: unsigned-release-${{ github.run_id }}
+          path: release-work/candidate
+      - name: Prepare pinned signing and verification tools without credentials
+        run: |
+          npm ci --ignore-scripts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo build --manifest-path src-tauri/Cargo.toml --locked --example verify_release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item release-work/candidate/release.json release-work/identity.json
+          python scripts/release_github.py preflight --release release-work/identity.json --branch $env:GITHUB_REF_NAME
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Sign final bytes and the complete checksum inventory
+        env:
+          APP_UPDATE_SIGNING_KEY: ${{ secrets.APP_UPDATE_SIGNING_KEY }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:APP_UPDATE_SIGNING_KEY)) { throw 'Application signing key is not configured.' }
+          $key = Join-Path $env:RUNNER_TEMP 'starframe-update.key'
+          try {
+            [IO.File]::WriteAllText($key, $env:APP_UPDATE_SIGNING_KEY)
+            Remove-Item Env:APP_UPDATE_SIGNING_KEY
+            $release = Get-Content -Raw release-work/identity.json | ConvertFrom-Json
+            $installer = "release-work/candidate/Starframe_$($release.version)_x64-setup.exe"
+            node node_modules/@tauri-apps/cli/tauri.js signer sign -f $key -p '' $installer
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            python scripts/release_artifacts.py metadata --output release-work/candidate
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            node node_modules/@tauri-apps/cli/tauri.js signer sign -f $key -p '' release-work/candidate/SHA256SUMS
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally { Remove-Item -LiteralPath $key -ErrorAction SilentlyContinue }
+          python scripts/release_artifacts.py verify --release release-work/identity.json --output release-work/candidate --verifier src-tauri/target/debug/examples/verify_release.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Create a draft and verify downloaded attachments
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python scripts/release_github.py upload --release release-work/identity.json
+          --branch $env:GITHUB_REF_NAME --output release-work/candidate
+          --verifier src-tauri/target/debug/examples/verify_release.exe

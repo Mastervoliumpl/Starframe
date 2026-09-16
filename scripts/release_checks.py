@@ -1,6 +1,7 @@
 """Validate release identity before granting a job signing or upload access."""
 
 import argparse
+from datetime import date
 import json
 from pathlib import Path
 import re
@@ -20,6 +21,7 @@ def release_notes(root, version):
     match = re.search(rf"(?m)^## {re.escape(version)} - (\d{{4}}-\d{{2}}-\d{{2}})\s*$", text)
     if not match:
         raise ValueError("Finalize the matching dated changelog entry before preparing a release")
+    date.fromisoformat(match[1])
     notes = re.split(r"(?m)^## ", text[match.end():], maxsplit=1)[0].strip()
     if not notes or len(notes.encode("utf-8")) > 65_536:
         raise ValueError("Release notes must be nonempty and fit the updater limit")
@@ -27,8 +29,10 @@ def release_notes(root, version):
 
 
 def validate_runs(runs, sha, branch):
-    for name in ("Checks", "Dependency security"):
+    for name, path in (("Checks", ".github/workflows/checks.yml"),
+                       ("Dependency security", ".github/workflows/dependencies.yml")):
         matching = [run for run in runs if run["name"] == name
+                    and run["path"] == path
                     and run["head_sha"] == sha and run["head_branch"] == branch
                     and run["head_repository"]["full_name"] == REPOSITORY]
         # A newer failure or cancellation must not be hidden by an old success.

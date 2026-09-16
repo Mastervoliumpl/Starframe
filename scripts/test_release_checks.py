@@ -21,12 +21,13 @@ class ReleaseChecks(unittest.TestCase):
 
     def test_exact_commit_repository_branch_and_latest_success_are_required(self):
         sha = "a" * 40
-        runs = [dict(name=name, head_sha=sha, head_branch="main",
+        runs = [dict(name=name, path=path, head_sha=sha, head_branch="main",
                      head_repository={"full_name": REPOSITORY}, run_number=3,
                      run_attempt=1, status="completed", conclusion="success")
-                for name in ("Checks", "Dependency security")]
+                for name, path in (("Checks", ".github/workflows/checks.yml"),
+                                   ("Dependency security", ".github/workflows/dependencies.yml"))]
         validate_runs(runs, sha, "main")
-        for field, value in (("head_sha", "b" * 40), ("head_branch", "untrusted"),
+        for field, value in (("head_sha", "b" * 40), ("head_branch", "untrusted"), ("path", ".github/workflows/fake.yml"),
                              ("head_repository", {"full_name": "other/repo"}),
                              ("status", "in_progress"), ("conclusion", "failure")):
             with self.subTest(field=field), self.assertRaises(ValueError):
