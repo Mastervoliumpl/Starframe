@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-from release_runtime import digest, pack, verify, RUNTIME_FILES
+from release_runtime import ARCHIVE_FILES, digest, pack, verify, RUNTIME_FILES
 
 
 class RuntimeReleaseChecks(unittest.TestCase):
@@ -16,13 +16,16 @@ class RuntimeReleaseChecks(unittest.TestCase):
             root = Path(directory)
             runtime = root / "build"
             runtime.mkdir()
+            (root / "docs/notices").mkdir(parents=True)
+            (root / "LICENSE").write_text("Fixture project license")
+            (root / "docs/notices/runtime-dependencies.txt").write_text("Fixture dependency notices")
             for name in RUNTIME_FILES:
                 (runtime / name).write_bytes(b"inert " + name.encode())
             (runtime / "Trebuchet.dll").write_bytes(b"must not be included")
             archive, manifest = root / "runtime.zip", root / "runtime.json"
             pack(root, runtime, archive, manifest)
             verify(root, archive, manifest, root / "accepted")
-            self.assertEqual({p.name for p in (root / "accepted").iterdir()}, set(RUNTIME_FILES))
+            self.assertEqual({p.name for p in (root / "accepted").iterdir()}, set(ARCHIVE_FILES))
             original = manifest.read_text()
             record = json.loads(original)
             record["inputs"] = {"runtime/source.cs": "changed"}

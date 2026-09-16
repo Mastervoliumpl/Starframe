@@ -11,6 +11,8 @@ import zipfile
 from prepare_desktop_runtime import RUNTIME_FILES
 from versions import read_version
 
+ARCHIVE_FILES = (*RUNTIME_FILES, "LICENSE.txt", "runtime-notices.txt")
+
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
@@ -19,7 +21,8 @@ def digest(data):
 def inputs(root):
     names = subprocess.check_output(
         ["git", "-C", str(root), "ls-files", "-z", "runtime", "scripts/release_runtime.py",
-         "scripts/build_release_runtime.ps1", "scripts/prepare_desktop_runtime.py"],
+         "scripts/build_release_runtime.ps1", "scripts/prepare_desktop_runtime.py",
+         "LICENSE", "docs/notices/runtime-dependencies.txt"],
     ).decode().split("\0")
     result = {}
     for name in sorted(filter(None, names)):
@@ -36,6 +39,8 @@ def pack(root, runtime, output, manifest):
     if output.exists() or manifest.exists():
         raise ValueError("Use new output paths; existing runtime evidence was retained")
     payload = {name: (runtime / name).read_bytes() for name in RUNTIME_FILES}
+    payload["LICENSE.txt"] = (root / "LICENSE").read_bytes()
+    payload["runtime-notices.txt"] = (root / "docs/notices/runtime-dependencies.txt").read_bytes()
     if any(not data or len(data) > 8_388_608 for data in payload.values()):
         raise ValueError("Runtime DLL missing or outside its supported size")
     with zipfile.ZipFile(output, "x", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -56,11 +61,11 @@ def verify(root, archive, manifest, output):
     if archive.stat().st_size > 64 * 1024 * 1024:
         raise ValueError("Runtime archive exceeds its limit")
     data = archive.read_bytes()
-    if digest(data) != record["archiveSha256"] or set(record["files"]) != set(RUNTIME_FILES):
+    if digest(data) != record["archiveSha256"] or set(record["files"]) != set(ARCHIVE_FILES):
         raise ValueError("Runtime archive or DLL inventory differs from its reviewed manifest")
     payload = {}
     with zipfile.ZipFile(io.BytesIO(data)) as package:
-        if len(package.infolist()) != len(RUNTIME_FILES) or set(package.namelist()) != set(RUNTIME_FILES):
+        if len(package.infolist()) != len(ARCHIVE_FILES) or set(package.namelist()) != set(ARCHIVE_FILES):
             raise ValueError("Runtime archive contains unexpected or duplicate entries")
         for entry in package.infolist():
             if not 0 < entry.file_size <= 8_388_608:

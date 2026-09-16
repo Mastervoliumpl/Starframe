@@ -8,7 +8,17 @@ Finalize a dated changelog entry matching VERSION. All npm, Cargo, Tauri and run
 
 The `release` GitHub environment requires the owner's review, disables administrative bypass and restricts deployment branches. It holds only `APP_UPDATE_SIGNING_KEY`, the separately backed-up application key. The catalog environment and its online key are independent. The build job has read-only repository permissions and no signing credentials. The signing job has a fresh checkout, no restored build cache, and sees the private key only in the signing step. Temporary key files are removed afterward. Pull requests cannot enter this workflow or access the environment.
 
+GitHub hides draft inputs from read-only workflow tokens. After the checked-revision gate, a separate transfer job receives contents-write permission only to download the draft's runtime ZIP, compare its reviewed hash and pass it as a workflow artifact. It does not install tools, execute project scripts, unpack the input or receive the signing key. The build job keeps read-only permissions and performs the full source/file inventory verification.
+
 For the pre-merge 0.6.0 rehearsal, the existing Checks workflow accepts `draft_release_commit` on `codex/0.6.0-windows-alpha`. This calls the same release workflow; it does not bypass its checked-commit, identity or approval gates. Temporarily permitting that exact branch in the release environment requires owner approval. Remove its environment branch policy after the rehearsal. Normal release dispatch is restricted to main. The rehearsal creates a development draft, never a public release.
+
+The [release API](https://docs.github.com/en/rest/releases/releases) also requires workflow-write authority to create a release whose target changes workflows relative to main; GITHUB_TOKEN cannot receive that permission. For this pre-merge rehearsal only, wait for the unsigned build, download its reviewed release identity, and use the local maintainer CLI to prepare the immutable tag and empty draft:
+
+```powershell
+python scripts/release_github.py scaffold --release $env:STARFRAME_RELEASE_IDENTITY --branch codex/0.6.0-windows-alpha --rehearsal
+```
+
+The hosted signing job can fill only that exact maintainer-owned draft, with its expected notes, matching tag/commit and no existing assets. It rejects published, changed or populated drafts. Normal main-branch release preparation creates its own draft. No personal access token is stored in Actions for this exception.
 
 ## Local in-game plugin input
 
@@ -20,7 +30,7 @@ Commit runtime source and build scripts first. Build against the lawful local ga
 ./scripts/build_release_runtime.ps1 -GameManagedPath $env:STARFRAME_GAME_MANAGED -BootstrapPath $env:STARFRAME_BOOTSTRAP -Output $env:STARFRAME_RUNTIME_OUTPUT
 ```
 
-The script uses the pinned .NET SDK, locked packages, a new output directory and mapped source paths. `runtime.zip` includes only the closed list of Starframe/runtime DLLs; game and Unity reference assemblies, PDBs and local paths are excluded. Review the package and its `runtime.json`, then upload only `runtime.zip` to a separately labelled draft input release. Record that draft's tag as `inputTag` in the manifest and commit it as `release/runtime.json`. Never publish the input draft. Retain it while a release workflow needs it.
+The script uses the pinned .NET SDK, locked packages, a new output directory and mapped source paths. `runtime.zip` includes only the closed list of Starframe/runtime DLLs plus the project license and runtime notices; game and Unity reference assemblies, PDBs and local paths are excluded. Notices travel with the input because workflow artifacts can be downloaded by repository readers. Review the package and its `runtime.json`, then upload only `runtime.zip` to a separately labelled draft input release. Record that draft's tag as `inputTag` in the manifest and commit it as `release/runtime.json`. Never publish the input draft. Retain it while a release workflow needs it.
 
 The manifest binds the product version, runtime source/build inputs, archive hash and every DLL hash. GitHub verifies those values before extraction, then runs the ordinary installer inventory/notices preflight. A runtime or build-script change requires a fresh input. Final release source archives contain the source and build instructions; they do not contain proprietary reference assemblies. Users rebuilding the plugin must supply their own lawful game installation.
 

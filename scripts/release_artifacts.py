@@ -58,7 +58,7 @@ def metadata(output, public_key):
         if not path.is_file() or path.name in ("SHA256SUMS", "SHA256SUMS.sig"):
             raise ValueError("Expected new ordinary release files before checksum generation")
         records.append(hashlib.sha256(path.read_bytes()).hexdigest() + "  " + path.name)
-    (output / "SHA256SUMS").write_text("\n".join(records) + "\n", encoding="utf-8")
+    (output / "SHA256SUMS").write_text("\n".join(records) + "\n", encoding="utf-8", newline="\n")
 
 
 def verify_signature(verifier, public_key, signature, artifact):

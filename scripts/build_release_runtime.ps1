@@ -7,7 +7,7 @@ $ErrorActionPreference = 'Stop'
 $taskRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $taskOutput = [IO.Path]::GetFullPath($Output)
 if (Test-Path -LiteralPath $taskOutput) { throw 'Use a new output directory.' }
-$taskChanged = git -C $taskRoot status --porcelain --untracked-files=all -- runtime scripts/build_release_runtime.ps1 scripts/release_runtime.py scripts/prepare_desktop_runtime.py
+$taskChanged = git -C $taskRoot status --porcelain --untracked-files=all -- runtime scripts/build_release_runtime.ps1 scripts/release_runtime.py scripts/prepare_desktop_runtime.py LICENSE docs/notices/runtime-dependencies.txt
 if ($taskChanged) { throw 'Commit the runtime source and build scripts before creating a release input.' }
 New-Item -ItemType Directory -Path $taskOutput | Out-Null
 Push-Location (Join-Path $taskRoot 'runtime')

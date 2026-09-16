@@ -26,6 +26,7 @@ class ReleaseArtifactChecks(unittest.TestCase):
             (output / (artifacts["installer"] + ".sig")).write_text(base64.b64encode(b"fixture").decode())
             key = base64.b64encode(b"fixture key").decode()
             metadata(output, key)
+            self.assertNotIn(b"\r", (output / "SHA256SUMS").read_bytes())
             (output / "SHA256SUMS.sig").write_text("fixture")
             verify(output, key, root / "verifier", release)
             self.assertEqual(signature_check.call_count, 2)
