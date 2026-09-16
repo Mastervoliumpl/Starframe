@@ -1,0 +1,16 @@
+{
+  "UnityDoorstop": {
+    "version": "4.5.0",
+    "source": "https://github.com/NeighTools/UnityDoorstop/archive/33dab9a6733862eb81869ff08431d9478b28784b.tar.gz",
+    "download": "https://codeload.github.com/NeighTools/UnityDoorstop/tar.gz/33dab9a6733862eb81869ff08431d9478b28784b",
+    "sha256": "59edff07b17e82e718a4d1def6ca4e13ae01995e0627b9e118547f0ec7e99280",
+    "filename": "doorstop-4.5.0.tar.gz"
+  },
+  "NSIS": {
+    "version": "3.11",
+    "source": "https://sourceforge.net/projects/nsis/files/NSIS%203/3.11/nsis-3.11-src.tar.bz2/download",
+    "download": "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.11/nsis-3.11-src.tar.bz2",
+    "sha256": "19e72062676ebdc67c11dc032ba80b979cdbffd3886c60b04bb442cdd401ff4b",
+    "filename": "nsis-3.11-src.tar.bz2"
+  }
+}

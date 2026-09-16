@@ -3694,6 +3694,7 @@ dependencies = [
  "futures-util",
  "httpdate",
  "keyvalues-parser",
+ "minisign-verify",
  "reqwest",
  "rusqlite",
  "semver",

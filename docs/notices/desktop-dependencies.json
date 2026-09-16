@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "scope": "Windows x64 Rust dependencies, including build dependencies; JavaScript identified in the production source map. Runtime, bootstrap, toolchain and assets have separate notices.",
   "inputs": {
-    "src-tauri/Cargo.lock": "eefca328e5055339725ba4ac3bcadc36a5b9b7231e8872e52e605e847651f1c8",
-    "src-tauri/Cargo.toml": "d293bf6608781285083cf1d8c65f97e202dcce063b83120ee6e9f6da91dcc16e",
+    "src-tauri/Cargo.lock": "56dfda7ba0ad8a4fe8dec1c9458e5e30d84690bf250e4b3ba9126e0786e0bf46",
+    "src-tauri/Cargo.toml": "7aca93ddecc093dbd36f50aae437d7ebbcd44ded78bec9d4e7e10da73111a226",
     "package-lock.json": "7b6356211ffb3783b9325b6ff102fa2bc75abc15d86cbe5fac9fe4ec5c4f3f2c",
     "package.json": "a83d12dfd90404f3bd4d90aee3494ce5ceda32df7466994a2ee22e187a5dda87"
   },
