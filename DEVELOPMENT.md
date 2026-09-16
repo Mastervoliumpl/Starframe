@@ -1,6 +1,6 @@
 # Starframe development and checks
 
-Status: the owner authorized milestone 0.6.0 on 9 September 2026. Version `0.6.0-dev.2` is in development on `codex/0.6.0-windows-alpha`, starting with installer packaging (#27). No installer or app release is published. Milestone 0.5.0 is complete through PR #56; retain its [exit evidence](docs/verification/milestone-0.5.0.md), [BepInEx acceptance](docs/verification/bepinex-plugins.md) and [verification on another Windows PC](docs/verification/pc-setup.md).
+Status: the owner authorized milestone 0.6.0 on 9 September 2026. Version `0.6.0-dev.2` is in development on `codex/0.6.0-windows-alpha`, with a verified signed development draft and final alpha acceptance still open. No installer or app release is published. Milestone 0.5.0 is complete through PR #56; retain its [exit evidence](docs/verification/milestone-0.5.0.md), [BepInEx acceptance](docs/verification/bepinex-plugins.md) and [verification on another Windows PC](docs/verification/pc-setup.md).
 
 Issue #24 adds local DLL/folder imports through the package worker and SQLite schema 11. [Local import verification](docs/verification/local-imports.md) records the metadata format, source retention, recovery and native checks. Issue #25 adds source watching and schema 12; [watcher verification](docs/verification/local-watching.md) records debounce, recovery and game-exit checks.
 
@@ -81,7 +81,7 @@ Use read-only permissions by default, immutable action commit pins, and isolated
 
 Continuous delivery first creates reviewable artifacts and draft releases. Publishing a release remains a maintainer action. Build and sign only from trusted repository revisions after required checks pass. Add the release workflow with the installer/updater milestone; no placeholder workflow should claim to publish a working app now.
 
-The [Windows draft-release procedure](docs/releasing.md) separates a hosted desktop/installer build from approved signing. The owner approved a locally built in-game plugin as a hash- and source-bound input; proprietary game references remain local. Hosted rehearsal and secret setup are tracked in #29. No draft is permission to publish.
+The [Windows draft-release procedure](docs/releasing.md) separates a hosted desktop/installer build from approved signing. The owner approved a locally built in-game plugin as a hash- and source-bound input; proprietary game references remain local. [Hosted signing and independent attachment verification](docs/verification/draft-releases.md) are recorded for #29; the protected release environment holds the approved application key. No draft is permission to publish.
 
 Dependency auditing moves forward to 0.3.0 as a separate CI workflow for dependency changes, scheduled checks and manual release checks. It does not run from ordinary local build commands. Keep scanner failures visible, triage findings and record expiring exceptions. Signing and wider security work follow [SECURITY.md](SECURITY.md); internal 0.3.0 does not open the catalog to general users.
 
@@ -120,7 +120,7 @@ npm run check:rust
 npm run tauri -- build --no-bundle -- --locked
 ```
 
-`npm run check` runs Prettier, ESLint, Svelte/TypeScript diagnostics, Vitest and Vite's production build. It builds `dist` before Rust checks, which need those frontend assets. `npm run check:rust` runs Rustfmt, Clippy with warnings denied, and locked Cargo tests. The final command builds the Windows executable without an installer; packaging and updates are later issues. It writes `src-tauri/target/release/starframe.exe`.
+`npm run check` runs Prettier, ESLint, Svelte/TypeScript diagnostics, Vitest and Vite's production build. It builds `dist` before Rust checks, which need those frontend assets. `npm run check:rust` runs Rustfmt, Clippy with warnings denied, and locked Cargo tests. The final command builds the Windows executable without an installer; use the separate NSIS recipe for installer packaging. It writes `src-tauri/target/release/starframe.exe`.
 
 Use `npm run tauri dev` for the native development window, or `npm run dev` for the browser frontend at `http://127.0.0.1:1420`. Use `npm run format` to format frontend/configuration files and `cargo fmt --manifest-path src-tauri/Cargo.toml` for Rust. Vitest watch mode is `npm run test:watch`. Stop the development command when finished.
 

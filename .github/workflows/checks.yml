@@ -20,6 +20,7 @@ concurrency:
 
 jobs:
   draft-rehearsal:
+    needs: required
     if: >-
       github.event_name == 'workflow_dispatch' &&
       github.repository == 'Mastervoliumpl/Starframe' &&
