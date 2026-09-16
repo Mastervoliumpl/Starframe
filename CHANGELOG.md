@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.6.0-dev.2 - 2026-09-16
+
+Internal replacement draft for release-workflow verification; public-release acceptance remains in progress.
+
+- Declare and map the application signing secret explicitly through the reusable release workflow. Keep its value in the protected release environment and check availability before compiling signing tools (#29).
+- Preserve the immutable 0.6.0-dev.1 tag and empty failed draft; no assets were signed or published by that rehearsal.
+
 ## 0.6.0-dev.1 - 2026-09-16
 
 Internal development draft. Milestone 0.6.0 and public-release acceptance remain in progress.

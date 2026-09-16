@@ -8,6 +8,10 @@ on:
         required: true
         type: string
   workflow_call:
+    secrets:
+      APP_UPDATE_SIGNING_KEY:
+        description: Resolved from the protected release environment by the signing job
+        required: false
     inputs:
       commit:
         required: true
@@ -153,6 +157,11 @@ jobs:
       contents: write
       actions: read
     steps:
+      - name: Require the protected signing key before preparing tools
+        env:
+          KEY_CONFIGURED: ${{ secrets.APP_UPDATE_SIGNING_KEY != '' }}
+        run: |
+          if ($env:KEY_CONFIGURED -ne 'true') { throw 'Application signing key is not configured in the protected release environment.' }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false

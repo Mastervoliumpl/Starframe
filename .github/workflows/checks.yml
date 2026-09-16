@@ -29,6 +29,8 @@ jobs:
       contents: write
       actions: read
     uses: ./.github/workflows/release.yml
+    secrets:
+      APP_UPDATE_SIGNING_KEY: ${{ secrets.APP_UPDATE_SIGNING_KEY }}
     with:
       commit: ${{ inputs.draft_release_commit }}
       rehearsal: true
