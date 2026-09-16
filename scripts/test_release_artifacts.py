@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from release_artifacts import metadata, names, prepare, verify
+from release_artifacts import metadata, names, prepare, verify, verify_input
 from release_sources import source_records
 
 
@@ -20,6 +20,9 @@ class ReleaseArtifactChecks(unittest.TestCase):
                 (root / name).write_bytes(b"inert " + name.encode())
             output = root / "release"
             prepare(release, root / artifacts["installer"], root, output)
+            verify_input(output, release)
+            with self.assertRaises(ValueError):
+                verify_input(output, release | {"commit": "b" * 40})
             (output / (artifacts["installer"] + ".sig")).write_text(base64.b64encode(b"fixture").decode())
             key = base64.b64encode(b"fixture key").decode()
             metadata(output, key)

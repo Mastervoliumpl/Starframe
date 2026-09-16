@@ -49,10 +49,7 @@ jobs:
         run: |
           if ($env:CHECKED_SHA -cne $env:GITHUB_SHA) { throw 'Dispatch the exact checked revision.' }
           New-Item -ItemType Directory release-work | Out-Null
-          $pages = gh api --paginate --slurp "repos/$env:GITHUB_REPOSITORY/actions/runs?head_sha=$env:CHECKED_SHA&per_page=100" | ConvertFrom-Json
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          @($pages.workflow_runs | Where-Object { "$($_.id)" -ne $env:GITHUB_RUN_ID }) | ConvertTo-Json -Depth 15 | Set-Content -Encoding utf8 release-work/runs.json
-          python scripts/release_checks.py --commit $env:CHECKED_SHA --branch $env:GITHUB_REF_NAME --runs release-work/runs.json --output release-work/identity.json
+          python scripts/release_checks.py --commit $env:CHECKED_SHA --branch $env:GITHUB_REF_NAME --output release-work/identity.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/release_github.py preflight --release release-work/identity.json --branch $env:GITHUB_REF_NAME
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -127,7 +124,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo build --manifest-path src-tauri/Cargo.toml --locked --example verify_release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Copy-Item release-work/candidate/release.json release-work/identity.json
+          python scripts/release_checks.py --commit $env:GITHUB_SHA --branch $env:GITHUB_REF_NAME --output release-work/identity.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/release_artifacts.py verify-input --release release-work/identity.json --output release-work/candidate
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/release_github.py preflight --release release-work/identity.json --branch $env:GITHUB_REF_NAME
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         env:

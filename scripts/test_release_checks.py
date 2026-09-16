@@ -1,4 +1,5 @@
 import tempfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import unittest
 
@@ -23,6 +24,7 @@ class ReleaseChecks(unittest.TestCase):
         sha = "a" * 40
         runs = [dict(name=name, path=path, head_sha=sha, head_branch="main",
                      head_repository={"full_name": REPOSITORY}, run_number=3,
+                     updated_at=datetime.now(timezone.utc).isoformat(),
                      run_attempt=1, status="completed", conclusion="success")
                 for name, path in (("Checks", ".github/workflows/checks.yml"),
                                    ("Dependency security", ".github/workflows/dependencies.yml"))]
@@ -36,6 +38,8 @@ class ReleaseChecks(unittest.TestCase):
             validate_runs(runs + [runs[0] | {"run_attempt": 2, "conclusion": "cancelled"}], sha, "main")
         with self.assertRaises(ValueError):
             validate_runs(runs[:1], sha, "main")
+        with self.assertRaises(ValueError):
+            validate_runs(runs, sha, "main", datetime.now(timezone.utc) + timedelta(days=2))
 
 
 if __name__ == "__main__":

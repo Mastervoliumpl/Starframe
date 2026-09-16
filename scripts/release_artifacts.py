@@ -33,6 +33,15 @@ def prepare(release, installer, sources, output):
     write_json(output / "release.json", release)
 
 
+def verify_input(output, expected):
+    if json.loads((output / "release.json").read_text(encoding="utf-8")) != expected:
+        raise ValueError("Unsigned artifact identity differs from the checked source")
+    if {path.name for path in output.iterdir()} != set(names(expected["version"]).values()) | {"release.json"}:
+        raise ValueError("Unsigned release inventory is incomplete or contains unexpected files")
+    if any(not path.is_file() or path.is_symlink() for path in output.iterdir()):
+        raise ValueError("Unsigned release inputs must be ordinary files")
+
+
 def metadata(output, public_key):
     release = json.loads((output / "release.json").read_text(encoding="utf-8"))
     installer = names(release["version"])["installer"]
@@ -91,7 +100,7 @@ def verify(output, public_key, verifier, expected):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("prepare", "metadata", "verify"))
+    parser.add_argument("mode", choices=("prepare", "metadata", "verify", "verify-input"))
     parser.add_argument("--release", type=Path)
     parser.add_argument("--installer", type=Path)
     parser.add_argument("--sources", type=Path)
@@ -104,6 +113,8 @@ if __name__ == "__main__":
         prepare(json.loads(args.release.read_text(encoding="utf-8")), args.installer, args.sources, args.output)
     elif args.mode == "metadata":
         metadata(args.output, key)
+    elif args.mode == "verify-input":
+        verify_input(args.output, json.loads(args.release.read_text(encoding="utf-8")))
     else:
         verify(args.output, key, args.verifier, json.loads(args.release.read_text(encoding="utf-8")))
     print("Release artifact operation completed: " + args.mode)

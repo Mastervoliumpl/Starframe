@@ -4,7 +4,7 @@ Issue #29 adds a manually dispatched release workflow. It builds the desktop and
 
 ## Trusted inputs
 
-Finalize a dated changelog entry matching VERSION. All npm, Cargo, Tauri and runtime version values must agree. Select the full commit SHA of current main after both Checks and Dependency security pass on that exact revision. A newer failed or cancelled attempt does not inherit an earlier success. The workflow rejects a changed branch head, a version tag pointing elsewhere, or an existing draft/release with that version. It never replaces tags or uploaded assets.
+Finalize a dated changelog entry matching VERSION. All npm, Cargo, Tauri and runtime version values must agree. Select the full commit SHA of current main after both Checks and Dependency security pass on that exact revision. Dependency audits must be less than 24 hours old; manually dispatch that workflow again if needed. A newer failed or cancelled attempt does not inherit an earlier success. The workflow rejects a changed branch head, a version tag pointing elsewhere, or an existing draft/release with that version. It never replaces tags or uploaded assets.
 
 The `release` GitHub environment requires the owner's review, disables administrative bypass and restricts deployment branches. It holds only `APP_UPDATE_SIGNING_KEY`, the separately backed-up application key. The catalog environment and its online key are independent. The build job has read-only repository permissions and no signing credentials. The signing job has a fresh checkout, no restored build cache, and sees the private key only in the signing step. Temporary key files are removed afterward. Pull requests cannot enter this workflow or access the environment.
 

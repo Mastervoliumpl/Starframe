@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.6.0-dev.1 - 2026-09-16
+
+Internal development draft. Milestone 0.6.0 and public-release acceptance remain in progress.
+
 - Add checked-commit draft-release preparation, source-bound local runtime inputs, retained component sources and independent verification of signed release inventories (#29). Keep hosted signing behind maintainer approval and publication manual.
 
 - Check official app releases after startup and every five minutes, retain quiet update notices and channel preferences, and install Tauri-verified updates only on request (#28). Wait for game exit and file work, preserve app data and reopen with automatic runtime preparation. Add separate application signing authority and documented key-recovery limits. See [update verification](docs/verification/app-updates.md).
