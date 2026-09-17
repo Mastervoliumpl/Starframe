@@ -2,6 +2,8 @@
 
 Issue [#27](https://github.com/Mastervoliumpl/Starframe/issues/27) has passed its functional checks on the 0.6.0 branch. The local `0.6.0-dev.1` candidate has no Windows publisher signature and has not been published. These checks establish the stated behavior, not public-alpha acceptance.
 
+The owner accepted the later hosted `0.6.0-dev.2` installer on 17 September 2026. The [consolidated milestone record](milestone-0.6.0.md) supersedes the historical pending #30 checks below, records the exact installer hash, and distinguishes reused evidence from waived checks. No public application release has been published.
+
 ## Automatic lifecycle
 
 DESIGN.md revision 0.10 supersedes the first candidate's separate game cleanup and keep-data default. Choosing a validated game location starts runtime preparation automatically when the game is closed. Each desktop start checks and prepares its bundled runtime, including new runtime bytes at an unchanged collection revision. Saved collection changes still apply after game exit.

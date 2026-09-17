@@ -2,7 +2,7 @@
 
 `releases.json` contains metadata only. Revision 3 adds Remmy's Sanctuary HUD, Build Hotkeys, Camera Utilities, Eco Manager, Replay Manager and Idle Engineers alongside Ladder Reporter. These mods require the BepInEx plugin support added in Starframe 0.5.0. See the [six-release review and HUD voice-pack limitation](../docs/verification/remmy-catalog.md) and the earlier [Ladder Reporter review](../docs/verification/ladder-reporter-catalog.md). Test releases use `example.invalid` and exist only in automated tests.
 
-The 0.6.0 client reads signed catalog and advisory targets from the `codex/catalog-published` branch using its embedded TUF root. The [publisher](../docs/catalog-publishing.md) prepares reviewed changes from checked `main` commits. Publication is currently disabled; the first signed publication remains pending. Earlier internal clients read the raw release file on main. Catalog edits increase `catalogRevision` without changing VERSION or publishing an app release. Mod archives stay at author-controlled download locations.
+The 0.6.0 client reads signed catalog and advisory targets from the `codex/catalog-published` branch using its embedded TUF root. The [publisher](../docs/catalog-publishing.md) prepares reviewed changes from checked `main` commits. Signed publication is enabled, with daily renewal and thirty-day validity. Earlier internal clients read the raw release file on main. Catalog edits increase `catalogRevision` without changing VERSION or publishing an app release. Mod archives stay at author-controlled download locations.
 
 ## Schemas 1 and 2
 
