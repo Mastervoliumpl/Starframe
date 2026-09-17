@@ -38,8 +38,31 @@ def verify(tuftool: Path, validator: Path, signer: Path, work: Path) -> None:
         timestamp = metadata(first / "metadata/timestamp.json")
         expiry = datetime.fromisoformat(timestamp["expires"].replace("Z", "+00:00"))
         assert timedelta(days=30) - timedelta(seconds=1) <= expiry - before <= timedelta(days=30)
+        expected_bytes = {
+            path.relative_to(first): path.read_bytes()
+            for folder in ("metadata", "targets") for path in (first / folder).iterdir()
+        }
+        run("git", "init", first)
+        run("git", "-C", first, "-c", "core.autocrlf=true", "add", "--", ".gitattributes", "metadata", "targets")
+        identity = ("-c", "user.name=Catalog fixture", "-c", "user.email=fixture@example.invalid")
+        run("git", "-C", first, *identity, "commit", "-m", "Signed fixture")
+        protected = fixture / "protected-checkout"
+        run("git", "-c", "core.autocrlf=true", "clone", first, protected)
+        for name, content in expected_bytes.items():
+            assert (protected / name).read_bytes() == content
+
+        # Older publications have no attributes; the workflow must also preserve their bytes.
+        run("git", "-C", first, "rm", "--", ".gitattributes")
+        run("git", "-C", first, *identity, "commit", "-m", "Legacy publication fixture")
+        changed = fixture / "converted-checkout"
+        run("git", "-c", "core.autocrlf=true", "clone", first, changed)
+        assert any((changed / name).read_bytes() != content for name, content in expected_bytes.items())
+        preserved = fixture / "preserved-checkout"
+        run("git", "-c", "core.autocrlf=false", "clone", first, preserved)
+        for name, content in expected_bytes.items():
+            assert (preserved / name).read_bytes() == content
         second = fixture / "second"
-        publish(**options, output=second, previous=first)
+        publish(**options, output=second, previous=preserved)
         assert metadata(second / "metadata/timestamp.json")["version"] > timestamp["version"]
         assert json.loads((source / "releases.json").read_text()) == catalog
         assert json.loads((source / "advisories.json").read_text()) == advisories
@@ -97,7 +120,7 @@ def verify(tuftool: Path, validator: Path, signer: Path, work: Path) -> None:
         rejected(key=replacement, previous_root=previous_root, previous=rotated)
         run(tuftool, "root", "sign", root, "--key", offline, "--cross-sign", second_root)
         publish(**rotated_options, output=fixture / "rotated-again", previous=rotated)
-    print("Catalog publication passed: thirty-day renewal, increasing metadata versions, unchanged targets, wrong/revoked-key rejection, invalid/tampered input rejection, expired-repository recovery and online/offline key rotation from an older client root.")
+    print("Catalog publication passed: exact Git checkout bytes, thirty-day renewal, increasing metadata versions, unchanged targets, wrong/revoked-key rejection, invalid/tampered input rejection, expired-repository recovery and online/offline key rotation from an older client root.")
 
 
 if __name__ == "__main__":

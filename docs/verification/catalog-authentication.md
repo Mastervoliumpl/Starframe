@@ -1,6 +1,16 @@
 # Catalog authentication, issue 46
 
-The desktop refresh uses `tough` 0.24.0 to verify both `catalog.json` and `advisories.json` from the same signed repository before accepting either. SQLite schema 13 commits the verified pair together. Download and activation checks enforce retained confirmed findings, and management screens retain evidence and correction history. The embedded production root and local signed candidate are prepared; no signed catalog has been published.
+The desktop refresh uses `tough` 0.24.0 to verify both `catalog.json` and `advisories.json` from the same signed repository before accepting either. SQLite schema 13 commits the verified pair together. Download and activation checks enforce retained confirmed findings, and management screens retain evidence and correction history. The first production publication and normal native-client refresh passed on 17 September 2026; the live evidence below supersedes the historical unpublished status in earlier entries.
+
+## First production publication, 17 September 2026
+
+After the owner's installer smoke passed, the owner explicitly approved merging PR #60 and enabling signed catalog publication and daily renewal. Main commit `9f01a7638645f88af2aa28b5e14bfaf78b7fc258` passed [required checks](https://github.com/Mastervoliumpl/Starframe/actions/runs/35236886048) and [dependency audits](https://github.com/Mastervoliumpl/Starframe/actions/runs/35236885261). The existing main-only publisher then passed [run 35239726804](https://github.com/Mastervoliumpl/Starframe/actions/runs/35239726804), producing publication commit `0f47bf0adfc20f850545f9c9838829e99aa322d1`. Metadata version `1789659313` expires on 17 October 2026 at 15:35:13 UTC.
+
+The freshly built native debug client from that main commit used the embedded production root, normal HTTPS endpoints and a new isolated data directory. No catalog state was seeded, and no trust or endpoint override was used. The UI reported verified security information and catalog revision 3 with seven releases. Saved state matched the reviewed release/artifact identities and advisory revision 1 (no advisories), with the expected signed expiry. The normalized saved catalog SHA-256 was `59d019c9234622922e5b0be2c63a009c4babb826f95dd6652fc955448a822d9c`. Closing and reopening with network access blocked retained the same authenticated security record. The library stayed empty; no game was selected, launched or modified.
+
+Client executable SHA-256: `e773d75c4fdf93df3351abc4bac15080a369977406a29c1623abf8b580c06404`. Logs, screenshots, the one-off check and result JSON remain private under ignored `test-results/0.6.0-catalog-live`. This check exercises production catalog transport and verification; it does not repeat existing package, advisory-tamper or gameplay acceptance.
+
+The immediate [renewal attempt](https://github.com/Mastervoliumpl/Starframe/actions/runs/35241505858) rejected the previous metadata before publication. Windows Git converted LF to CRLF during checkout: the signed snapshot contained 1,524 bytes in Git, but its local copy contained 1,547. The public first publication remained unchanged and valid. The publisher now clones with `core.autocrlf=false` and includes `* -text` attributes in new publications. A real Git round-trip regression reproduces the legacy conversion, verifies exact bytes with both protections and successfully renews from the preserved checkout. The existing signing, tamper, expiry and rotation fixtures passed with this regression. Hosted renewal acceptance remains pending.
 
 ## Tooling decision
 
@@ -14,7 +24,7 @@ The Windows dependency graph adds 30 non-development packages, including the cli
 
 The caller supplies an embedded trusted root and an owned persistent TUF datastore. The module rejects reparse points in that directory, retains metadata versions for rollback checks and resumes from an accepted cached root. Retaining the root matters even if a later refresh stage fails; an old embedded root must not restore a revoked signing authority. This datastore assumes the same local integrity boundary as Starframe's existing saved data; it is not protection against a hostile process with the user's filesystem access.
 
-On 9 September 2026 the owner selected daily GitHub Actions renewal with thirty-day validity. Expired metadata pauses new catalog downloads. Installed offline use and cached confirmed security blocks remain effective. Catalog/advisory keys are separate from app-release keys. The [publisher and disabled workflow](../catalog-publishing.md) implement renewal and checked publication; disposable RSA-key fixtures passed locally. The owner confirmed the production recovery-key backup. No renewal job is active yet.
+On 9 September 2026 the owner selected daily GitHub Actions renewal with thirty-day validity. Expired metadata pauses new catalog downloads. Installed offline use and cached confirmed security blocks remain effective. Catalog/advisory keys are separate from app-release keys. The [publisher and workflow](../catalog-publishing.md) implement renewal and checked publication; disposable RSA-key fixtures passed locally. The owner confirmed the production recovery-key backup. Publication was enabled on 17 September; the first production results and renewal correction are recorded above.
 
 ## Verification
 

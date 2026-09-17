@@ -88,7 +88,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $previous = @()
           if ($existing) {
-            git clone --depth 1 --single-branch --branch $branch $repository $published
+            git -c core.autocrlf=false clone --depth 1 --single-branch --branch $branch $repository $published
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             $previous = @('--previous', $published)
           } else {
@@ -113,7 +113,8 @@ jobs:
           $main = gh api "repos/$env:GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha
           if ($LASTEXITCODE -ne 0 -or $main -ne $env:CHECKED_SHA) { throw 'Main changed during preparation. Wait for its successful checks.' }
           Copy-Item -LiteralPath "$output/metadata", "$output/targets" -Destination $published -Recurse -Force
-          git -C $published add -- metadata targets
+          Copy-Item -LiteralPath "$output/.gitattributes" -Destination $published -Force
+          git -C $published add -- .gitattributes metadata targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C $published -c user.name=github-actions[bot] -c user.email=41898282+github-actions[bot]@users.noreply.github.com commit -m "Renew catalog metadata from $env:CHECKED_SHA"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

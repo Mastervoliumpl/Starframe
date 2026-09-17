@@ -1,6 +1,6 @@
 # Milestone 0.6.0 acceptance
 
-Status: pre-merge work on 17 September 2026. Issues #27, #28, #29, #47 and #74 are complete. #30 awaits the owner's short hosted-installer smoke result; #46 awaits the main-only publisher's first live publication and renewal after an approved merge. No public app release, catalog publication or merge is authorized by this record.
+Status: merged implementation on 17 September 2026. Issues #27, #28, #29, #30, #47 and #74 are complete. The owner reported a successful hosted-installer smoke and explicitly approved merging PR #60 and enabling signed catalog publication with daily renewal. PR #60 merged as `9f01a7638645f88af2aa28b5e14bfaf78b7fc258`. #46 retains the live catalog acceptance below; the application release remains an unpublished development draft.
 
 ## Accepted scope and reused evidence
 
@@ -21,7 +21,9 @@ The owner directed a benefit-versus-effort approach on 17 September. Reuse passe
 
 The signed candidate at `617dc7c7e53de35d362d6f08150dff4d3484cf95` passed its checked build and hosted rehearsal. Follow-up `90329b699e7778878ba5be179237b94e853eab26` passed [required checks](https://github.com/Mastervoliumpl/Starframe/actions/runs/35134053731) and [dependency audits](https://github.com/Mastervoliumpl/Starframe/actions/runs/35134053445). Its workflow dependency fix and verification prose do not change installer behavior. Subsequent #30 changes correct documentation and Help text, without changing installation, startup, game or updater logic. Current-head validation is recorded on #30 and PR #60.
 
-## Owner smoke: one install and start
+## Owner smoke: passed on 17 September
+
+The owner completed the following short check and reported that everything went as expected with no issues. This is owner-reported acceptance of the exact hosted installer below, not a claim of additional independent VM instrumentation. #30 is closed. The earlier VM, retention, updater, keyboard and game results were reused without another manual campaign.
 
 Use the already reviewed `Starframe_0.6.0-dev.2_x64-setup.exe` from the [maintainer draft](https://github.com/Mastervoliumpl/Starframe/releases/tag/untagged-2375b1f85a264b76f2bf). SHA-256: `ea3db2c4b9bb0098751c63c5694a824f22aed0e8d5dfa9e4ff209b6774bb95c6`. Local preparation checks this hash before copying the file into a private smoke kit. The executable is not rebuilt for these documentation changes.
 
@@ -36,7 +38,7 @@ Purpose: exercise the hosted package's installed resources and first launch. It 
 
 The catalog workflow and its environment are restricted to main. It cannot establish production publication from the milestone branch. Avoid a second publisher or temporary production-key access merely to move this check before merge.
 
-After the smoke result and maintainer merge approval, merge PR #60 and wait for successful main checks. With maintainer catalog-publication approval, enable the existing workflow, publish once, verify a normal client refresh and manually trigger one renewal. Verify the client accepts the newer signed metadata, the targets match reviewed content and expiry is thirty days. Do not create artificial production advisories or repeat tamper/rotation suites. See [catalog publication](../catalog-publishing.md#first-live-acceptance).
+The owner approved the merge and catalog publication on 17 September. PR #60 merged, and [main checks](https://github.com/Mastervoliumpl/Starframe/actions/runs/35236886048) and [dependency audits](https://github.com/Mastervoliumpl/Starframe/actions/runs/35236885261) passed. The existing main-only workflow is enabled. Live acceptance uses normal client refresh and one immediate renewal, with matching reviewed targets and thirty-day validity. It does not introduce artificial production advisories or repeat tamper/rotation suites. See [catalog publication](../catalog-publishing.md#first-live-acceptance).
 
 Keep #46 and the milestone open through this live check. Close #30 when its narrowed acceptance is complete; #46 owns the remaining catalog check. A merge, an issue closure or an unpublished draft does not authorize public installer publication. Final version preparation and public release remain a separate maintainer decision.
 

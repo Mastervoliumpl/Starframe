@@ -88,6 +88,7 @@ def publish(
             if (verified / name).read_bytes() != (inputs / name).read_bytes():
                 raise ValueError("Verified targets differ from the reviewed input.")
         shutil.copytree(candidate, output, symlinks=False)
+        (output / ".gitattributes").write_bytes(b"* -text\n")
     print(f"Verified catalog metadata version {version}; expires {expiry}. Output is ready for publication.")
 
 
