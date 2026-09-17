@@ -20,13 +20,13 @@ The owner's 17 September amendment reuses completed verification and narrows #30
 | [0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11) | Exact approval identities, package/runtime limits and maintenance | Complete |
 | [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Complete: #24–#26, #57–#58 verified |
 | [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Complete: signed draft accepted and signed catalog live; app unpublished |
-| [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Native game integration | Blocked on official game API |
+| [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Scope to be agreed | No assigned work; not started |
 
 AI-package support is deferred until the game provides suitable AI extension/selection facilities. Automated replacement of the shipped AI is outside the current scope. Assign that work to a future milestone after those facilities can be verified; it is not a promised 0.7.0 feature.
 
 [Security scope](SECURITY.md) keeps 0.3.0 focused on the internal mod lifecycle, accurate status messages, disk/write recovery checks and separate dependency auditing. Catalog signing/advisory delivery must precede public catalog access; Installer/update artifact signatures and hosted release approval remain in 0.6.0. Windows publisher certificates are deferred to [#61](https://github.com/Mastervoliumpl/Starframe/issues/61), without a milestone, at the owner's request. Broader fuzzing and detailed compatibility reporting are follow-up work. Publishing an empty development catalog is not approval to open a live catalog to general users.
 
-Versions describe bounded outcomes, not dates. The native integration target may move when the official API becomes available; it must not block corrective releases to existing features. Add a patch milestone such as `0.6.1` when a released version needs fixes. Finish or explicitly pause the active milestone before changing focus.
+Versions describe bounded outcomes, not dates. Native integration is unscheduled and externally blocked until the official API becomes available; it must not block work on existing features. Add a patch milestone such as `0.6.1` when a released version needs fixes. Finish or explicitly pause the active milestone before changing focus.
 
 ## Issue index
 
@@ -136,15 +136,16 @@ Complete. Signed user-initiated updates, NSIS install/uninstall, release checks 
 
 On 15 September 2026, the owner moved final clean-machine/prerequisite and display/accessibility acceptance from #27 to #30. The 17 September amendment superseded that list: reuse the successful offline VM and lifecycle checks, accept the hosted-installer smoke, and waive additional display/accessibility and absent-WebView2 execution tests. Existing prerequisite error handling remains required. The installer identity requirements are recorded in DESIGN.md revision 0.11, and verification priorities in revision 0.13.
 
-### 0.7.0: Native game integration
+### 0.7.0: Scope to be agreed
 
-Blocked on the game's official mod API and completion of 0.6.0. Replace the current integration with native loading where supported, retain collections and library identities, and provide recoverable migration. No speculative adapter implementation or release date.
-
-- [#31: Evaluate the official mod API when the game exposes it](https://github.com/Mastervoliumpl/Starframe/issues/31)
-- [#32: Integrate native mod loading with recoverable migration](https://github.com/Mastervoliumpl/Starframe/issues/32)
+On 17 September 2026 the owner removed #31 and #32 from this milestone because their required official game facilities do not exist yet. No replacement issues have been assigned. Agree on the next scope before implementation; completing 0.6.0 does not start 0.7.0.
 
 ## Unscheduled backlog
 
+Native game integration remains future work, labelled `future` and `blocked` on GitHub. Reconsider it when Enhearten Media provides a documented or verifiable official loader/API, then assign a milestone. Preserve the current working integration until a replacement and recoverable migration are verified.
+
+- [#31: Evaluate the official mod API when the game exposes it](https://github.com/Mastervoliumpl/Starframe/issues/31)
+- [#32: Integrate native mod loading with recoverable migration](https://github.com/Mastervoliumpl/Starframe/issues/32)
 - [#61: Add trusted Windows publisher signing when eligible](https://github.com/Mastervoliumpl/Starframe/issues/61). No milestone; does not block the initial alpha.
 
 ## Working boundaries
