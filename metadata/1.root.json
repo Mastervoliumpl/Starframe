@@ -1,0 +1,57 @@
+{
+  "signed": {
+    "_type": "root",
+    "spec_version": "1.0.0",
+    "consistent_snapshot": true,
+    "version": 1,
+    "expires": "2027-09-09T21:05:49Z",
+    "keys": {
+      "dbf83df7cab5172672c4081feb118035b5ebcf306160dd1803468922d0e952bd": {
+        "keytype": "rsa",
+        "keyval": {
+          "public": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAxv/rC+I9BdQbjli40IdL\nM/JJW3PwLdDd7NLke7cirx6pDSMk3U+xPjgbgHt/o5ZysMXoux+2m0dgRye34MjE\nl+Rj+BJ1KJGfKVcWkKg7dJZZEebgyuPS6dUP/YgdZ9x4UN9UWSjG0+NX0k8KOxJu\nZnxr4oIE4hOIctlqxh4/8grzlerUCM2Qx/6k1BzVs/3jvTn/GgVhyQRs9QIIRfmw\ncnpScytUO+i4rXplH0ml1uJsXLbvBvkQ394YP0pQuhJK4awCTJZMqEe9xVPA0Scn\nDeksKAibsiW9pHKjMgd6WLAFUZe2PIc7Ho3ywb+X7IDeLVTu+z73V/RdwGKWkzaH\nfA+dRJ5TzENJAtbOtLH0+02MYW06SjR3iUR2KKuaNptf3ECE7Ck7b+j6ttDmAvP+\nptVpArDSjxVKMuo8FAyyjhtigA6reM7tcNrjjmthe+5cVmrf8aoEtmtausLf3i4Z\n8ZK+PA2lCuT91IXHXxgG/Ux5qp7gCZUETlbnSvjXuVeJ+OMnVcV05ueCklThsls7\nkhCG6X5eCY54rajTe410vrg+40IRzicnGQadphuHKDhroJE4IY55j+rqnkFUckkC\nGLLETm7pxCAzvnrPRpGis373ba1UWZ+Ke6Muk5ZyfmrIxeNkk9XPIGlZu1kfYdOf\n10HX3/e5netyp1nCXkM+m/MCAwEAAQ==\n-----END PUBLIC KEY-----"
+        },
+        "scheme": "rsassa-pss-sha256"
+      },
+      "0484c23dbb1dde54d2467f2bc66dfd02260fac338f8b6a7aac361e228e0e4278": {
+        "keytype": "rsa",
+        "keyval": {
+          "public": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAwkiq9G3yKHX7JQ4twm5Q\noqR4eSLcmBJL+7QWncFSbprvEZWiKf1VtG7UqkSYMdmnOyYmk+FNAuVuWBVw9KWg\n/YnGaZHumjMH7wEV8bLVoog5C3ZTJZorXtaLJCq3ghscPVwPCB+oFjrO3RZN8uMW\nmloBO3tK8bamrEIcTJobh1ibDSdqsvwJNmZbaj8NbD/Fy2nlLiZOG1UTIdLiqeQ3\nq1r+cAYlb8hvpL3H7N1+ohBiMnwdnUwA/ZbCqgiCy0LCv7hDt/DD2wHlOx6Q9L0E\nb3jb3oOHGiGDaRGdYYhnvKdaqGgfJEDr5Mcsz1bNCQSihm7tLiH0IGQncUoDsT+c\n62c0lncqy5kTm+zy0BGH6LQZdcBmld1ByLdv3UjWQfc2t9YajXXtAZNag05ioyGQ\nwEiyASE+3Lk5ObBKPv243vOOVV5uydoH2UPX7TbOzrhYatTBXSFieoiB8ZYpnPR7\nRCdGAGYM2cBnLgEPXaNm6/npDFtYte+Vi8r3fHo8U15gimkr+IW5Dsc1+l5mWJy8\n8XpRUZ3xLUdrUe6wAXTh8/m3W/IcvKzxg3iQdv7Z3fEgbNM2qjleu2wUhLMXBY0m\n7CK4GbM+egWx0UXmJpux35/42w9Dg8JcM8xXVo0N+gSF3wXkKcTeZb7KkUMVLmdc\nIavC8ozEbNZO6wAt5N+J8vsCAwEAAQ==\n-----END PUBLIC KEY-----"
+        },
+        "scheme": "rsassa-pss-sha256"
+      }
+    },
+    "roles": {
+      "timestamp": {
+        "keyids": [
+          "dbf83df7cab5172672c4081feb118035b5ebcf306160dd1803468922d0e952bd"
+        ],
+        "threshold": 1
+      },
+      "root": {
+        "keyids": [
+          "0484c23dbb1dde54d2467f2bc66dfd02260fac338f8b6a7aac361e228e0e4278"
+        ],
+        "threshold": 1
+      },
+      "targets": {
+        "keyids": [
+          "dbf83df7cab5172672c4081feb118035b5ebcf306160dd1803468922d0e952bd"
+        ],
+        "threshold": 1
+      },
+      "snapshot": {
+        "keyids": [
+          "dbf83df7cab5172672c4081feb118035b5ebcf306160dd1803468922d0e952bd"
+        ],
+        "threshold": 1
+      }
+    }
+  },
+  "signatures": [
+    {
+      "keyid": "0484c23dbb1dde54d2467f2bc66dfd02260fac338f8b6a7aac361e228e0e4278",
+      "sig": "82cb92bb2aa5161e6a0e04e9396db266b3fc60e030122551dde16be95870cd92476dbdea19895da7beda9f246b8816acdf900ec866131e87773cd5a91f348f0a42685f82b5d56c5c30ef85de1b26170d5958d581dd0f8e911369de020860b30a2cb37d543d26e7860df03f35edc263ad1051342add65f110abe772ba29540c3af8dd48454a42c3ad71eb51b5ff3c54e65a5675cadaf716beefdd5e9d8e0224f35e7d009d5689c8f1e0f4c350db4c3c5dd0fa1f39cc6cae2e0827de3c8369e836f48c5159d437e6814b43b060e6adf5f12ace39a1107512c3f62f2ff508d13cbb969114b294e3bae43e1d5a6d993bbfb44c2c18b72d00ff907a28221c8ff6b7c19acb9e89f8e3a2e715fbc36b3eea0f97b9a901733bd06e70fd6338947a82a50e22741f53e3335d7ce689898e73e6e767d8cc969b6a30c16a08e11e660062f42fb2d7900c0ab8bdecc87ea3b2ef16bb173d94c6c251da209ca4a2d21f979f1e3818bf77cc3654b3a15d2665d5fab05992cc4cfe9f8fdac7b79d1e269d3ce41030fb188c560e4c9940334737d438da977fc1943c8d7bd06dea06a51ddfea1611f90a2d4f875e3d33dfed469486553f46088e14de964970c3ffdd7a6f80be04b320bdf9c8320f1cb0cb53d6fc257d9ca29214b2f868e0653ec27e1a43a1b8f83dc0f41fefd954302c9920c0eeb78c3c19abaaa16986734c2f5fe2f5a076337bf209"
+    }
+  ]
+}
