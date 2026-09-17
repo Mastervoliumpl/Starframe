@@ -4,6 +4,7 @@
 
 - Add the alpha user guide and consolidate 0.6.0 acceptance around existing evidence, the owner's hosted-installer smoke check and post-merge live catalog verification (#30, #46). Record the owner's proportionate testing policy; retain existing error handling and waive additional display/accessibility and absent-WebView2 execution checks.
 - Correct Help text for BepInEx 5 support and the current-session game menu. Library, installer and runtime behavior are unchanged.
+- Enable signed catalog publication with daily renewal and thirty-day validity (#46). Preserve signed metadata bytes across Windows Git checkouts.
 
 ## 0.6.0-dev.2 - 2026-09-16
 

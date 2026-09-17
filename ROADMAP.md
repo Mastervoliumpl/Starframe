@@ -1,10 +1,10 @@
 # Starframe version roadmap
 
-**[0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7)** is active from 9 September 2026. Version `0.6.0-dev.2` prepares Windows alpha distribution on `codex/0.6.0-windows-alpha`. Installer packaging (#27) has passed functional acceptance; final prerequisite and display checks remain in #30. Updates (#28), installer branding (#74) and bounded fuzzing (#47) are verified. Release automation (#29) produced a signed, independently verified development draft. Catalog live acceptance (#46) and alpha acceptance/documentation (#30) remain. No app release or installer is published. Milestone 0.5.0 is complete; see its [exit evidence](docs/verification/milestone-0.5.0.md).
+**[0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7)** is complete on 17 September 2026. PR #60 delivered Windows packaging (#27), signed updates (#28), release automation (#29), alpha acceptance and documentation (#30), catalog authentication (#46), bounded fuzzing (#47) and installer branding (#74). PR #76 corrected signed catalog renewal on Windows. The owner accepted the hosted installer, and production catalog publication, renewal and client verification passed. Version `0.6.0-dev.2` remains an unpublished development draft. No later milestone has started; see the [acceptance record](docs/verification/milestone-0.6.0.md).
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
-The owner's 17 September amendment reuses completed verification and narrows #30 to the hosted-installer smoke result plus consolidated documentation, now prepared. Additional display/accessibility and absent-WebView2 execution checks are waived. [The acceptance record](docs/verification/milestone-0.6.0.md) owns the remaining list. #46's main-only publication and live renewal check follow an approved merge and must pass before public release or milestone closure.
+The owner's 17 September amendment reuses completed verification and narrows #30 to the hosted-installer smoke result plus consolidated documentation, both complete. Additional display/accessibility and absent-WebView2 execution checks are waived. #46's main-only publication and live renewal checks passed after the approved merges. Public app publication remains a separate maintainer decision.
 
 ## Delivery sequence
 
@@ -19,7 +19,7 @@ The owner's 17 September amendment reuses completed verification and narrows #30
 | [0.4.0](https://github.com/Mastervoliumpl/Starframe/milestone/5) | Ordered and shared collections | Complete |
 | [0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11) | Exact approval identities, package/runtime limits and maintenance | Complete |
 | [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Complete: #24–#26, #57–#58 verified |
-| [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Active: signed development draft verified; final acceptance remains |
+| [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Complete: signed draft accepted and signed catalog live; app unpublished |
 | [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Native game integration | Blocked on official game API |
 
 AI-package support is deferred until the game provides suitable AI extension/selection facilities. Automated replacement of the shipped AI is outside the current scope. Assign that work to a future milestone after those facilities can be verified; it is not a promised 0.7.0 feature.
@@ -126,7 +126,7 @@ Pre-publication follow-ups: [#46: Catalog authentication and security advisory d
 
 The #47 bounded targets and local campaign are implemented, with [results and remaining coverage limits](docs/verification/fuzzing.md). Installer #27 has passed its functional checks, including cross-build migration, installed desktop startup, maintenance-uninstall completion and recovery after actual process interruption. The owner reported successful offline installation/use on a fresh Windows 11 VMware guest with WebView2 present. See [installer evidence and remaining final-candidate checks](docs/verification/windows-installer.md).
 
-Active. Deliver signed user-initiated updates, NSIS install/uninstall, release checks and user documentation. Exit: whole-app Windows verification passes and a draft installer release is reviewable. Publishing remains a maintainer action. Windows Authenticode is deferred to #61. Private/public-key signatures for installer/update artifacts and catalog metadata remain required. The owner approved daily catalog renewal with thirty-day validity; expired metadata pauses new catalog downloads. The owner approved a locally built plugin input with source/file verification on GitHub; proprietary game references remain local. See [draft-release verification](docs/verification/draft-releases.md). Runtime installation, upgrade and uninstall are automatic; full app uninstall deletes managed app data by default with an explicit keep-data option (DESIGN.md revision 0.10).
+Complete. Signed user-initiated updates, NSIS install/uninstall, release checks and user documentation are delivered. The accepted Windows checks passed and the signed installer draft is reviewable. Publishing remains a maintainer action. Windows Authenticode is deferred to #61. Installer/update artifact signatures and catalog authentication are verified. Daily catalog renewal is enabled with thirty-day validity; expired metadata pauses new catalog downloads. The owner approved a locally built plugin input with source/file verification on GitHub; proprietary game references remain local. See [draft-release verification](docs/verification/draft-releases.md). Runtime installation, upgrade and uninstall are automatic; full app uninstall deletes managed app data by default with an explicit keep-data option (DESIGN.md revision 0.10).
 
 - [#27: Package Windows installation and owned-file cleanup](https://github.com/Mastervoliumpl/Starframe/issues/27)
 - [#28: Check GitHub releases and install signed updates on request](https://github.com/Mastervoliumpl/Starframe/issues/28)
@@ -134,7 +134,7 @@ Active. Deliver signed user-initiated updates, NSIS install/uninstall, release c
 - [#30: Complete Windows alpha acceptance and user documentation](https://github.com/Mastervoliumpl/Starframe/issues/30)
 - [#74: Brand the Windows installer and uninstaller with Starframe design](https://github.com/Mastervoliumpl/Starframe/issues/74)
 
-On 15 September 2026, the owner moved final clean-machine/prerequisite and display/accessibility acceptance from #27 to #30. These remain mandatory before public release; #27 can complete after its functional installer work passes. #74 follows #27 and supplies the branded installer for #30's final acceptance. Display/accessibility checks do not require a clean machine. The installer identity requirements are recorded in DESIGN.md revision 0.11.
+On 15 September 2026, the owner moved final clean-machine/prerequisite and display/accessibility acceptance from #27 to #30. The 17 September amendment superseded that list: reuse the successful offline VM and lifecycle checks, accept the hosted-installer smoke, and waive additional display/accessibility and absent-WebView2 execution tests. Existing prerequisite error handling remains required. The installer identity requirements are recorded in DESIGN.md revision 0.11, and verification priorities in revision 0.13.
 
 ### 0.7.0: Native game integration
 
