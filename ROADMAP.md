@@ -20,7 +20,7 @@ The owner's 17 September amendment reuses completed verification and narrows #30
 | [0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11) | Exact approval identities, package/runtime limits and maintenance | Complete |
 | [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Complete: #24–#26, #57–#58 verified |
 | [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Complete: signed draft accepted and signed catalog live; app unpublished |
-| [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Scope to be agreed | No assigned work; not started |
+| [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Backend operations independent of the graphical UI | Planned: #66; not started |
 
 AI-package support is deferred until the game provides suitable AI extension/selection facilities. Automated replacement of the shipped AI is outside the current scope. Assign that work to a future milestone after those facilities can be verified; it is not a promised 0.7.0 feature.
 
@@ -136,9 +136,13 @@ Complete. Signed user-initiated updates, NSIS install/uninstall, release checks 
 
 On 15 September 2026, the owner moved final clean-machine/prerequisite and display/accessibility acceptance from #27 to #30. The 17 September amendment superseded that list: reuse the successful offline VM and lifecycle checks, accept the hosted-installer smoke, and waive additional display/accessibility and absent-WebView2 execution tests. Existing prerequisite error handling remains required. The installer identity requirements are recorded in DESIGN.md revision 0.11, and verification priorities in revision 0.13.
 
-### 0.7.0: Scope to be agreed
+### 0.7.0: Backend operations independent of the graphical UI
 
-On 17 September 2026 the owner removed #31 and #32 from this milestone because their required official game facilities do not exist yet. No replacement issues have been assigned. Agree on the next scope before implementation; completing 0.6.0 does not start 0.7.0.
+On 17 September 2026 the owner assigned #66 to this milestone. Keep the existing stack and place management operations behind a shared interface for the graphical app and headless commands. Implementation has not started; the later UI redesign remains separate work.
+
+- [#66: Separate Starframe backend operations from the graphical UI](https://github.com/Mastervoliumpl/Starframe/issues/66). Prerequisite: #54 (complete).
+
+The owner removed #31 and #32 from this milestone because their required official game facilities do not exist yet. They remain unscheduled and externally blocked.
 
 ## Unscheduled backlog
 
