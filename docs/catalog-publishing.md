@@ -1,6 +1,6 @@
 # Catalog publication
 
-Issue #46 is in progress. The publisher, embedded trust root and desktop signed refresh are implemented. The owner approved uploading the dedicated online key to the `catalog` GitHub environment on 9 September 2026. Its only allowed deployment branch is `main`, and `CATALOG_SIGNING_KEY` is configured. `CATALOG_PUBLICATION_ENABLED` is explicitly `false`; no signed catalog has been published. The first hosted renewal and live client refresh remain acceptance checks before public distribution.
+The publisher, embedded trust root and desktop signed refresh are implemented. The owner approved uploading the dedicated online key to the `catalog` GitHub environment on 9 September 2026. Its only allowed deployment branch is `main`, and `CATALOG_SIGNING_KEY` is configured. On 17 September the owner explicitly approved merging PR #60 and enabling signed catalog publication and daily renewal. `CATALOG_PUBLICATION_ENABLED` is `true`; the first production publication and normal client refresh passed. [Live verification](verification/catalog-authentication.md#first-production-publication-17-september-2026) records the source, workflow, publication and client identities.
 
 The initial public root is [catalog/trust/root.json](../catalog/trust/root.json), version 1, with separate RSA-4096 recovery and online publishing keys. Its file SHA-256 is `2ab2812d4d89d4d37d2722b64c6e1902ee1dacb80f44de2bbcfd5206fc887345`, and it expires on 9 September 2027. The owner confirmed a secure backup of the recovery key and root on 9 September 2026. Private keys remain outside tracked files. A candidate signed with these keys passed local TUF target verification without publication.
 
@@ -34,7 +34,7 @@ Only the publisher uses `--allow-expired-repo` when examining its previous publi
 
 ## First live acceptance
 
-As of 17 September, the release automation prerequisite #29 is complete. Publication remains disabled. The workflow and catalog environment both require main, so this last #46 check follows a maintainer-approved merge and successful main checks. This is a pre-public-release gate; it is not a reason to add a second publishing path or repeat verified cryptographic fixtures.
+The release automation prerequisite #29 is complete. The workflow and catalog environment both require main, so this #46 check follows the maintainer-approved merge and successful main checks. It uses the existing publisher and client rather than a second publishing path or a repeat of the cryptographic fixtures. The procedure below records the live acceptance sequence; publication is now enabled.
 
 With maintainer approval to enable catalog publication:
 
