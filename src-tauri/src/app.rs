@@ -25,6 +25,7 @@ impl Default for Core {
                 operations: vec![],
                 saved_data: SavedData::Loading,
                 catalog: Default::default(),
+                updates: Default::default(),
                 game: Default::default(),
             },
             revision: 0,
@@ -36,6 +37,12 @@ impl Default for Core {
 }
 
 impl Core {
+    pub fn updates(&mut self, view: starframe::updates::View) {
+        if !self.stopped && self.snapshot.updates != view {
+            self.snapshot.updates = view;
+            self.changed();
+        }
+    }
     pub fn shell_ready(&self) -> bool {
         self.subscriber.is_some()
     }

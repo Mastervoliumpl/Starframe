@@ -61,6 +61,8 @@ export function fixtureManagement(
       }))
     : [];
   const data: ModView = {
+    advisories: { schemaVersion: 1, revision: '1', advisories: [] },
+    findings: {},
     localSources: [],
     localWatches: [],
     imports: [],
@@ -86,6 +88,39 @@ export function fixtureManagement(
     cleanupErrors: [],
   };
   const operations: PackageOperation[] = [];
+  const security = new URLSearchParams(location.search).get('security');
+  if (
+    populated &&
+    ['confirmed', 'suspected', 'cleared'].includes(security ?? '')
+  ) {
+    const hash = data.library[0].reference.hash;
+    data.advisories!.advisories.push({
+      id: 'fixture.finding',
+      title: 'Synthetic security finding',
+      affected: [
+        { releaseId: mods[0].releases[0].id, sha256: hash, payloadSha256: [] },
+      ],
+      history: [
+        {
+          recordedAt: 1788819700,
+          state: security === 'suspected' ? 'suspected' : 'confirmed',
+          explanation: 'Inert fixture evidence for security controls.',
+          evidence: ['https://example.invalid/security-evidence'],
+          recommendedAction: 'Disable the affected fixture.',
+        },
+      ],
+    });
+    if (security === 'cleared')
+      data.advisories!.advisories[0].history.push({
+        recordedAt: 1788820000,
+        state: 'cleared',
+        explanation: 'The fixture finding was corrected after review.',
+        evidence: ['https://example.invalid/correction'],
+        recommendedAction: 'Use is permitted.',
+      });
+    data.findings[hash] = ['fixture.finding'];
+    data.enabled = [data.library[0].reference];
+  }
   const commit = () => {
     const active = data.collections.find((c) => c.id === data.activeCollection);
     if (active) active.entries = [...data.enabled];

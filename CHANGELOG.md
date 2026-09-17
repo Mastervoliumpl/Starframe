@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+- Add the alpha user guide and consolidate 0.6.0 acceptance around existing evidence, the owner's hosted-installer smoke check and post-merge live catalog verification (#30, #46). Record the owner's proportionate testing policy; retain existing error handling and waive additional display/accessibility and absent-WebView2 execution checks.
+- Correct Help text for BepInEx 5 support and the current-session game menu. Library, installer and runtime behavior are unchanged.
+
+## 0.6.0-dev.2 - 2026-09-16
+
+Internal replacement draft for release-workflow verification; public-release acceptance remains in progress.
+
+- Declare and map the application signing secret explicitly through the reusable release workflow. Keep its value in the protected release environment and check availability before compiling signing tools (#29).
+- Preserve the immutable 0.6.0-dev.1 tag and empty failed draft; no assets were signed or published by that rehearsal.
+
+## 0.6.0-dev.1 - 2026-09-16
+
+Internal development draft. Milestone 0.6.0 and public-release acceptance remain in progress.
+
+- Add checked-commit draft-release preparation, source-bound local runtime inputs, retained component sources and independent verification of signed release inventories (#29). Keep hosted signing behind maintainer approval and publication manual.
+
+- Check official app releases after startup and every five minutes, retain quiet update notices and channel preferences, and install Tauri-verified updates only on request (#28). Wait for game exit and file work, preserve app data and reopen with automatic runtime preparation. Add separate application signing authority and documented key-recovery limits. See [update verification](docs/verification/app-updates.md).
+
+- Brand the Windows installer with Starframe portrait artwork, navy surfaces, orange headings and progress, thin control borders and clearer maintenance/uninstall wording (#74). Preserve native keyboard controls, system high-contrast fallback and the unchecked data-retention default. Owner review and installer regressions passed; final display/accessibility acceptance remains in #30.
+- Exit setup after a successful same-version maintenance uninstall instead of returning to installation pages. Preserve reinstall, version replacement and cancellation behavior (#27).
+- Update rustls to 0.23.45 to fix TLS handshake validation advisory RUSTSEC-2026-0285 in the catalog verifier's dependency graph; refresh the corresponding notice inventory.
+- Authenticate catalog refreshes through TUF, with expiry, rollback and retained key-rotation checks (#46). Schema 13 commits catalog and advisory targets together. Expired or unverified information pauses new downloads; verified library reuse remains available offline. Confirmed findings block matching downloads and activation, including local payloads, while preserving files/settings. Show evidence and correction history and add public problem/private security reporting routes. Daily renewal uses thirty-day validity; hosted publication remains disabled pending acceptance.
+- Add bounded mutation campaigns for catalogs, runtime contracts, ZIP extraction and paths, plus Windows directory-replacement stress checks. Keep longer campaigns separate from ordinary builds and retain reproducible failures (#47). See [results and limits](docs/verification/fuzzing.md).
+- Include desktop/runtime/installer dependency notices and exact source references in NSIS packaging; reject stale notices and mismatched third-party runtime DLLs before bundling.
+- Add opt-in NSIS packaging with verified runtime staging and current-user installation. Require normal app shutdown before setup instead of force-terminating file work. Prepare the game runtime automatically after selection and on startup, including updated runtime resources; keep repair/reinstall in Settings. Uninstall cleans all recorded game deployments before removing the app, deletes managed app data by default and offers explicit retention. Installs, upgrades and reinstall preserve data. See [completed functional checks and remaining distribution gates](docs/verification/windows-installer.md).
+- Defer Windows publisher certificates to unscheduled #61. Keep installer/update artifact signatures and catalog authentication in 0.6.0; replace the SignPath enquiry with accurate application form notes.
+
 ## 0.5.0 - 2026-09-08
 
 - Show only current-session mods in the game's main Mods list, with names alone. Hide disabled library entries, redundant status/version text and the inherited checkmark; preserve failure details in a separate section (#58).

@@ -41,7 +41,7 @@ Retain originals until restored records and artifacts have been checked. These t
 
 ## Windows build comparison
 
-Measured on 6 September 2026: Windows 11 Education 25H2 build 26200, Ryzen 7 7840HS (8 cores, 16 logical processors), about 31.3 GiB visible RAM. Both runs used Cargo 1.98.1, rustc 1.98.1, LLVM 22.1.8 and host x86_64-pc-windows-msvc. Builds ran sequentially in isolated detached checkouts, with separate initially absent target directories and a populated offline Cargo registry. No other compilation ran during these measurements.
+Measured on 6 September 2026 on Windows 11. Personal hardware details are withheld; compare these two runs on the same machine, not absolute timings across machines. Both runs used Cargo 1.98.1, rustc 1.98.1, LLVM 22.1.8 and host x86_64-pc-windows-msvc. Builds ran sequentially in isolated detached checkouts, with separate initially absent target directories and a populated offline Cargo registry. No other compilation ran during these measurements.
 
 The baseline is e33dbef400d4708657643b4721f6d977ade59a5b. The migrated implementation is 4ba28a27ff367b268138a161ae798964b8dd3846, before the final version-label/documentation commit. [Structured results and package inventories](sqlite-builds.json) include binary SHA-256 values and toolchain identities.
 

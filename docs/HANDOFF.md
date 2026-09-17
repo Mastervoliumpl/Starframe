@@ -6,6 +6,8 @@ Read [DESIGN.md](../DESIGN.md), [ARCHITECTURE.md](../ARCHITECTURE.md), [DEVELOPM
 
 ## Initial support and performance target
 
+The original matrix below is historical. The owner's 17 September 2026 [verification priorities](../DESIGN.md#verification-priorities) and [0.6.0 acceptance record](verification/milestone-0.6.0.md) supersede its exhaustive display and hardware acceptance expectations. Existing measurements remain evidence for their stated conditions; no new performance guarantee is inferred.
+
 Target **Windows 11 x64**, starting with version **25H2**, and test supported later Windows 11 releases before listing them as supported. Use the current Evergreen WebView2 runtime through Tauri. Windows 10, ARM64, Linux and macOS are outside the initial support promise. This is a product support choice, not a claim that Tauri cannot run elsewhere. Microsoft lists Windows 11 25H2 within support through October 2027 for Home/Pro; recheck the supported Windows matrix before shipping. [Microsoft lifecycle](https://learn.microsoft.com/en-us/lifecycle/products/windows-11-home-and-pro), [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)
 
 Use a modest test machine: four CPU cores, 8 GB RAM, SSD storage, integrated graphics capable of driving a 1280 × 800 display at 60 Hz, and a supported Windows/WebView2 installation. Record the actual CPU, GPU, memory, display scale, OS and WebView2 versions with results. These are manager test targets, not Sanctuary's minimum game requirements. Test the game itself on hardware that meets the game's requirements.

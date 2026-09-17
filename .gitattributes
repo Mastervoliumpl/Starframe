@@ -1,1 +1,6 @@
 * text=auto eol=lf
+
+# Preserve upstream license formatting in copied and generated notice files.
+docs/notices/Rust-1.98.1-COPYRIGHT.html -whitespace
+docs/notices/desktop-dependencies.txt -whitespace
+docs/notices/runtime-dependencies.txt -whitespace

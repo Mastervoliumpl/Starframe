@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      draft_release_commit:
+        description: Optional checked SHA for the maintainer-approved 0.6.0 draft rehearsal
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -14,6 +19,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  draft-rehearsal:
+    needs: required
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'Mastervoliumpl/Starframe' &&
+      github.ref == 'refs/heads/codex/0.6.0-windows-alpha' &&
+      inputs.draft_release_commit != ''
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/release.yml
+    secrets:
+      APP_UPDATE_SIGNING_KEY: ${{ secrets.APP_UPDATE_SIGNING_KEY }}
+    with:
+      commit: ${{ inputs.draft_release_commit }}
+      rehearsal: true
   repository:
     name: Repository checks
     runs-on: ubuntu-latest
@@ -87,10 +108,17 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run check:rust
+      - name: Verify draft signatures and artifact rejection with disposable keys
+        run: |
+          cargo build --manifest-path src-tauri/Cargo.toml --locked --example verify_release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/verify_release_fixture.py --verifier src-tauri/target/debug/examples/verify_release.exe
       - name: Validate catalog and retained release identities
         env:
           CATALOG_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
         run: cargo run --manifest-path src-tauri/Cargo.toml --locked --bin check_catalog -- catalog/releases.json --git-base $env:CATALOG_BASE
+      - name: Compile native installer controls
+        run: ./scripts/prepare_windows_installer.ps1 -ThemeOnly
       - run: npm run tauri -- build --debug --no-bundle -- --locked
       - run: npm run test:native
       - run: npm run tauri -- build --no-bundle -- --locked

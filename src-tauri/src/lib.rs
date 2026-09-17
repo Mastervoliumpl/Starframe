@@ -3,6 +3,7 @@ pub mod deployment;
 pub mod game;
 pub mod launch;
 pub mod local_import;
+pub mod maintenance;
 pub mod mods;
 pub mod ordering;
 pub mod packages;
@@ -10,6 +11,7 @@ pub mod runtime_contract;
 pub mod sharing;
 pub mod space;
 pub mod storage;
+pub mod updates;
 #[cfg(windows)]
 pub mod windows_game;
 

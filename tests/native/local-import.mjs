@@ -7,6 +7,7 @@ import {
   realpath,
   writeFile,
   stat,
+  unlink,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -16,6 +17,9 @@ const root = await realpath(
   await mkdtemp(join(tmpdir(), 'starframe-local-import-')),
 );
 const data = join(root, 'data');
+await mkdir(data);
+const startupGate = join(data, 'hold-storage-startup');
+await writeFile(startupGate, '');
 const source = join(root, 'source');
 const content = join(source, 'LJ', 'lua', 'fixture.lua');
 await mkdir(join(source, 'LJ', 'lua'), { recursive: true });
@@ -46,7 +50,9 @@ await withDesktop(
       name: 'Import local mod',
       exact: true,
     });
-    await expect(trigger).toBeEnabled();
+    await expect(trigger).toBeDisabled({ timeout: 30000 });
+    await unlink(startupGate);
+    await expect(trigger).toBeEnabled({ timeout: 30000 });
     await trigger.click();
     const dialog = page.getByRole('dialog', {
       name: 'Import local mod',

@@ -21,7 +21,7 @@ The browser fixture transport exists only in development builds with `?fixture`.
 
 ## Timing conditions
 
-The native release check used Windows 11 Education, build 26200 (25H2), Evergreen WebView2 `152.0.4191.62`, an AMD Ryzen 7 7840HS (8 cores/16 threads), 32 GB installed RAM and a WD PC SN810 SSD. The machine has Radeon integrated graphics and an RTX 4070 Laptop GPU; the active rendering adapter was not established. WebView2 reported a device-pixel ratio of 1.5 and a 1280 × 800 logical viewport.
+The native release check used Windows 11 and Evergreen WebView2 `152.0.4191.62`. Personal hardware details are withheld; these timings describe one test machine and are not a hardware baseline. The active rendering adapter was not established. WebView2 reported a device-pixel ratio of 1.5 and a 1280 × 800 logical viewport.
 
 The list contained 1,000 fixture rows. All three simulated transfers remained active during measurement. One blocking worker hashed an 8 MiB memory buffer three times per iteration, then waited at least 100 ms before publishing progress. The transfers had no network payload or real transfer rate. Archive extraction was not exercised.
 

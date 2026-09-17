@@ -10,6 +10,7 @@ export default defineConfig(
     'dist/**',
     'src-tauri/**',
     'test-results/**',
+    '.local-signing/**',
     'playwright-report/**',
   ]),
   js.configs.recommended,

@@ -588,6 +588,51 @@ pub fn remove(store: &mut Storage, game: &game::Installation) -> Result<usize> {
     }
     apply(store, &mut engine, Vec::new(), &mut guard, &mut |_| Ok(()))
 }
+
+pub fn remove_all(store: &mut Storage) -> Result<()> {
+    let mut games = Vec::new();
+    for root in store.deployment_roots().map_err(|e| e.to_string())? {
+        let root = PathBuf::from(root);
+        let record = load(store, &root)?;
+        if record.owned.is_empty() && record.pending.is_none() {
+            continue;
+        }
+        let game = game::inspect(&root)?;
+        if engine_root(&game)? != root {
+            return Err("The recorded game location changed. Retain the app data and restore the location before uninstalling.".into());
+        }
+        guard_game(&game)?;
+        games.push(game);
+    }
+    for game in games {
+        remove(store, &game)?;
+    }
+    Ok(())
+}
+
+/// Missing owned files can be recreated; changed content still needs inspection.
+pub fn repair_missing(store: &mut Storage, game: &game::Installation) -> Result<()> {
+    let mut guard = || guard_game(game);
+    let mut engine = Engine::open(&engine_root(game)?, &mut guard)?;
+    let mut record = load(store, &engine.root)?;
+    rollback(store, &mut engine, &mut record, &mut guard, &mut |_| Ok(()))?;
+    let mut missing = Vec::new();
+    for (path, expected) in &record.owned {
+        match engine.digest(path, &mut guard)? {
+            None => missing.push(path.clone()),
+            Some(actual) if &actual == expected => (),
+            Some(_) => {
+                return Err(format!(
+                    "Repair stopped: {path} was changed outside Starframe. The file was retained."
+                ));
+            }
+        }
+    }
+    for path in missing {
+        record.owned.remove(&path);
+    }
+    save(store, &engine.root, &record, &[])
+}
 fn external_dll(
     folder: &Path,
     root: &Path,

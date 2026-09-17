@@ -14,8 +14,19 @@ const offline = {
 await withDesktop(
   root,
   async (page) => {
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await expect(
+      page.getByText('Saved locally: 0 library entries and 0 collections.'),
+    ).toBeVisible({ timeout: 30000 });
     await page.getByRole('button', { name: 'Catalog', exact: true }).click();
-    await expect(page.getByText('No catalog is cached yet.')).toBeVisible();
+    await expect(page.getByText('No catalog is cached yet.')).toBeVisible({
+      timeout: 30000,
+    });
+    await expect(
+      page.getByText('Catalog security information has not been verified.', {
+        exact: false,
+      }),
+    ).toBeVisible();
   },
   offline,
 );
@@ -44,7 +55,7 @@ await withDesktop(
       { timeout: 30000 },
     );
     await expect(region.getByRole('alert')).toContainText(
-      'Catalog request failed',
+      'Catalog authentication failed',
       { timeout: 30000 },
     );
     await expect(
@@ -65,7 +76,7 @@ const retained = JSON.parse(
 expect(retained.catalog).toEqual(catalog);
 expect(retained.etag).toBe(cache.etag);
 expect(retained.lastSuccess).toBe(cache.lastSuccess);
-expect(retained.error).toContain('Catalog request failed');
+expect(retained.error).toContain('Catalog authentication failed');
 reopened.close();
 console.log(
   'Native catalog check passed: offline startup, cached restart, persistent error and clean exit.',

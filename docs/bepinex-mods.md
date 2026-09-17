@@ -29,7 +29,7 @@ Put this `starframe.local.json` beside `LadderReporter.dll`:
 The existing layout name describes Starframe's managed package storage. It now accepts both internal `IMod` entries and supported BepInEx plugin entries. A local folder does not need to be zipped. For a DLL selected directly, name its metadata `LadderReporter.starframe.json` instead.
 
 1. Close Sanctuary and open a Starframe build that includes the 0.5.0 runtime resources.
-2. Select the game installation in Settings and finish setup if required.
+2. Select the game installation in Settings. Starframe prepares its runtime automatically while the game is closed.
 3. In My mods, choose **Import local mod**, select `SanctuaryMods/LadderReporter`, and choose **Import copy**.
 4. Enable Ladder Reporter in the collection you want to use. Wait for the saved setup to be ready, then launch from Starframe. Keep Steam online for this playtest.
 5. Confirm that the desktop reports the active mod and that the game's **Mods** page lists Ladder Reporter. The main list contains only successful session entries; failures appear separately under **Could not load**. Open the mod's row to inspect the BepInEx settings.

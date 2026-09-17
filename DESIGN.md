@@ -1,6 +1,6 @@
 # Starframe: design direction
 
-Status: revision 0.9, 8 September 2026. Product name: Starframe. The user retained the logo and accepted the desktop layout for the first version. This revision simplifies the in-game list to the current session; the approved launch action remains unchanged.
+Status: revision 0.13, 17 September 2026. Product name: Starframe. This revision records the owner's proportionate verification policy and reduced alpha acceptance scope. The app-update channel defaults, installer identity, automatic runtime lifecycle, uninstall data default, deferred Windows certificate signing and catalog expiry decisions remain in effect.
 
 This is the accepted design handoff. The user authorized milestone 0.1.0 on 6 September 2026, including desktop navigation and live state in issue #8. Later feature screens remain planned. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
@@ -31,7 +31,35 @@ The user supplied these six colors:
 
 Game compatibility and mod releases are separate concepts. Warn when a catalog mod was made for an older game version, while still allowing the user to enable it and try launching. Collections contain a name and an ordered list of mod references. Sharing preserves those releases and their order, without mod settings. Refresh catalog data independently on launch and every five minutes while the desktop app is open; this does not require an app update.
 
+### Verification priorities
+
+The owner selected a benefit-versus-effort approach on 17 September 2026. Focus implementation and testing on ordinary supported workflows, reported problems, and failures with meaningful consequences. Do not try to accommodate every possible display setting, environment combination or hypothetical edge case. Reuse recorded passes when the relevant code, dependencies, packaging and assumptions remain applicable. A version number or final milestone checklist alone does not justify repeating a manual test. State the specific missing evidence or changed behavior before adding verification work.
+
+Additional installer scaling, high-contrast, screen-reader and unusual display-combination tests are waived for 0.6.0. They are unverified, not passed. Preserve the existing native controls, keyboard behavior, readable defaults and high-contrast fallback; respond to concrete reports rather than expanding a speculative matrix. Keep protection against data loss, unsafe file operations and invalid signatures. Existing useful automated checks remain in place.
+
+WebView2 remains required. Retain the installer's existing prerequisite attempt and clear failure message; a dedicated absent-WebView2 environment is not an alpha acceptance requirement. The owner will perform one short install/start smoke check of the GitHub-built draft. Earlier functional and offline VM results carry forward without repeating the complete checklist. [The 0.6.0 acceptance record](docs/verification/milestone-0.6.0.md) supersedes older open-ended acceptance lists.
+
 ## 2. Visual character
+
+### Installation, updates and removal
+
+The installer and uninstaller must follow Starframe's navy/orange palette, typography and existing icon/wordmark identity, with familiar Windows controls and simpler wording. Replace the default blue computer illustration with a suitable composition from the approved social-preview artwork in the sibling `Starframe Assets/Social preview` directory. Preserve proportions, readable branding and asset provenance. Use the body and heading font rules below, with system fallbacks; do not require font installation or redistribute Windows font files. Preserve visible keyboard focus, readable disabled states and system high-contrast behavior. Representative pages were reviewed for [#74](https://github.com/Mastervoliumpl/Starframe/issues/74). Additional display/accessibility acceptance is subject to the owner's verification priorities above.
+
+The owner accepted the portrait/navy/orange direction on 15 September 2026 and requested consistent styling for the remaining controls, including buttons. Carry the dark treatment through navigation buttons, inputs, license text and progress details. Keep Windows button behavior and visible focus; high-contrast colors take precedence over branding.
+
+The subsequent uninstall review requested thin borders instead of raised, bright Windows bevels. Use thin neutral borders for ordinary controls and an orange focus outline, retaining the native controls and their keyboard behavior. Decorative divider lines should remain subdued. Custom drawing must yield to the system in high-contrast mode.
+
+Radio buttons and checkboxes also use thin borders, with orange radio dots and orange checkbox fills with dark checkmarks. Keep selection and keyboard focus distinguishable, preserve native checked/disabled states and radio-group navigation, and retain the unchecked data-retention default.
+
+Installer focus uses the same border geometry as the unfocused control: change the color without widening or shifting the outline, and retain a native text focus marker. Keep the approved checkmark shape. Standard-page headings align with their subtitle and body content.
+
+Starframe manages the game integration automatically. Choosing a validated game installation authorizes preparation of the required bootstrap/runtime when the game is closed. App installation and upgrades include the required runtime resources; the desktop prepares the matching runtime automatically on first start and after updates. If a game location is not yet known, ask for the location, not a separate runtime installation. Show preparation, waiting and failure states accurately. Keep repair/reinstall available in Settings without making it part of ordinary setup.
+
+Uninstall automatically removes Starframe's recorded game integration and restores backed-up originals before removing the desktop app. Users must not have to visit Settings first. A running game, inaccessible installation or conflicting files must stop cleanup with an explanation and a retry path. Keep the app and its recovery records until cleanup succeeds; never force-close the game or erase another loader's files.
+
+Full app uninstall deletes Starframe-managed library copies, collections, app settings, caches and retained legacy app-data backups by default. Provide an unchecked **Keep my library, collections and settings** option. Installation, upgrades, repair and reinstall always preserve those data. Original imported source folders, game saves, external plugins and unowned game configuration remain untouched. Do not mistake unowned mod-created configuration for Starframe-owned app data.
+
+The owner approved proceeding without Windows Authenticode for the initial alpha. Explain the unsigned publisher and possible Windows warnings without promising that every Windows policy permits execution. Keep private/public-key verification for installer release artifacts, Tauri updates and catalog/advisory metadata. Windows certificate signing is a future issue without a milestone; publication still requires maintainer approval.
 
 Reading this as a desktop mod-management tool for Sanctuary players and mod developers: precise, game-informed, dark navy, with concentrated orange emphasis. Dials: ENERGY 2 / RHYTHM 2 / MOTION 2.
 
@@ -176,6 +204,8 @@ Details include description, author/source link, approved versions, dependencies
 
 Fetch catalog changes on startup and every five minutes while the app is open. A valid new catalog updates the list in place, preserving filters, focus and scroll position. Reuse cached data while offline and show when it was last checked. New approval metadata must not install a mod or update an installed release by itself.
 
+When signed catalog metadata expires, pause new catalog downloads until a valid signed refresh succeeds. Explain the unavailable download action and show that catalog information is stale. Installed mods and local collections remain usable offline, subject to cached confirmed security blocks. The owner approved daily renewal through GitHub Actions with thirty-day validity for #46 on 9 September 2026. Renewal does not require an app update or a new mod release.
+
 ### Collections
 
 Tiles are appropriate here because each collection is an identifiable setup. Use an 8-unit radius, optional artwork, its name, and a concise mod summary. One active collection gets an explicit `Active` label and a check, not a glowing border. Use two or three columns where they fit; fall back to a list at narrow widths.
@@ -239,6 +269,8 @@ Target smooth motion at 60 frames per second on the agreed baseline hardware. In
 
 ### App updates from GitHub
 
+Fresh prerelease builds default to Preview updates; stable builds default to Stable. Settings provides a labeled channel selector and remembers the user's choice. Preview includes stable releases. Switching channels does not downgrade the installed app. The owner approved these defaults on 16 September 2026.
+
 Run the startup check after the shell is usable, then check every five minutes while the app is open. Five minutes is the selected default within the user's suggested range. Checks also continue while the window is minimized. After sleep or connectivity returns, run one check if due, with no burst of missed checks. Keep requests from overlapping and delay retries if the server requests it. Settings also provides `Check for updates`, the installed version, and the last successful check time.
 
 All desktop checking runs within the app's lifetime. Closing the app exits it and stops update checks. Do not install a service, scheduled task, startup agent, or separate background updater. Do not keep the app running in the system tray after its window closes. If a file operation needs to finish safely before exit, explain that in the visible app instead of silently continuing after close. The in-game runtime remains part of an already-running game and ends with that game.
@@ -249,7 +281,7 @@ When a newer eligible version exists, show a persistent, quiet `Update available
 
 The user chooses when to install or restart. Background checking does not authorize automatic installation. An app update must wait for active file changes to reach a safe stopping point and, initially, for the game to close because the release can include a new in-game runtime. Explain that reason beside the action. Failure to reach GitHub leaves mod management usable and shows a nonblocking check status. Do not label a failed check as `Up to date`.
 
-Use Tauri's NSIS installer, generated Windows uninstaller, and signed updater as specified in [ARCHITECTURE.md](ARCHITECTURE.md). Preserve user data by default. Provide `Remove Starframe from game` in Settings to remove owned integration files safely, with the game closed. App removal and game cleanup must state their different effects. No custom installer framework or persistent update service is required.
+Use Tauri's NSIS installer, generated Windows uninstaller, and signed updater as specified in [ARCHITECTURE.md](ARCHITECTURE.md). Updates preserve user data and prepare the matching runtime automatically when the game is closed. Settings retains runtime repair/reinstall. Full uninstall performs owned game cleanup automatically and deletes managed app data unless the user selects retention, as specified under Installation, updates and removal. No custom installer framework or persistent update service is required.
 
 ## 8. Motion specification
 

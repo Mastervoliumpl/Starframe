@@ -2,6 +2,7 @@ import type { Snapshot } from '../lib/generated/model';
 import type { Transport } from '../lib/state';
 import { version } from '../../package.json';
 import { fixtureManagement } from './management';
+import { emptyUpdates } from './updates';
 
 // Browser tests opt into this fixture with ?fixture; production builds omit it.
 export function fixtureTransport(): Transport {
@@ -10,12 +11,15 @@ export function fixtureTransport(): Transport {
     revision: '0',
     appVersion: version,
     operations: [],
+    updates: emptyUpdates(),
     catalog: {
       revision: '1',
       releaseCount: 0,
       checking: false,
       lastChecked: null,
       lastSuccess: null,
+      expires: '4102444800',
+      fresh: true,
       error: null,
     },
     game: {
@@ -41,11 +45,21 @@ export function fixtureTransport(): Transport {
     },
   };
   const catalogCase = new URLSearchParams(location.search).get('catalog');
+  if (new URLSearchParams(location.search).has('update')) {
+    snapshot.updates.release = {
+      version: '0.6.1',
+      notes: '<script>Release notes remain plain text.</script>',
+    };
+    snapshot.updates.message = 'An update is available.';
+  }
   if (catalogCase === 'offline') {
     snapshot.catalog.lastChecked = '1788820000';
     snapshot.catalog.lastSuccess = '1788819700';
     snapshot.catalog.error =
       'Fixture connection failed. Starframe will retry automatically.';
+  } else if (catalogCase === 'expired' || catalogCase === 'unverified') {
+    snapshot.catalog.fresh = false;
+    snapshot.catalog.expires = catalogCase === 'expired' ? '1788819700' : null;
   } else if (catalogCase === 'update') {
     snapshot.catalog.checking = true;
   }
@@ -53,6 +67,30 @@ export function fixtureTransport(): Transport {
   let work: ReturnType<typeof setInterval>;
   const publish = () => receiver?.(structuredClone(snapshot));
   return {
+    async update(action) {
+      const updates = snapshot.updates;
+      if (action.kind === 'later') updates.dismissed = true;
+      if (action.kind === 'channel') {
+        updates.channel = action.channel;
+        updates.release = null;
+      }
+      if (action.kind === 'check') {
+        updates.message = 'Update status could not be confirmed.';
+        updates.error = 'Fixture offline. Installed mods remain usable.';
+      }
+      if (action.kind === 'install') {
+        updates.phase = 'waiting';
+        updates.message =
+          'Installer verified. Waiting for the game and active file work to finish…';
+      }
+      if (action.kind === 'cancel') {
+        updates.phase = 'idle';
+        updates.message =
+          'Update cancelled. The installed version is unchanged.';
+      }
+      snapshot.revision = (BigInt(snapshot.revision) + 1n).toString();
+      publish();
+    },
     ...fixtureManagement((data) => {
       snapshot.savedData = {
         status: 'ready',

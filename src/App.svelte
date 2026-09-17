@@ -4,12 +4,13 @@
   import { version } from '../package.json';
   import DiagnosticList from './features/DiagnosticList.svelte';
   import GameSettings from './features/GameSettings.svelte';
+  import AppUpdates from './features/AppUpdates.svelte';
   import LaunchBar from './features/LaunchBar.svelte';
   import ModList from './features/ModList.svelte';
   import Collections from './features/Collections.svelte';
   import CollectionSelect from './features/CollectionSelect.svelte';
   import PackageDownloads from './features/PackageDownloads.svelte';
-  import { createManagement } from './lib/management';
+  import { createManagement, confirmedFinding } from './lib/management';
   import { createDesktop } from './lib/state';
   import { getTransport } from './lib/native';
 
@@ -31,6 +32,11 @@
   let fail = $state(false);
   const operations = $derived($desktop.snapshot?.operations ?? []);
   const catalog = $derived($desktop.snapshot?.catalog);
+  const affectedInstalled = $derived(
+    $manager.data?.library.filter((entry) =>
+      confirmedFinding($manager.data, entry.reference.hash),
+    ).length ?? 0,
+  );
   const managementError = $derived(
     $desktop.snapshot?.savedData.status === 'unavailable' ? '' : $manager.error,
   );
@@ -104,6 +110,11 @@
       >
     {/each}
   </nav>
+  {#if $desktop.snapshot?.updates.release && !$desktop.snapshot.updates.dismissed}
+    <button class="update-notice" onclick={() => navigate('settings')}
+      >Update available · {$desktop.snapshot.updates.release.version}</button
+    >
+  {/if}
 {/snippet}
 
 <a class="skip-link" href="#workspace">Skip to content</a>
@@ -140,6 +151,15 @@
       </p>
     </header>
     <main id="workspace" tabindex="-1">
+      {#if affectedInstalled}<div class="error" role="alert">
+          <p>
+            {affectedInstalled} installed {affectedInstalled === 1
+              ? 'mod matches'
+              : 'mods match'} confirmed security findings. Affected selections block
+            launch through Starframe. Files and settings are retained.
+          </p>
+          <button onclick={() => navigate('mods')}>Review affected mods</button>
+        </div>{/if}
       {#if $desktop.snapshot?.savedData.status === 'unavailable'}
         <p class="error" role="alert">
           Saved data is unavailable. {$desktop.snapshot.savedData.message} No empty
@@ -164,6 +184,7 @@
           </p>{/if}
         <ModList
           mode="mods"
+          catalogFresh={catalog?.fresh ?? false}
           {manager}
           game={$desktop.snapshot?.game}
           unavailable={$desktop.connection !== 'connected'}
@@ -196,6 +217,18 @@
               ).toLocaleString()}
             </p>
           {/if}
+          {#if catalog?.fresh && catalog.expires}<p>
+              Security information verified. Valid until {new Date(
+                Number(catalog.expires) * 1000,
+              ).toLocaleString()}.
+            </p>
+          {:else}<p class="error">
+              {catalog?.expires
+                ? 'Catalog security information has expired or the clock changed.'
+                : 'Catalog security information has not been verified.'} New downloads
+              are paused until a signed refresh succeeds. Verified library copies
+              remain available offline; confirmed findings still apply.
+            </p>{/if}
           <p>
             Downloads come from authors. Curation does not guarantee that a
             binary is free of malware.
@@ -211,6 +244,7 @@
           </p>{/if}
         <ModList
           mode="catalog"
+          catalogFresh={catalog?.fresh ?? false}
           {manager}
           game={$desktop.snapshot?.game}
           unavailable={$desktop.connection !== 'connected'}
@@ -317,13 +351,12 @@
             $desktop.gameRequest}
           onaction={(action) => desktop.game(action)}
         />
-        <div class="settings-section">
-          <h2>Starframe {version}</h2>
-          <p>Automatic update checks are not available yet.</p>
-          <button onclick={() => desktop.open('releases')}
-            >View releases in browser</button
-          >
-        </div>
+        <AppUpdates
+          view={$desktop.snapshot?.updates}
+          {version}
+          unavailable={$desktop.connection !== 'connected'}
+          onaction={(action) => desktop.update(action)}
+        />
       </section>
       <section class="page" hidden={page !== 'help'} aria-label="Help and logs">
         <div class="settings-section">
@@ -371,6 +404,16 @@
         <DiagnosticList />
         <div class="settings-section">
           <h2>Project help</h2>
+          <p>
+            For mod problems, include the exact release from Package details.
+            Remove personal paths and private logs before posting.
+          </p>
+          <button onclick={() => desktop.open('report')}
+            >Report a mod problem</button
+          >
+          <button onclick={() => desktop.open('security')}
+            >Report a security concern privately</button
+          >
           <details>
             <summary>Collection order and current limits</summary>
             <p>
@@ -386,16 +429,17 @@
               to try the collection; it does not confirm compatibility.
             </p>
             <p>
-              This internal build supports Starframe managed packages and the
-              verified Lua overlay paths. General BepInEx plugins, AI and maps
-              need further adapters and testing. A collection supports up to 256
-              active mods, and each package supports up to 1,024 files. Package
-              preparation checks the supported file and size limits.
+              This build supports Starframe managed packages, compatible BepInEx
+              5 Unity/Mono plugins and the verified Lua overlay paths. Maps, AI
+              packages and other loader formats remain unsupported. A collection
+              supports up to 256 active mods, and each package supports up to
+              1,024 files. Package preparation checks the supported file and
+              size limits.
             </p>
             <p>
-              Your library can contain more than 256 mods. The in-game list
-              includes every active mod and up to 256 mods in total. It shows
-              how many additional disabled mods remain in your desktop library.
+              Your library can contain more than 256 mods. The in-game Mods menu
+              lists successfully loaded mods for the current session. Failures
+              appear under Could not load; disabled mods stay out of that list.
               Their saved settings are retained. Different mods and approvals
               can share downloaded files while collections keep their exact
               release references.

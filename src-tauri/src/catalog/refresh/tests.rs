@@ -1,7 +1,5 @@
 use super::*;
 use serde_json::{Value, json};
-use std::io::{Read, Write};
-use std::net::TcpListener;
 
 fn fixture() -> Value {
     json!({"schemaVersion":1,"catalogRevision":"1","mods":[{
@@ -19,14 +17,16 @@ fn read(value: &Value) -> Result<Catalog, String> {
     Catalog::read(&serde_json::to_vec(value).unwrap())
 }
 
-fn response(value: &Value) -> Response {
-    Response {
-        status: 200,
-        etag: Some("\"fixture-1\"".into()),
-        last_modified: None,
-        retry_after: None,
-        bytes: serde_json::to_vec(value).unwrap(),
-    }
+async fn response(value: &Value) -> VerifiedCatalog {
+    super::super::authentication::tests::verified_catalog(
+        &read(value).unwrap(),
+        &super::super::advisories::Advisories {
+            schema_version: 1,
+            revision: "1".into(),
+            advisories: vec![],
+        },
+    )
+    .await
 }
 
 #[test]
@@ -163,8 +163,8 @@ fn revisions_preserve_identity_and_withdrawal_blocks_new_downloads() {
     assert!(read(&changed).unwrap().accepts_after(&original).is_err());
 }
 
-#[test]
-fn refresh_replacement_is_durable_and_does_not_change_installed_records_or_app_version() {
+#[tokio::test]
+async fn refresh_replacement_is_durable_and_does_not_change_installed_records_or_app_version() {
     let root = tempfile::tempdir().unwrap();
     let mut storage = Storage::open(root.path()).unwrap();
     let reference = crate::storage::ModReference {
@@ -187,21 +187,22 @@ fn refresh_replacement_is_durable_and_does_not_change_installed_records_or_app_v
     let before = storage.load().unwrap();
     let version = env!("CARGO_PKG_VERSION");
     let mut refresh = Refresh::load(&storage).unwrap();
-    refresh.complete(&mut storage, Ok(response(&fixture())), 100);
+    refresh.complete(&mut storage, Ok(response(&fixture()).await), 100);
     assert_eq!(refresh.next_check, 400);
     let retained = refresh.cache.catalog.clone();
-    for malformed in [b"not json".to_vec(), br#"{"schemaVersion":99}"#.to_vec()] {
-        let mut bad = response(&fixture());
-        bad.bytes = malformed;
-        refresh.complete(&mut storage, Ok(bad), 200);
+    assert!(refresh.fresh(100));
+    assert!(!refresh.fresh(refresh.expires().unwrap()));
+    assert!(!refresh.fresh(99));
+    for error in ["Signature verification failed", "Transfer interrupted"] {
+        refresh.complete(&mut storage, Err(error.into()), 200);
         assert_eq!(refresh.cache.catalog, retained);
         assert!(refresh.cache.error.is_some());
-        assert_eq!(refresh.cache.etag.as_deref(), Some("\"fixture-1\""));
+        assert!(refresh.cache.etag.is_none());
     }
     let mut newer = fixture();
     newer["catalogRevision"] = json!("2");
     newer["mods"][0]["releases"][0]["withdrawn"] = json!(true);
-    refresh.complete(&mut storage, Ok(response(&newer)), 300);
+    refresh.complete(&mut storage, Ok(response(&newer).await), 300);
     assert!(refresh.cache.error.is_none());
     assert_eq!(storage.load().unwrap(), before);
     assert_eq!(env!("CARGO_PKG_VERSION"), version);
@@ -225,91 +226,6 @@ fn refresh_replacement_is_durable_and_does_not_change_installed_records_or_app_v
     assert_eq!(storage.catalog_cache().unwrap().unwrap(), restarted.cache);
 }
 
-fn server(raw: Vec<u8>) -> (String, mpsc::Receiver<String>, std::thread::JoinHandle<()>) {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let url = format!("http://{}/catalog.json", listener.local_addr().unwrap());
-    let (sender, receiver) = mpsc::sync_channel(1);
-    let thread = std::thread::spawn(move || {
-        let (mut stream, _) = listener.accept().unwrap();
-        stream
-            .set_read_timeout(Some(Duration::from_secs(3)))
-            .unwrap();
-        let mut request = Vec::new();
-        while !request.ends_with(b"\r\n\r\n") {
-            let mut byte = [0];
-            stream.read_exact(&mut byte).unwrap();
-            request.push(byte[0]);
-        }
-        sender.send(String::from_utf8(request).unwrap()).unwrap();
-        let _ = stream.write_all(&raw);
-    });
-    (url, receiver, thread)
-}
-
-#[tokio::test]
-async fn http_fixtures_cover_validators_redirects_limits_and_interrupted_bodies() {
-    let client = Client::builder()
-        .no_proxy()
-        .redirect(reqwest::redirect::Policy::none())
-        .retry(reqwest::retry::never())
-        .timeout(Duration::from_secs(2))
-        .build()
-        .unwrap();
-    let body = serde_json::to_string(&fixture()).unwrap();
-    let (url, request, thread) = server(format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nETag: \"one\"\r\nConnection: close\r\n\r\n{body}", body.len()).into_bytes());
-    let response = fetch(&client, &url, &Cache::default()).await.unwrap();
-    assert_eq!(response.bytes, body.as_bytes());
-    assert!(request.recv().unwrap().contains("accept: application/json"));
-    thread.join().unwrap();
-    let mut cache = Cache {
-        catalog: Some(read(&fixture()).unwrap()),
-        etag: Some("\"one\"".into()),
-        ..Default::default()
-    };
-    for use_etag in [true, false] {
-        if !use_etag {
-            cache.etag = None;
-            cache.last_modified = Some("Mon, 07 Sep 2026 00:00:00 GMT".into());
-        }
-        let (url, request, thread) =
-            server(b"HTTP/1.1 304 Not Modified\r\nConnection: close\r\n\r\n".to_vec());
-        assert_eq!(fetch(&client, &url, &cache).await.unwrap().status, 304);
-        let request = request.recv().unwrap();
-        assert!(request.contains(if use_etag {
-            "if-none-match: \"one\""
-        } else {
-            "if-modified-since: Mon, 07 Sep 2026 00:00:00 GMT"
-        }));
-        thread.join().unwrap();
-    }
-    for status in [301, 302, 404, 429, 503] {
-        let (url, request, thread) = server(format!("HTTP/1.1 {status} Fixture\r\nLocation: http://127.0.0.1:1/no-follow\r\nRetry-After: 900\r\nContent-Length: 0\r\n\r\n").into_bytes());
-        let response = fetch(&client, &url, &cache).await.unwrap();
-        assert_eq!(response.status, status);
-        assert_eq!(response.retry_after, Some(900));
-        request.recv().unwrap();
-        thread.join().unwrap();
-    }
-    for raw in [
-        b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\nshort".to_vec(),
-        format!(
-            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n",
-            MAX_BYTES + 1
-        )
-        .into_bytes(),
-        [
-            b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n".as_slice(),
-            &vec![b' '; MAX_BYTES + 1],
-        ]
-        .concat(),
-    ] {
-        let (url, request, thread) = server(raw);
-        assert!(fetch(&client, &url, &Cache::default()).await.is_err());
-        request.recv().unwrap();
-        thread.join().unwrap();
-    }
-}
-
 #[tokio::test]
 async fn scheduler_waits_for_shell_prevents_overlap_and_aborts_on_shutdown() {
     let root = tempfile::tempdir().unwrap();
@@ -327,12 +243,10 @@ async fn scheduler_waits_for_shell_prevents_overlap_and_aborts_on_shutdown() {
     assert!(abort.is_finished());
     assert!(!refresh.checking);
     assert!(storage.catalog_cache().unwrap().is_none());
-    refresh.complete(&mut storage, Ok(response(&fixture())), 100);
+    refresh.complete(&mut storage, Ok(response(&fixture()).await), 100);
     refresh.tick(&mut storage, 399, true, false);
     assert!(!refresh.checking);
-    let mut unchanged = response(&fixture());
-    unchanged.status = 304;
-    refresh.complete(&mut storage, Ok(unchanged), 400);
+    refresh.complete(&mut storage, Ok(response(&fixture()).await), 400);
     assert_eq!(refresh.cache.last_success, Some(400));
     assert_eq!(refresh.next_check, 700);
     refresh.tick(&mut storage, 86_400, true, false);
@@ -346,9 +260,4 @@ async fn scheduler_waits_for_shell_prevents_overlap_and_aborts_on_shutdown() {
             700 + (30u64 * (1 << (i - 1).min(6))).min(1800)
         );
     }
-    let mut busy = response(&fixture());
-    busy.status = 429;
-    busy.retry_after = Some(3600);
-    refresh.complete(&mut storage, Ok(busy), 1000);
-    assert_eq!(refresh.next_check, 4600);
 }

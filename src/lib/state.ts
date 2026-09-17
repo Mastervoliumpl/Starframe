@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import type { Snapshot, GameAction } from './generated/model';
 import type { ManagementTransport } from './management';
+import type { UpdateAction } from './generated/updates';
 
 export interface Transport extends ManagementTransport {
   watch(receive: (snapshot: Snapshot) => void): Promise<() => void>;
@@ -8,6 +9,7 @@ export interface Transport extends ManagementTransport {
   cancel(operationId: string): Promise<void>;
   open(page: string): Promise<void>;
   game(action: GameAction): Promise<void>;
+  update(action: UpdateAction): Promise<void>;
 }
 
 export type DesktopView = {
@@ -135,6 +137,14 @@ export function createDesktop(transport: Transport | null) {
       };
     },
     reconnect: connect,
+    async update(action: UpdateAction) {
+      if (!transport || view.connection !== 'connected') return;
+      try {
+        await confirmed(transport.update(action));
+      } catch (error) {
+        if (!stopped) update({ error: errorMessage(error) });
+      }
+    },
     async game(action: GameAction) {
       if (
         !transport ||

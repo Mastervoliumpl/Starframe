@@ -3,6 +3,102 @@ use crate::{mods, sharing};
 use serde_json::json;
 use std::time::Instant;
 
+#[tokio::test(flavor = "multi_thread")]
+async fn known_payload_findings_follow_renamed_local_copies_without_deleting_sources() {
+    use crate::catalog::{advisories::*, authentication::tests::verified};
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("source");
+    fixture(&source, "fixture.local", false);
+    let mut store = Storage::open(&root.path().join("data")).unwrap();
+    let mut queue = Packages::open(&mut store).unwrap();
+    let reference = import(&mut queue, &mut store, &source);
+    let prepared = store.prepared_artifact(&reference.hash).unwrap().unwrap();
+    let mut advisories = Advisories {
+        schema_version: 1,
+        revision: "1".into(),
+        advisories: vec![Advisory {
+            id: "synthetic.payload".into(),
+            title: "Synthetic payload finding".into(),
+            affected: vec![AffectedArtifact {
+                release_id: "fixture.catalog.1".into(),
+                sha256: "a".repeat(64),
+                payload_sha256: vec![prepared.files[0].sha256.clone()],
+            }],
+            history: vec![Finding {
+                recorded_at: 1,
+                state: State::Suspected,
+                explanation: "Unconfirmed synthetic evidence".into(),
+                evidence: vec!["https://example.invalid/evidence".into()],
+                recommended_action: "Review the synthetic evidence".into(),
+            }],
+        }],
+    };
+    store
+        .save_verified_catalog(&verified(1, &advisories).await, 100)
+        .unwrap();
+    let expected_revision = store.load().unwrap().revision.to_string();
+    mods::action(
+        &mut store,
+        mods::Action::SetEnabled {
+            reference: reference.clone(),
+            enabled: true,
+            expected_revision,
+        },
+    )
+    .unwrap();
+    mods::requested(&store).unwrap();
+    advisories.revision = "2".into();
+    let mut confirmed = advisories.advisories[0].current().clone();
+    confirmed.recorded_at = 2;
+    confirmed.state = State::Confirmed;
+    advisories.advisories[0].history.push(confirmed);
+    store
+        .save_verified_catalog(&verified(2, &advisories).await, 101)
+        .unwrap();
+    assert!(
+        mods::requested(&store)
+            .unwrap_err()
+            .contains("synthetic.payload")
+    );
+    let renamed = root.path().join("renamed");
+    fixture(&renamed, "fixture.renamed", false);
+    fs::rename(renamed.join("Mod.dll"), renamed.join("Other.dll")).unwrap();
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(renamed.join(MANIFEST)).unwrap()).unwrap();
+    manifest["layout"]["entryAssembly"] = json!("Other.dll");
+    fs::write(
+        renamed.join(MANIFEST),
+        serde_json::to_vec(&manifest).unwrap(),
+    )
+    .unwrap();
+    let copy = import(&mut queue, &mut store, &renamed);
+    assert_ne!(copy.hash, reference.hash);
+    let expected_revision = store.load().unwrap().revision.to_string();
+    assert!(
+        mods::action(
+            &mut store,
+            mods::Action::SetEnabled {
+                reference: copy.clone(),
+                enabled: true,
+                expected_revision
+            }
+        )
+        .err()
+        .unwrap()
+        .contains("synthetic.payload")
+    );
+    assert!(source.join("Mod.dll").exists());
+    assert!(renamed.join("Other.dll").exists());
+    assert_eq!(store.load().unwrap().library.len(), 2);
+    assert!(
+        store
+            .artifact_directory(&copy)
+            .unwrap()
+            .join("Other.dll")
+            .exists()
+    );
+}
+
 fn fixture(source: &Path, id: &str, lua: bool) {
     fs::create_dir_all(source).unwrap();
     let layout = if lua {

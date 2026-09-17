@@ -9,6 +9,12 @@ import xml.etree.ElementTree as ET
 from versions import read_version
 
 
+HOME_PATH = re.compile(
+    r"(?:[a-z]:[\\/]+users[\\/]+|(?:file://|(?<![\w/:]))/(?:home|users)/)[^\\/\s]+",
+    re.I,
+)
+
+
 def check(root: Path, tracked: list[str]) -> list[str]:
     errors = []
     if any(Path(name).name.lower() == "agents.md" for name in tracked):
@@ -26,10 +32,19 @@ def check(root: Path, tracked: list[str]) -> list[str]:
                 ET.parse(path)
             except ET.ParseError as exc:
                 errors.append(f"{name}: invalid SVG XML: {exc}")
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            if path.suffix == ".md":
+                errors.append(f"{name}: Markdown must use UTF-8")
+            continue
+        for line_number, line in enumerate(text.splitlines(), 1):
+            if HOME_PATH.search(unquote(line)):
+                errors.append(f"{name}:{line_number}: personal home-directory path; use a portable placeholder")
         if path.suffix != ".md":
             continue
         fence = None
-        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        for line_number, line in enumerate(text.splitlines(), 1):
             marker = re.match(r"^\s{0,3}(`{3,}|~{3,})(.*)$", line)
             if marker:
                 run, tail = marker.groups()
@@ -61,4 +76,4 @@ if __name__ == "__main__":
     errors = check(root, tracked)
     if errors:
         raise SystemExit("\n".join(errors))
-    print("Repository checks passed: version, local links, fences, SVG XML and local-instruction exclusion.")
+    print("Repository checks passed: version, local links, fences, SVG XML, home-path privacy and local-instruction exclusion.")

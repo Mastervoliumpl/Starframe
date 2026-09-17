@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeBundleCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare_windows_installer.ps1"
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "Starframe",
+    "homepage": "https://github.com/Mastervoliumpl/Starframe",
+    "shortDescription": "Mod manager for Sanctuary: Shattered Sun",
+    "license": "AGPL-3.0-only",
+    "licenseFile": "../LICENSE",
+    "resources": {
+      "target/installer/integration/": "integration/",
+      "../LICENSE": "LICENSE.txt",
+      "../docs/THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
+      "../docs/notices/": "notices/"
+    },
+    "windows": {
+      "allowDowngrades": false,
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English"],
+        "template": "windows/installer.nsi",
+        "installerIcon": "icons/icon.ico",
+        "sidebarImage": "windows/assets/installer-sidebar.bmp",
+        "uninstallerIcon": "icons/icon.ico",
+        "installerHooks": "windows/installer-hooks.nsh",
+        "customLanguageFiles": {
+          "English": "windows/English.nsh"
+        }
+      }
+    }
+  }
+}

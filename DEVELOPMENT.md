@@ -1,8 +1,10 @@
 # Starframe development and checks
 
-Status: milestone 0.5.0 is in final PR checks; #24–#26 implementation and developer/game verification are complete. See [0.5.0 exit evidence](docs/verification/milestone-0.5.0.md). Version `0.5.0` is an internal development build with no published installer or app release. Milestone 0.4.1 is complete; see [0.4.1 exit evidence](docs/verification/milestone-0.4.1.md).
+Status: the owner authorized milestone 0.6.0 on 9 September 2026. Version `0.6.0-dev.2` is in development on `codex/0.6.0-windows-alpha`, with a verified signed development draft and final alpha acceptance still open. No installer or app release is published. Milestone 0.5.0 is complete through PR #56; retain its [exit evidence](docs/verification/milestone-0.5.0.md), [BepInEx acceptance](docs/verification/bepinex-plugins.md) and [verification on another Windows PC](docs/verification/pc-setup.md).
 
 Issue #24 adds local DLL/folder imports through the package worker and SQLite schema 11. [Local import verification](docs/verification/local-imports.md) records the metadata format, source retention, recovery and native checks. Issue #25 adds source watching and schema 12; [watcher verification](docs/verification/local-watching.md) records debounce, recovery and game-exit checks.
+
+Issue #46 adds schema 13 for atomic storage of authenticated catalog and advisory data. [Catalog authentication verification](docs/verification/catalog-authentication.md) records signature, correction, migration and failure checks and the remaining desktop integration work.
 
 Issue #17 adds package preparation through the existing storage worker, with schema-7 operation history and immutable file manifests. [Package checks and recovery](docs/verification/packages.md) record the supported format and limits. Its native fixture runs with the existing native suite; [screen integration and checks](docs/verification/management.md) complete issue #19.
 
@@ -12,7 +14,9 @@ Read [DESIGN.md](DESIGN.md) for behavior and presentation, [ARCHITECTURE.md](ARC
 
 ## Work one milestone at a time
 
-The design handoff and milestones through **0.4.1** are complete. Milestone **0.5.0** covers issues #24 through #26. Every project issue belongs to one version milestone. Give a new issue a milestone before starting it. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise assign a later version explicitly.
+For #27, use the opt-in [Windows installer recipe and verification](docs/verification/windows-installer.md). Packaging adds a local preflight and isolated install/uninstall fixture. It does not publish a release or replace the executable-only CI build. DESIGN.md revision 0.10 supersedes the initial app-only uninstall and keep-data default. Windows certificate signing is deferred; [SignPath form notes](docs/planning/signpath-request.md) are retained for a later application. Installer artifact, updater and catalog verification remain required before distribution.
+
+The design handoff and milestones through **0.5.0** are complete. Implementation issues belong to one version milestone. Explicitly deferred backlog decisions, including Windows certificate signing at the owner's request, may remain without a milestone; assign one before implementation begins. Bugs found during a milestone belong there if they prevent its intended outcome; otherwise record them as future work.
 
 Work on an issue only when its milestone is active and its prerequisites are complete. Keep issue dependencies in a `Depends on` section with issue links. Each issue must state its scope, observable completion criteria and checks. Split an issue when it contains independently reviewable outcomes; avoid splitting one small change into tasks that cannot be tested separately.
 
@@ -32,11 +36,15 @@ Pull requests identify the issue, target milestone, behavior changed, verificati
 
 ## Test as features are built
 
+Apply the owner's 17 September 2026 verification policy in [DESIGN.md](DESIGN.md#verification-priorities). Prioritize likely workflows, material failure consequences and reported bugs against the time and effort of a check. Carry forward existing evidence unless a relevant implementation, dependency, build configuration or environment change invalidates it. Record that reason before repeating a manual test. Do not expand support matrices or build speculative edge-case tests merely to complete a milestone. Keep existing useful CI and file-safety/security regressions; ordinary check runs need no duplicate manual campaign.
+
+For 0.6.0, [the consolidated acceptance record](docs/verification/milestone-0.6.0.md) supersedes older broad checklists. Extra scaling/high-contrast/screen-reader checks are waived. Absent-WebView2 testing is replaced by inspection of the existing prerequisite error handling. The remaining owner check is a short hosted-installer smoke test. Catalog publication requires checked code on main: its first publication, live client refresh and renewal are explicitly post-merge, pre-public-release gates. Keep #46 and the milestone open until those gates pass; a maintainer-approved merge does not authorize an app release.
+
 Add useful tests with implementation, not at the end of the project. Each bug fix gets a regression test where the failure is reproducible. A milestone's final verification checks how its pieces work together; it does not replace tests for those pieces.
 
 Prefer observable behavior over tests of private function shapes. Use unit tests for deterministic rules such as ordering, version comparison and validation. Use temporary-file integration tests for storage, deployment, archive handling and recovery. Use frontend interaction tests for stale replies, pending states, navigation and accessible controls. Avoid snapshots of entire screens, blanket coverage percentages, and tests that only repeat a constant or a CSS declaration.
 
-Run `python scripts/check_repository.py` and `python -m unittest discover -s scripts -p 'test_*.py'` for repository checks and their regression tests. The desktop commands below check Svelte/TypeScript and Rust. C# checks are listed below. Do not report absent language tests as passing.
+Run `python scripts/check_repository.py` and `python -m unittest discover -s scripts -p 'test_*.py'` for repository checks and their regression tests. The repository check rejects absolute home-directory paths in tracked UTF-8 text, including code examples. Use environment variables or relative placeholders in shared instructions. Review screenshots, logs, hardware details and Git author metadata for privacy before publishing; the path check does not inspect those. The desktop commands below check Svelte/TypeScript and Rust. C# checks are listed below. Do not report absent language tests as passing.
 
 | Area | Checks when that area is introduced |
 | --- | --- |
@@ -77,11 +85,13 @@ Use read-only permissions by default, immutable action commit pins, and isolated
 
 Continuous delivery first creates reviewable artifacts and draft releases. Publishing a release remains a maintainer action. Build and sign only from trusted repository revisions after required checks pass. Add the release workflow with the installer/updater milestone; no placeholder workflow should claim to publish a working app now.
 
+The [Windows draft-release procedure](docs/releasing.md) separates a hosted desktop/installer build from approved signing. The owner approved a locally built in-game plugin as a hash- and source-bound input; proprietary game references remain local. [Hosted signing and independent attachment verification](docs/verification/draft-releases.md) are recorded for #29; the protected release environment holds the approved application key. No draft is permission to publish.
+
 Dependency auditing moves forward to 0.3.0 as a separate CI workflow for dependency changes, scheduled checks and manual release checks. It does not run from ordinary local build commands. Keep scanner failures visible, triage findings and record expiring exceptions. Signing and wider security work follow [SECURITY.md](SECURITY.md); internal 0.3.0 does not open the catalog to general users.
 
 ## Versions and change history
 
-[VERSION](VERSION) is the source of the product version, currently `0.5.0`. No installer has been published. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
+[VERSION](VERSION) is the source of the product version, currently `0.6.0-dev.2`. No installer has been published. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
 
 Use three-part versions: `0.MINOR.PATCH` during initial development. A capability milestone advances the minor version; a corrective release advances the patch version. The planning handoff uses `0.0.1`. Published content is immutable; never replace a release with different bytes under the same version. The `0.x` series makes no stable public API promise, but format migrations and compatibility changes still need explicit notes. [Semantic Versioning](https://semver.org/)
 
@@ -114,7 +124,7 @@ npm run check:rust
 npm run tauri -- build --no-bundle -- --locked
 ```
 
-`npm run check` runs Prettier, ESLint, Svelte/TypeScript diagnostics, Vitest and Vite's production build. It builds `dist` before Rust checks, which need those frontend assets. `npm run check:rust` runs Rustfmt, Clippy with warnings denied, and locked Cargo tests. The final command builds the Windows executable without an installer; packaging and updates are later issues. It writes `src-tauri/target/release/starframe.exe`.
+`npm run check` runs Prettier, ESLint, Svelte/TypeScript diagnostics, Vitest and Vite's production build. It builds `dist` before Rust checks, which need those frontend assets. `npm run check:rust` runs Rustfmt, Clippy with warnings denied, and locked Cargo tests. The final command builds the Windows executable without an installer; use the separate NSIS recipe for installer packaging. It writes `src-tauri/target/release/starframe.exe`.
 
 Use `npm run tauri dev` for the native development window, or `npm run dev` for the browser frontend at `http://127.0.0.1:1420`. Use `npm run format` to format frontend/configuration files and `cargo fmt --manifest-path src-tauri/Cargo.toml` for Rust. Vitest watch mode is `npm run test:watch`. Stop the development command when finished.
 
@@ -133,6 +143,8 @@ Storage tests run as part of `npm run check:rust`. The process-interruption test
 The build icons were generated from [the approved SVG](docs/design/starframe-mark.svg) using Tauri's icon command. Only the PNG and Windows ICO needed for this build are retained. Final installer/taskbar asset review remains part of packaging.
 
 ## Tool references
+
+The NSIS packaging preflight also compiles the small native control painter in `src-tauri/windows/theme` using the installed Visual Studio C++ x86 tools. The installer host is 32-bit even though Starframe is 64-bit. `scripts/prepare_windows_installer.ps1` runs the existing runtime/notices preflight, then builds the helper with compiler warnings treated as errors. CI uses `-ThemeOnly` to compile it without game integration resources. The helper links Windows system libraries and requires no separate C runtime installation. Button input remains in the standard Windows controls; the helper handles drawing and falls back to native rendering in high-contrast mode.
 
 - [Svelte tooling](https://svelte.dev/packages)
 - [Clippy usage](https://doc.rust-lang.org/stable/clippy/usage.html)
