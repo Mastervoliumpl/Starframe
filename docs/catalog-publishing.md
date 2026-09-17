@@ -32,6 +32,20 @@ The small `sign_catalog` example uses tough's repository editor, signature imple
 
 Only the publisher uses `--allow-expired-repo` when examining its previous publication for renewal. This preserves signature/hash verification and retained-content checks while allowing the maintainer to issue fresh metadata after an outage. It does not authorize downloads in the desktop; that client retains normal expiry enforcement. The public root is always supplied explicitly, never downloaded as a new trust anchor.
 
+## First live acceptance
+
+As of 17 September, the release automation prerequisite #29 is complete. Publication remains disabled. The workflow and catalog environment both require main, so this last #46 check follows a maintainer-approved merge and successful main checks. This is a pre-public-release gate; it is not a reason to add a second publishing path or repeat verified cryptographic fixtures.
+
+With maintainer approval to enable catalog publication:
+
+1. Confirm main's successful checks, the configured catalog environment and the reviewed catalog/advisory contents. Retain their revisions and file hashes. No recovery key is uploaded.
+2. Set `CATALOG_PUBLICATION_ENABLED` to `true` with the GitHub CLI and dispatch `catalog.yml` on main. Inspect the completed publication run and resulting `codex/catalog-published` commit. The existing schedule then renews daily at 03:17 UTC.
+3. Use an isolated Starframe client with the shipped trusted root and normal production endpoints. Refresh from `https://raw.githubusercontent.com/Mastervoliumpl/Starframe/codex/catalog-published/metadata/` and the corresponding `targets/` directory through the application's catalog operation. Confirm authenticated success, matching reviewed catalog/advisory revisions and thirty-day validity. Inspect retained state after reopening. No game launch or duplicate mod-install campaign is required.
+4. Dispatch the same publisher once more to exercise renewal immediately. Confirm increased TUF metadata versions and a new expiry, unchanged target contents/revisions when no catalog edits occurred, and successful acceptance by the same client. Do not wait a day or introduce test advisories into production.
+5. Record run URLs, publication commits, accepted revisions/expiry and the client build in [catalog verification](verification/catalog-authentication.md). Close #46 only when this live path succeeds. A failure remains visible on the issue; preserve any previous signed publication while fixing it.
+
+The private app draft cannot establish public updater discovery, and catalog publication does not publish that app draft. The [milestone record](verification/milestone-0.6.0.md) tracks the separate owner smoke and release decisions.
+
 ## Rotation and recovery
 
 To replace an online key, copy the reviewed current public root to `catalog/trust/previous-root.json`, increase the current root version, replace the affected role key IDs and sign the new root with the offline authority. Update the catalog environment's online credential only as part of that checked change. The workflow passes the retained root to `--previous-root`: it verifies the previous publication using the old authority, retains numbered root files and verifies the candidate starting from both the older and current roots. This permits revoking the old online key without losing the previous target history. Keep the retained public root available for this validation across renewals; it contains no private key.

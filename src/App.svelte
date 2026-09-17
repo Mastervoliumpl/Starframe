@@ -429,16 +429,17 @@
               to try the collection; it does not confirm compatibility.
             </p>
             <p>
-              This internal build supports Starframe managed packages and the
-              verified Lua overlay paths. General BepInEx plugins, AI and maps
-              need further adapters and testing. A collection supports up to 256
-              active mods, and each package supports up to 1,024 files. Package
-              preparation checks the supported file and size limits.
+              This build supports Starframe managed packages, compatible BepInEx
+              5 Unity/Mono plugins and the verified Lua overlay paths. Maps, AI
+              packages and other loader formats remain unsupported. A collection
+              supports up to 256 active mods, and each package supports up to
+              1,024 files. Package preparation checks the supported file and
+              size limits.
             </p>
             <p>
-              Your library can contain more than 256 mods. The in-game list
-              includes every active mod and up to 256 mods in total. It shows
-              how many additional disabled mods remain in your desktop library.
+              Your library can contain more than 256 mods. The in-game Mods menu
+              lists successfully loaded mods for the current session. Failures
+              appear under Could not load; disabled mods stay out of that list.
               Their saved settings are retained. Different mods and approvals
               can share downloaded files while collections keep their exact
               release references.

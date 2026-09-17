@@ -1,6 +1,6 @@
 # Starframe: design direction
 
-Status: revision 0.12, 16 September 2026. Product name: Starframe. This revision records the accepted app-update channel defaults. The installer identity, automatic runtime lifecycle, uninstall data default, deferred Windows certificate signing and catalog expiry decisions remain in effect.
+Status: revision 0.13, 17 September 2026. Product name: Starframe. This revision records the owner's proportionate verification policy and reduced alpha acceptance scope. The app-update channel defaults, installer identity, automatic runtime lifecycle, uninstall data default, deferred Windows certificate signing and catalog expiry decisions remain in effect.
 
 This is the accepted design handoff. The user authorized milestone 0.1.0 on 6 September 2026, including desktop navigation and live state in issue #8. Later feature screens remain planned. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
@@ -31,11 +31,19 @@ The user supplied these six colors:
 
 Game compatibility and mod releases are separate concepts. Warn when a catalog mod was made for an older game version, while still allowing the user to enable it and try launching. Collections contain a name and an ordered list of mod references. Sharing preserves those releases and their order, without mod settings. Refresh catalog data independently on launch and every five minutes while the desktop app is open; this does not require an app update.
 
+### Verification priorities
+
+The owner selected a benefit-versus-effort approach on 17 September 2026. Focus implementation and testing on ordinary supported workflows, reported problems, and failures with meaningful consequences. Do not try to accommodate every possible display setting, environment combination or hypothetical edge case. Reuse recorded passes when the relevant code, dependencies, packaging and assumptions remain applicable. A version number or final milestone checklist alone does not justify repeating a manual test. State the specific missing evidence or changed behavior before adding verification work.
+
+Additional installer scaling, high-contrast, screen-reader and unusual display-combination tests are waived for 0.6.0. They are unverified, not passed. Preserve the existing native controls, keyboard behavior, readable defaults and high-contrast fallback; respond to concrete reports rather than expanding a speculative matrix. Keep protection against data loss, unsafe file operations and invalid signatures. Existing useful automated checks remain in place.
+
+WebView2 remains required. Retain the installer's existing prerequisite attempt and clear failure message; a dedicated absent-WebView2 environment is not an alpha acceptance requirement. The owner will perform one short install/start smoke check of the GitHub-built draft. Earlier functional and offline VM results carry forward without repeating the complete checklist. [The 0.6.0 acceptance record](docs/verification/milestone-0.6.0.md) supersedes older open-ended acceptance lists.
+
 ## 2. Visual character
 
 ### Installation, updates and removal
 
-The installer and uninstaller must follow Starframe's navy/orange palette, typography and existing icon/wordmark identity, with familiar Windows controls and simpler wording. Replace the default blue computer illustration with a suitable composition from the approved social-preview artwork in the sibling `Starframe Assets/Social preview` directory. Preserve proportions, readable branding and asset provenance. Use the body and heading font rules below, with system fallbacks; do not require font installation or redistribute Windows font files. Preserve visible keyboard focus, readable disabled states and system high-contrast behavior. Review representative pages before completing [#74](https://github.com/Mastervoliumpl/Starframe/issues/74) in 0.6.0. Final display/accessibility acceptance belongs to #30 and remains required before public release.
+The installer and uninstaller must follow Starframe's navy/orange palette, typography and existing icon/wordmark identity, with familiar Windows controls and simpler wording. Replace the default blue computer illustration with a suitable composition from the approved social-preview artwork in the sibling `Starframe Assets/Social preview` directory. Preserve proportions, readable branding and asset provenance. Use the body and heading font rules below, with system fallbacks; do not require font installation or redistribute Windows font files. Preserve visible keyboard focus, readable disabled states and system high-contrast behavior. Representative pages were reviewed for [#74](https://github.com/Mastervoliumpl/Starframe/issues/74). Additional display/accessibility acceptance is subject to the owner's verification priorities above.
 
 The owner accepted the portrait/navy/orange direction on 15 September 2026 and requested consistent styling for the remaining controls, including buttons. Carry the dark treatment through navigation buttons, inputs, license text and progress details. Keep Windows button behavior and visible focus; high-contrast colors take precedence over branding.
 

@@ -4,6 +4,8 @@
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
+The owner's 17 September amendment reuses completed verification and narrows #30 to the hosted-installer smoke result plus consolidated documentation, now prepared. Additional display/accessibility and absent-WebView2 execution checks are waived. [The acceptance record](docs/verification/milestone-0.6.0.md) owns the remaining list. #46's main-only publication and live renewal check follow an approved merge and must pass before public release or milestone closure.
+
 ## Delivery sequence
 
 | Version | Outcome | Status |

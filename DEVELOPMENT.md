@@ -36,6 +36,10 @@ Pull requests identify the issue, target milestone, behavior changed, verificati
 
 ## Test as features are built
 
+Apply the owner's 17 September 2026 verification policy in [DESIGN.md](DESIGN.md#verification-priorities). Prioritize likely workflows, material failure consequences and reported bugs against the time and effort of a check. Carry forward existing evidence unless a relevant implementation, dependency, build configuration or environment change invalidates it. Record that reason before repeating a manual test. Do not expand support matrices or build speculative edge-case tests merely to complete a milestone. Keep existing useful CI and file-safety/security regressions; ordinary check runs need no duplicate manual campaign.
+
+For 0.6.0, [the consolidated acceptance record](docs/verification/milestone-0.6.0.md) supersedes older broad checklists. Extra scaling/high-contrast/screen-reader checks are waived. Absent-WebView2 testing is replaced by inspection of the existing prerequisite error handling. The remaining owner check is a short hosted-installer smoke test. Catalog publication requires checked code on main: its first publication, live client refresh and renewal are explicitly post-merge, pre-public-release gates. Keep #46 and the milestone open until those gates pass; a maintainer-approved merge does not authorize an app release.
+
 Add useful tests with implementation, not at the end of the project. Each bug fix gets a regression test where the failure is reproducible. A milestone's final verification checks how its pieces work together; it does not replace tests for those pieces.
 
 Prefer observable behavior over tests of private function shapes. Use unit tests for deterministic rules such as ordering, version comparison and validation. Use temporary-file integration tests for storage, deployment, archive handling and recovery. Use frontend interaction tests for stale replies, pending states, navigation and accessible controls. Avoid snapshots of entire screens, blanket coverage percentages, and tests that only repeat a constant or a CSS declaration.

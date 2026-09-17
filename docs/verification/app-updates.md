@@ -2,6 +2,8 @@
 
 Issue [#28](https://github.com/Mastervoliumpl/Starframe/issues/28), milestone 0.6.0. Local acceptance passed on 16 September 2026; hosted checks are recorded on the issue and PR. This record does not authorize a release.
 
+The owner confirmed on 17 September that these existing results carry forward without duplicate manual testing. Additional display/accessibility checks are waived under the [current acceptance scope](milestone-0.6.0.md). The private hosted draft is signed and verified under #29; publication and discovery through the public updater feed remain separate release steps.
+
 The Rust storage worker starts release checks after the frontend subscribes. Successful checks repeat after five minutes, including while minimized. Manual requests join an active check; resume causes one due check. Failed checks back off from five minutes to eighty minutes and respect GitHub's Retry-After (seconds or HTTP date) and rate-limit reset. Failed checks retain the earlier release notice and last successful check, without reporting that the installation is current.
 
 Fresh prerelease installations default to Preview; fresh stable installations default to Stable. The selected channel and Later choice are saved in SQLite schema 14. Preview includes eligible stable releases. Selection compares semantic versions rather than release dates and never downgrades. Draft releases, catalog-only releases and releases without updater metadata are excluded. A successful refresh removes a withdrawn or ineligible notice. Release notes render as plain text. Later hides the navigation notice while retaining the release in Settings.
