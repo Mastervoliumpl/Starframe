@@ -115,7 +115,7 @@ jobs:
         with:
           name: runtime-input-${{ github.run_id }}
           path: release-work
-      - uses: actions/setup-node@94196ee1d15439c1b6651cd87ef14e88ec435966
+      - uses: actions/setup-node@db0fb3a98ed314b69026b6e8c9be26a7e2fe65a8
         with:
           node-version-file: .node-version
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
@@ -168,7 +168,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.13'
-      - uses: actions/setup-node@94196ee1d15439c1b6651cd87ef14e88ec435966
+      - uses: actions/setup-node@db0fb3a98ed314b69026b6e8c9be26a7e2fe65a8
         with:
           node-version-file: .node-version
       - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87

@@ -48,7 +48,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@94196ee1d15439c1b6651cd87ef14e88ec435966
+      - uses: actions/setup-node@db0fb3a98ed314b69026b6e8c9be26a7e2fe65a8
         if: matrix.ecosystem == 'npm'
         with:
           node-version-file: .node-version
@@ -71,7 +71,7 @@ jobs:
       - name: Audit Cargo lockfile against current RustSec advisories
         if: matrix.ecosystem == 'cargo'
         run: '"$RUNNER_TEMP/cargo-audit/bin/cargo-audit" audit --file src-tauri/Cargo.lock'
-      - uses: actions/setup-dotnet@bbbb8c9ab609f9ab643834ffe948a0f577bc4c0c
+      - uses: actions/setup-dotnet@9b203d2b06c477e8cb2649af3e60ee3e6bdabe60
         if: matrix.ecosystem == 'nuget'
         with:
           global-json-file: runtime/global.json
