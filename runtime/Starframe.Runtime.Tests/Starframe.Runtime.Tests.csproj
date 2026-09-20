@@ -4,9 +4,9 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="[18.9.0]" />
-    <PackageReference Include="MSTest.TestAdapter" Version="[4.4.0]" />
-    <PackageReference Include="MSTest.TestFramework" Version="[4.4.0]" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="[18.10.1]" />
+    <PackageReference Include="MSTest.TestAdapter" Version="[4.4.1]" />
+    <PackageReference Include="MSTest.TestFramework" Version="[4.4.1]" />
     <ProjectReference Include="../Starframe.Runtime/Starframe.Runtime.csproj" />
     <ProjectReference Include="../Starframe.FixtureMods/Starframe.FixtureMods.csproj" ReferenceOutputAssembly="false" />
     <None Include="../Starframe.FixtureMods/bin/$(Configuration)/netstandard2.0/Starframe.FixtureMods.dll" Link="fixture-binaries/Starframe.FixtureMods.dll" CopyToOutputDirectory="PreserveNewest" />
