@@ -1,0 +1,32 @@
+{
+  "signed": {
+    "_type": "targets",
+    "spec_version": "1.0.0",
+    "version": 1790066821,
+    "expires": "2026-10-22T08:47:01Z",
+    "targets": {
+      "advisories.json": {
+        "length": 64,
+        "hashes": {
+          "sha256": "710a09130cd340dfbc3f9f26bedd33b47852bdda76d3203cc798312b5f1134d0"
+        }
+      },
+      "catalog.json": {
+        "length": 8748,
+        "hashes": {
+          "sha256": "24b471d84c1a3ce2fad5e13b7918c6fb1d4bcca4cdf1593d36acb6852db2d459"
+        }
+      }
+    },
+    "delegations": {
+      "keys": {},
+      "roles": []
+    }
+  },
+  "signatures": [
+    {
+      "keyid": "dbf83df7cab5172672c4081feb118035b5ebcf306160dd1803468922d0e952bd",
+      "sig": "420f60326233aedb79bdcbc27c6aa5939d9fe64b794a095e7859ff44cfc5a78deccc512a97d2f5f622149b7823c7575a88d4d759d73e73b280a59ce95e916d89d2556e94fbe72fd436c715d7288f8df277341acc4a94e56f7e30cec099f2279a79db73eef683654f13984dff4ba0cad8fcf3372d2c6d70e49c53b16d7505024268d6e139192e4e9202d11f6f7eb75282d0a1aa6f96a3c5c0234541d88aa3976bc3781102061d90d3b55d7b25bb2aacb4963471399434dd79c258762ec31fb0a1abc1fd93180d467b78c0e508fbba8cd240204476a97c356c414fab3ab3a8d84848d7d3c30d4a1b63ea494aee19013ffdbb4e24ed3bb1e7bee49a6b7894effa7a16c2ff80cf33d81037d791dce0901e933fdb679dcf15ab7be9af7ee3ddb62ef7f95103cb4a701b3cbb93a532d81aa56b1f58cc20a4ba698ecc34009e364c104ca6125bd773db56188a4567c06016f9e719d2024a134874fe876a1e098f9e2ede9f4ce998e8ab3bdfb03885f5b5ea771b51cb45eeca619acc1fe0ad7188362a065d756272aee8d5fef7d5d362665f18239b83056b9c87acde5f8afb65fa247abe33c79b58d9f98bd864ccae8327da2559e92fc90bb40f16900aa10678c53d8e46d021b6e2ffeef3bf3c88d1f8953ceecf74b5cb2bc3521137bba9befb5b61d1b63044d3e07898755ee8d64a10eea2372485b2a1a577f583c9b315ca0f251cdfdd"
+    }
+  ]
+}
