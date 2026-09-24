@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Begin 0.7.0 backend separation with shared Rust management calls and an internal headless command for local import, collections and game preparation (#66). The registry and native Mods browser remain in progress.
+
+## 0.7.0-dev.1 - 2026-09-24
+
+Internal development version for milestone 0.7.0. No installer or app release was published.
+
+## 0.6.0 completion - 2026-09-17
+
 - Add the alpha user guide and consolidate 0.6.0 acceptance around existing evidence, the owner's hosted-installer smoke check and post-merge live catalog verification (#30, #46). Record the owner's proportionate testing policy; retain existing error handling and waive additional display/accessibility and absent-WebView2 execution checks.
 - Correct Help text for BepInEx 5 support and the current-session game menu. Library, installer and runtime behavior are unchanged.
 - Enable signed catalog publication with daily renewal and thirty-day validity (#46). Preserve signed metadata bytes across Windows Git checkouts.

@@ -3,6 +3,7 @@ use crate::{
     model::{CatalogStatus, CommandError, GameAction, SavedData},
 };
 use starframe::{
+    backend,
     catalog::refresh::Refresh,
     deployment,
     game::{self, GameView, Running},
@@ -272,33 +273,9 @@ fn prepare(
     dispatch: bool,
 ) -> Result<serde_json::Value, String> {
     let resources = resources(app)?;
-    if !resources.join("runtime/runtime-package.json").is_file() {
-        return Err("This Starframe build does not include the game runtime. Use a build with runtime support to finish setup.".into());
-    }
-    let store = std::cell::RefCell::new(store);
-    launch::prepare_latest(
-        || starframe::mods::requested(&store.borrow()),
-        |activation| {
-            deployment::repair_missing(&mut store.borrow_mut(), game)?;
-            deployment::prepare_desktop(
-                &mut store.borrow_mut(),
-                game,
-                &resources,
-                activation,
-                &|| core.lock().expect("state lock").stopped,
-            )
-            .map(|_| ())
-        },
-        || {
-            if core.lock().expect("state lock").stopped {
-                return Err("Starframe closed before launch was requested.".into());
-            }
-            if dispatch {
-                windows_game::launch(game)?;
-            }
-            Ok(())
-        },
-    )
+    backend::prepare(store, game, &resources, dispatch, &|| {
+        core.lock().expect("state lock").stopped
+    })
 }
 
 pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {

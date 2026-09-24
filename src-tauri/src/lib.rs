@@ -1,3 +1,5 @@
+#[cfg(windows)]
+pub mod backend;
 pub mod catalog;
 pub mod deployment;
 pub mod game;

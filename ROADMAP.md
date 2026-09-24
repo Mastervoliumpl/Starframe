@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-**[0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7)** is complete on 17 September 2026. PR #60 delivered Windows packaging (#27), signed updates (#28), release automation (#29), alpha acceptance and documentation (#30), catalog authentication (#46), bounded fuzzing (#47) and installer branding (#74). PR #76 corrected signed catalog renewal on Windows. The owner accepted the hosted installer, and production catalog publication, renewal and client verification passed. Version `0.6.0-dev.2` remains an unpublished development draft. No later milestone has started; see the [acceptance record](docs/verification/milestone-0.6.0.md).
+**[0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8)** is active under draft PR #78. It separates management operations from the graphical shell and replaces the GitHub catalog with the website registry. The development version is `0.7.0-dev.1`. No website deployment or app release is authorized. The completed 0.6.0 evidence remains in its [acceptance record](docs/verification/milestone-0.6.0.md).
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -20,7 +20,7 @@ The owner's 17 September amendment reuses completed verification and narrows #30
 | [0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11) | Exact approval identities, package/runtime limits and maintenance | Complete |
 | [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Complete: #24–#26, #57–#58 verified |
 | [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Complete: signed draft accepted and signed catalog live; app unpublished |
-| [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Backend operations independent of the graphical UI | Planned: #66; not started |
+| [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Shared backend and website registry integration | Active: #66, #82–#90 |
 
 AI-package support is deferred until the game provides suitable AI extension/selection facilities. Automated replacement of the shipped AI is outside the current scope. Assign that work to a future milestone after those facilities can be verified; it is not a promised 0.7.0 feature.
 
@@ -136,11 +136,20 @@ Complete. Signed user-initiated updates, NSIS install/uninstall, release checks 
 
 On 15 September 2026, the owner moved final clean-machine/prerequisite and display/accessibility acceptance from #27 to #30. The 17 September amendment superseded that list: reuse the successful offline VM and lifecycle checks, accept the hosted-installer smoke, and waive additional display/accessibility and absent-WebView2 execution tests. Existing prerequisite error handling remains required. The installer identity requirements are recorded in DESIGN.md revision 0.11, and verification priorities in revision 0.13.
 
-### 0.7.0: Backend operations independent of the graphical UI
+### 0.7.0: Shared backend and website registry
 
-On 17 September 2026 the owner assigned #66 to this milestone. Keep the existing stack and place management operations behind a shared interface for the graphical app and headless commands. Implementation has not started; the later UI redesign remains separate work.
+The owner authorized implementation on 24 September 2026. Keep Tauri, Svelte, Rust, SQLite and the existing game runtime. The graphical app and a small headless command use shared Rust operations. Replace the old catalog with the website registry's exact releases, Steam manager session, signed metadata and authenticated downloads. Build Mods browsing inside the existing desktop shell. New release installation depends on website #101 supplying validated, signed installation metadata; do not infer missing entry points or map/AI destinations. The owner waived migration and compatibility for obsolete pre-release catalog data and exports. Preserve local imports, normal offline use, original sources and game data. The later full desktop redesign and native game integration remain outside this milestone.
 
 - [#66: Separate Starframe backend operations from the graphical UI](https://github.com/Mastervoliumpl/Starframe/issues/66). Prerequisite: #54 (complete).
+- [#82: Adopt the website registry contract and native release identities](https://github.com/Mastervoliumpl/Starframe/issues/82). Prerequisites: #66 and website #22.
+- [#83: Add Steam sign-in and secure manager sessions](https://github.com/Mastervoliumpl/Starframe/issues/83). Prerequisite: #82.
+- [#84: Verify signed registry releases and persistent security decisions](https://github.com/Mastervoliumpl/Starframe/issues/84). Prerequisite: #82.
+- [#85: Download approved registry archives with resumable grants and receipts](https://github.com/Mastervoliumpl/Starframe/issues/85). Prerequisites: #82–#84.
+- [#86: Install registry releases using author-declared website metadata](https://github.com/Mastervoliumpl/Starframe/issues/86). Prerequisites: #82, #84, #85 and website #101.
+- [#87: Use registry release identities and dependencies in mods and collections](https://github.com/Mastervoliumpl/Starframe/issues/87). Prerequisites: #82 and #86.
+- [#88: Replace Catalog with a native Mods browser based on the website](https://github.com/Mastervoliumpl/Starframe/issues/88). Prerequisites: #82, #83 and #87.
+- [#89: Remove the legacy catalog client and publication workflow completely](https://github.com/Mastervoliumpl/Starframe/issues/89). Prerequisites: #87 and #88.
+- [#90: Verify registry integration and existing offline manager behavior](https://github.com/Mastervoliumpl/Starframe/issues/90). Prerequisites: #66, #88 and #89.
 
 The owner removed #31 and #32 from this milestone because their required official game facilities do not exist yet. They remain unscheduled and externally blocked.
 

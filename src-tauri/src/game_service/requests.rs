@@ -32,7 +32,7 @@ impl Worker {
                     return Err("Starframe is closing.".into());
                 }
                 let store = self.storage.as_mut().ok_or("Saved data is unavailable.")?;
-                let result = starframe::sharing::action(store, action)?;
+                let result = backend::sharing_action(store, action)?;
                 self.core.lock().expect("state lock").saved_data(
                     saved_status(store)
                         .unwrap_or_else(|message| SavedData::Unavailable { message }),
@@ -47,18 +47,9 @@ impl Worker {
                 if self.core.lock().expect("state lock").stopped {
                     return Err("Starframe is closing.".into());
                 }
-                if let starframe::mods::Action::Uninstall { reference, .. } = &action
-                    && self
-                        .packages
-                        .as_ref()
-                        .ok()
-                        .and_then(|q| q.as_ref())
-                        .is_some_and(|q| q.busy_hash(&reference.hash))
-                {
-                    return Err("This package is being prepared. Finish or cancel its download before uninstalling.".into());
-                }
                 let store = self.storage.as_mut().ok_or("Saved data is unavailable.")?;
-                let result = starframe::mods::action(store, action)?;
+                let queue = self.packages.as_ref().ok().and_then(|q| q.as_ref());
+                let result = backend::mod_action(store, queue, action)?;
                 self.core.lock().expect("state lock").saved_data(
                     saved_status(store)
                         .unwrap_or_else(|message| SavedData::Unavailable { message }),
@@ -80,22 +71,7 @@ impl Worker {
                     .as_mut()
                     .ok_or("Package storage is unavailable.")?;
                 let store = self.storage.as_mut().ok_or("Saved data is unavailable.")?;
-                match action {
-                    packages::Action::ImportLocal { request_id, path } => {
-                        queue.import_local(store, &request_id, &path)?;
-                    }
-                    packages::Action::Prepare {
-                        request_id,
-                        release_id,
-                    } => {
-                        queue.start(store, &request_id, &release_id)?;
-                    }
-                    packages::Action::Cancel { operation_id } => {
-                        queue.cancel(store, &operation_id)?
-                    }
-                    packages::Action::List => (),
-                }
-                queue.operations(store)
+                backend::package_action(store, queue, action)
             })();
             let _ = reply.send(result);
             return;
@@ -141,7 +117,7 @@ impl Worker {
                     return Err("A launch request is still waiting for its game process.".into());
                 }
                 if matches!(request, Request::RemoveRuntime) {
-                    deployment::remove(store, game)?;
+                    backend::remove_runtime(store, game)?;
                     self.session.prepared = None;
                     return Ok(LaunchView::new(
                         Phase::SetupRequired,
@@ -207,11 +183,7 @@ impl Worker {
                     .ok_or_else(|| {
                         "Saved data is unavailable; the game selection was not changed.".to_owned()
                     })
-                    .and_then(|store| {
-                        store
-                            .select_game(&item.id, &item.path)
-                            .map_err(|e| e.to_string())
-                    });
+                    .and_then(|store| backend::select_game(store, &item));
                 match save {
                     Ok(_) => {
                         self.selected = Some((item.id.clone(), item.path.clone()));
