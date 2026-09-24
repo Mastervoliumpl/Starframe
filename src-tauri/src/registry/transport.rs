@@ -488,7 +488,7 @@ impl Client {
                 progress.store(received, Ordering::SeqCst);
             }
             if received != grant.bytes {
-                return Err(Error::Integrity);
+                return Err(Error::Transport);
             }
             file.flush().await.map_err(|_| Error::Integrity)?;
             file.seek(std::io::SeekFrom::Start(0))
@@ -515,6 +515,47 @@ impl Client {
             result = exchange => result,
             _ = cancel.changed() => Err(Error::Cancelled),
         }
+    }
+
+    pub async fn download_with_renewal(
+        &self,
+        identity: &super::trust::DownloadIdentity,
+        session: &Session,
+        bearer: &str,
+        file: &mut tokio::fs::File,
+        progress: &AtomicU64,
+        cancel: watch::Receiver<bool>,
+    ) -> Result<(DownloadGrant, VerifiedArchive), Error> {
+        if !can_download(session) {
+            return Err(Error::InvalidToken);
+        }
+        file.set_len(0).await.map_err(|_| Error::Integrity)?;
+        progress.store(0, Ordering::SeqCst);
+        for attempt in 0..3 {
+            let grant = self
+                .download_grant(identity, session, bearer, cancel.clone())
+                .await?;
+            let mut start = file.metadata().await.map_err(|_| Error::Integrity)?.len();
+            if start >= grant.bytes {
+                file.set_len(0).await.map_err(|_| Error::Integrity)?;
+                start = 0;
+            }
+            match self
+                .download_content(&grant, bearer, file, start, progress, cancel.clone())
+                .await
+            {
+                Ok(verified) => return Ok((grant, verified)),
+                Err(Error::Transport | Error::Http(StatusCode::GONE)) if attempt < 2 => (),
+                Err(Error::Http(StatusCode::CONFLICT | StatusCode::RANGE_NOT_SATISFIABLE))
+                    if attempt < 2 =>
+                {
+                    file.set_len(0).await.map_err(|_| Error::Integrity)?;
+                    progress.store(0, Ordering::SeqCst);
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        Err(Error::Transport)
     }
 
     pub async fn download_receipt(
@@ -693,7 +734,7 @@ mod tests {
     use super::*;
     use crate::registry::{ApiResponse, ReleaseResult};
     use std::io::{Read, Write};
-    use std::net::TcpListener;
+    use std::net::{TcpListener, TcpStream};
     use std::sync::atomic::AtomicU64;
 
     fn fixture(name: &str) -> String {
@@ -719,6 +760,35 @@ mod tests {
         serde_json::from_value(value["data"].clone()).unwrap()
     }
 
+    fn read_request(stream: &mut TcpStream) -> String {
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        let mut request = Vec::new();
+        loop {
+            let mut buffer = [0; 8192];
+            let n = stream.read(&mut buffer).unwrap();
+            assert!(n > 0);
+            request.extend_from_slice(&buffer[..n]);
+            if let Some(end) = request.windows(4).position(|bytes| bytes == b"\r\n\r\n") {
+                let headers = String::from_utf8_lossy(&request[..end]);
+                let length = headers
+                    .lines()
+                    .find_map(|line| {
+                        line.split_once(':').and_then(|(name, value)| {
+                            name.eq_ignore_ascii_case("content-length")
+                                .then(|| value.trim().parse::<usize>().unwrap())
+                        })
+                    })
+                    .unwrap_or(0);
+                if request.len() >= end + 4 + length {
+                    break;
+                }
+            }
+        }
+        String::from_utf8_lossy(&request).to_string()
+    }
+
     fn serve(
         status: &str,
         body: &str,
@@ -731,37 +801,13 @@ mod tests {
         let extra_headers = extra_headers.to_owned();
         let thread = std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
-            stream
-                .set_read_timeout(Some(Duration::from_secs(5)))
-                .unwrap();
-            let mut request = Vec::new();
-            loop {
-                let mut buffer = [0; 8192];
-                let n = stream.read(&mut buffer).unwrap();
-                assert!(n > 0);
-                request.extend_from_slice(&buffer[..n]);
-                if let Some(end) = request.windows(4).position(|bytes| bytes == b"\r\n\r\n") {
-                    let headers = String::from_utf8_lossy(&request[..end]);
-                    let length = headers
-                        .lines()
-                        .find_map(|line| {
-                            line.split_once(':').and_then(|(name, value)| {
-                                name.eq_ignore_ascii_case("content-length")
-                                    .then(|| value.trim().parse::<usize>().unwrap())
-                            })
-                        })
-                        .unwrap_or(0);
-                    if request.len() >= end + 4 + length {
-                        break;
-                    }
-                }
-            }
+            let request = read_request(&mut stream);
             let response = format!(
                 "HTTP/1.1 {status}\r\nContent-Length: {}\r\n{extra_headers}Connection: close\r\n\r\n{body}",
                 body.len()
             );
             stream.write_all(response.as_bytes()).unwrap();
-            String::from_utf8_lossy(&request).to_string()
+            request
         });
         (origin, thread)
     }
@@ -1145,6 +1191,101 @@ mod tests {
         thread.join().unwrap();
         assert_eq!(file.metadata().await.unwrap().len(), bytes as u64);
         assert_eq!(progress.load(Ordering::SeqCst), bytes as u64);
+    }
+
+    #[tokio::test]
+    async fn interrupted_transfer_renews_grant_and_resumes_same_account_prefix() {
+        let archive = "PK\u{0003}\u{0004}resume this complete archive";
+        let prefix = 9;
+        let hash = format!("{:x}", Sha256::digest(archive.as_bytes()));
+        let release_id =
+            ReleaseId(uuid::Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap());
+        let identity = super::super::trust::DownloadIdentity {
+            reference: ExactReference {
+                mod_id: super::super::ModId::try_from(1).unwrap(),
+                release_id,
+                sha256: super::super::Sha256::try_from(hash.clone()).unwrap(),
+            },
+            bytes: archive.len() as u64,
+            metadata_revision: 1,
+            security_revision: 1,
+        };
+        let ids = [
+            uuid::Uuid::parse_str("33333333-3333-4333-8333-333333333333").unwrap(),
+            uuid::Uuid::parse_str("44444444-4444-4444-8444-444444444444").unwrap(),
+        ];
+        let expires = (OffsetDateTime::now_utc() + time::Duration::minutes(5))
+            .format(&Rfc3339)
+            .unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let reference = identity.reference.clone();
+        let expected_archive = archive.to_string();
+        let expected_second_id = ids[1];
+        let archive = archive.to_string();
+        let thread = std::thread::spawn(move || {
+            let mut requests = Vec::new();
+            for step in 0..4 {
+                let (mut stream, _) = listener.accept().unwrap();
+                requests.push(read_request(&mut stream));
+                match step {
+                    0 | 2 => {
+                        let id = ids[step / 2];
+                        let body = serde_json::json!({"apiVersion":1,"data":{
+                            "downloadId":id,"reference":reference,"bytes":archive.len(),
+                            "metadataRevision":1,"securityRevision":1,
+                            "contentPath":format!("/v1/downloads/{id}/content"),
+                            "expiresAt":expires
+                        }})
+                        .to_string();
+                        write!(stream, "HTTP/1.1 201 Created\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+                    }
+                    1 => {
+                        write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nETag: \"sha256-{hash}\"\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n", archive.len()).unwrap();
+                        stream.write_all(&archive.as_bytes()[..prefix]).unwrap();
+                    }
+                    _ => {
+                        let rest = &archive[prefix..];
+                        write!(stream, "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nETag: \"sha256-{hash}\"\r\nAccept-Ranges: bytes\r\nContent-Range: bytes {prefix}-{}/{}\r\nConnection: close\r\n\r\n", rest.len(), archive.len()-1, archive.len()).unwrap();
+                        stream.write_all(rest.as_bytes()).unwrap();
+                    }
+                }
+            }
+            requests
+        });
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("renewed.part");
+        let mut file = tokio::fs::OpenOptions::new()
+            .create_new(true)
+            .read(true)
+            .write(true)
+            .open(&path)
+            .await
+            .unwrap();
+        let progress = AtomicU64::new(0);
+        let (_sender, cancel) = watch::channel(false);
+        let (grant, _) = client
+            .download_with_renewal(
+                &identity,
+                &manager_session(),
+                "fixture-token",
+                &mut file,
+                &progress,
+                cancel,
+            )
+            .await
+            .unwrap();
+        assert_eq!(grant.download_id, expected_second_id);
+        assert_eq!(
+            tokio::fs::read(path).await.unwrap(),
+            expected_archive.as_bytes()
+        );
+        let requests = thread.join().unwrap();
+        assert_eq!(requests.len(), 4);
+        assert!(requests[3].contains(&format!("bytes={prefix}-")));
     }
 
     #[tokio::test]
