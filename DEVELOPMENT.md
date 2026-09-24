@@ -113,6 +113,8 @@ For a release, finalize its changelog entry, validate version agreement, and cre
 
 ## Desktop development
 
+The internal headless command for #66 uses the same Rust operation functions as the Tauri worker. Build it with `cargo build --manifest-path src-tauri/Cargo.toml --locked --bin starframe_headless`, then pass an explicit absolute app-data directory and one command: `status`, `import <absolute source>`, `prepare-package <release ID>`, `collection-create <name>`, `collection-select <ID>`, `select-game <absolute game folder>`, `readiness <absolute game folder>`, `setup <absolute game folder> <absolute integration resources>` or `launch` with the same arguments. It emits a JSON result or structured error and package progress lines; it does not run as a service. The GUI and command cannot own the same SQLite data concurrently. Run the isolated fake-game check in [headless verification](docs/verification/backend-headless.md) with separately staged integration resources. This is an internal test surface, not a stable public CLI.
+
 Use Node.js **24.19.0** (see [.node-version](.node-version)) with npm, and Rust **1.98.1** with Rustfmt and Clippy (see [rust-toolchain.toml](rust-toolchain.toml)). On Windows, install the MSVC C++ build tools with the Windows SDK and the WebView2 runtime required by [Tauri's prerequisites](https://v2.tauri.app/start/prerequisites/). Target Windows x64. A Node-only machine can check and preview the frontend; Rust compilation needs the native build prerequisites too.
 
 From the repository root:
