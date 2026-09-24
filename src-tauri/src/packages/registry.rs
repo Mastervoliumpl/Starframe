@@ -43,6 +43,38 @@ fn stage_path(dir: &Path, operation_id: Uuid) -> PathBuf {
     dir.join(format!("{operation_id}.part"))
 }
 
+fn discard_stage(root: &Path, operation_id: Uuid) -> Result<()> {
+    let (dir, _pin) = archive_dir(root)?;
+    let path = stage_path(&dir, operation_id);
+    match fs::symlink_metadata(&path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.to_string()),
+        Ok(_) => (),
+    }
+    crate::filesystem::regular_metadata(&path, false)?;
+    fs::remove_file(path).map_err(|e| e.to_string())
+}
+
+fn recover_stages(root: &Path, active: &[Uuid]) -> Result<()> {
+    let (dir, _pin) = archive_dir(root)?;
+    for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let name = entry.file_name();
+        let Some(id) = name
+            .to_str()
+            .and_then(|name| name.strip_suffix(".part"))
+            .and_then(|id| Uuid::parse_str(id).ok())
+        else {
+            continue;
+        };
+        if !active.contains(&id) {
+            crate::filesystem::regular_metadata(&entry.path(), false)?;
+            fs::remove_file(entry.path()).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 fn verify(path: &Path, identity: &DownloadIdentity) -> Result<()> {
     let mut file = read_file(path)?;
     if file.metadata().map_err(|e| e.to_string())?.len() != identity.bytes {
@@ -233,6 +265,12 @@ impl Packages {
             );
         }
         let root = storage.package_root().to_owned();
+        let active_ids = self
+            .registry_active
+            .keys()
+            .filter_map(|id| Uuid::parse_str(id).ok())
+            .collect::<Vec<_>>();
+        recover_stages(&root, &active_ids)?;
         let operation_id = Uuid::new_v4();
         let mut operation = Operation {
             id: operation_id.to_string(),
@@ -372,7 +410,7 @@ impl Packages {
                     let outcome = (|| {
                         active.cancel.check()?;
                         if *active.abort.borrow() {
-                            return Err("Sign-in changed during the download. The verified transfer was retained for its original account.".into());
+                            return Err("Sign-in changed during the download. The receipt claim remains with its original account; the archive was not saved.".into());
                         }
                         let current = current?;
                         storage
@@ -422,6 +460,14 @@ impl Packages {
                                 Status::Failed
                             };
                             active.operation.message = message;
+                            if let Err(error) = discard_stage(
+                                storage.package_root(),
+                                Uuid::parse_str(&active.operation.id).unwrap(),
+                            ) {
+                                active.operation.message.push_str(&format!(
+                                    " Staging cleanup needs attention: {error}"
+                                ));
+                            }
                         }
                     }
                 }
@@ -433,6 +479,15 @@ impl Packages {
                             Status::Failed
                         };
                         active.operation.message = message;
+                        if let Err(error) = discard_stage(
+                            storage.package_root(),
+                            Uuid::parse_str(&active.operation.id).unwrap(),
+                        ) {
+                            active
+                                .operation
+                                .message
+                                .push_str(&format!(" Staging cleanup needs attention: {error}"));
+                        }
                     }
                 }
                 RegistryEvent::Receipt(result) => {
@@ -687,6 +742,27 @@ mod tests {
         (origin, thread)
     }
 
+    #[test]
+    fn restart_cleanup_removes_only_inactive_registry_stages() {
+        let root = tempfile::tempdir().unwrap();
+        let _store = Storage::open(root.path()).unwrap();
+        let abandoned = Uuid::new_v4();
+        let active = Uuid::new_v4();
+        let (abandoned_path, mut file, pin) = begin(root.path(), abandoned).unwrap();
+        file.write_all(b"partial").unwrap();
+        drop(file);
+        drop(pin);
+        let (active_path, file, pin) = begin(root.path(), active).unwrap();
+        drop(file);
+        drop(pin);
+        let note = root.path().join("registry-archives").join("notes.txt");
+        fs::write(&note, b"unowned").unwrap();
+        recover_stages(root.path(), &[active]).unwrap();
+        assert!(!abandoned_path.exists());
+        assert!(active_path.exists());
+        assert_eq!(fs::read(note).unwrap(), b"unowned");
+    }
+
     #[tokio::test]
     async fn queue_saves_exact_archive_and_receipt_without_installing() {
         let root = tempfile::tempdir().unwrap();
@@ -911,5 +987,135 @@ mod tests {
             fs::read(cached(root.path(), &identity).unwrap().unwrap()).unwrap(),
             archive
         );
+    }
+
+    #[tokio::test]
+    async fn queue_cancel_removes_partial_stage_without_receipt() {
+        let root = tempfile::tempdir().unwrap();
+        let mut store = Storage::open(root.path()).unwrap();
+        let archive = b"PK\x03\x04a cancellable registry archive";
+        let (root_public, mod_id, release_id, identity) = signed_store(&mut store, archive);
+        let fixtures: serde_json::Value =
+            serde_json::from_str(include_str!("../../../tests/fixtures/registry-v1.json")).unwrap();
+        let mut session = fixtures
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|value| value["name"] == "session")
+            .unwrap()["body"]["data"]
+            .clone();
+        session["expiresAt"] = (OffsetDateTime::now_utc() + time::Duration::hours(1))
+            .format(&Rfc3339)
+            .unwrap()
+            .into();
+        let session: Session = serde_json::from_value(session).unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let reference = identity.reference.clone();
+        let hash = identity.reference.sha256.as_str().to_owned();
+        let expires = (OffsetDateTime::now_utc() + time::Duration::minutes(5))
+            .format(&Rfc3339)
+            .unwrap();
+        let (release_client, release_server) = std::sync::mpsc::channel();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let grant_request = request(&mut stream);
+            let body = serde_json::json!({"apiVersion":1,"data":{
+                "downloadId":"33333333-3333-4333-8333-333333333333",
+                "reference":reference,"bytes":archive.len(),
+                "metadataRevision":1,"securityRevision":1,
+                "contentPath":"/v1/downloads/33333333-3333-4333-8333-333333333333/content",
+                "expiresAt":expires
+            }})
+            .to_string();
+            write!(
+                stream,
+                "HTTP/1.1 201 Created\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+            drop(stream);
+            let (mut stream, _) = listener.accept().unwrap();
+            let content_request = request(&mut stream);
+            write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nETag: \"sha256-{hash}\"\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n", archive.len()).unwrap();
+            stream.write_all(&archive[..8]).unwrap();
+            release_server.recv_timeout(Duration::from_secs(5)).unwrap();
+            (grant_request, content_request)
+        });
+        let client = Client::new(
+            crate::registry::Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true)
+                .unwrap(),
+        )
+        .unwrap();
+        let mut queue = Packages::open(&mut store).unwrap();
+        let (_sender, auth_cancel) = watch::channel(false);
+        let operation = queue
+            .start_registry(
+                &mut store,
+                &Uuid::new_v4().to_string(),
+                RegistryRequest {
+                    mod_id,
+                    release_id,
+                    root_public,
+                    client,
+                    session: session.clone(),
+                    bearer: "fixture-token".into(),
+                    auth_cancel,
+                },
+            )
+            .unwrap();
+        for _ in 0..100 {
+            if queue
+                .operations(&store)
+                .unwrap()
+                .iter()
+                .any(|item| item.id == operation.id && item.received_bytes >= 8)
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert!(
+            queue
+                .operations(&store)
+                .unwrap()
+                .iter()
+                .any(|item| item.id == operation.id && item.received_bytes >= 8)
+        );
+        queue.cancel(&mut store, &operation.id).unwrap();
+        for _ in 0..100 {
+            queue.poll(&mut store).unwrap();
+            if queue.registry_active.is_empty() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        let finished = queue
+            .operations(&store)
+            .unwrap()
+            .into_iter()
+            .find(|item| item.id == operation.id)
+            .unwrap();
+        assert_eq!(finished.status, Status::Cancelled);
+        assert!(
+            store
+                .pending_registry_receipts(session.account_id)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            !stage_path(
+                &root.path().join("registry-archives"),
+                Uuid::parse_str(&operation.id).unwrap()
+            )
+            .exists()
+        );
+        release_client.send(()).unwrap();
+        let (grant, content) = server.join().unwrap();
+        assert!(grant.starts_with(&format!(
+            "POST /v1/registry/releases/{}/downloads HTTP/1.1",
+            release_id.0
+        )));
+        assert!(content.starts_with("GET /v1/downloads/"));
     }
 }
