@@ -1079,6 +1079,75 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn representative_stream_uses_bounded_chunks_and_reaches_signed_size() {
+        const CHUNK: usize = 64 * 1024;
+        const CHUNKS: usize = 512;
+        let bytes = CHUNK * CHUNKS;
+        let block = [0x5au8; CHUNK];
+        let mut digest = Sha256::new();
+        for _ in 0..CHUNKS {
+            digest.update(block);
+        }
+        let hash = format!("{:x}", digest.finalize());
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let response_hash = hash.clone();
+        let thread = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut request = [0u8; 2048];
+            assert!(stream.read(&mut request).unwrap() > 0);
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Length: {bytes}\r\nETag: \"sha256-{response_hash}\"\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n"
+            )
+            .unwrap();
+            for _ in 0..CHUNKS {
+                stream.write_all(&block).unwrap();
+            }
+        });
+        let download_id = uuid::Uuid::new_v4();
+        let grant = DownloadGrant {
+            download_id,
+            reference: ExactReference {
+                mod_id: super::super::ModId::try_from(1).unwrap(),
+                release_id: ReleaseId(uuid::Uuid::new_v4()),
+                sha256: super::super::Sha256::try_from(hash).unwrap(),
+            },
+            bytes: bytes as u64,
+            metadata_revision: 1,
+            security_revision: 1,
+            content_path: format!("/v1/downloads/{download_id}/content"),
+            expires_at: (OffsetDateTime::now_utc() + time::Duration::minutes(5))
+                .format(&Rfc3339)
+                .unwrap(),
+            account_id: manager_session().account_id,
+        };
+        let root = tempfile::tempdir().unwrap();
+        let mut file = tokio::fs::OpenOptions::new()
+            .create_new(true)
+            .read(true)
+            .write(true)
+            .open(root.path().join("large.part"))
+            .await
+            .unwrap();
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let progress = AtomicU64::new(0);
+        let (_sender, cancel) = watch::channel(false);
+        client
+            .download_content(&grant, "fixture-token", &mut file, 0, &progress, cancel)
+            .await
+            .unwrap();
+        thread.join().unwrap();
+        assert_eq!(file.metadata().await.unwrap().len(), bytes as u64);
+        assert_eq!(progress.load(Ordering::SeqCst), bytes as u64);
+    }
+
+    #[tokio::test]
     async fn reads_pinned_release_without_leaking_token_to_redirects() {
         let (origin, thread) = serve("200 OK", &fixture("approved"), "");
         let client =
