@@ -2,6 +2,7 @@ mod auth;
 #[cfg(windows)]
 mod credential;
 mod transport;
+pub mod trust;
 mod wire;
 
 pub use auth::{Auth, AuthError, ChallengeView, Poll, SignOut};

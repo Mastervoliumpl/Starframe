@@ -3698,6 +3698,7 @@ dependencies = [
  "keyvalues-parser",
  "minisign-verify",
  "reqwest",
+ "ring",
  "rusqlite",
  "semver",
  "serde",

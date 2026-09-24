@@ -1,0 +1,7 @@
+# Website registry trust
+
+Issue #84 is in progress against website contract revision `fcd81be6667e2595166698178d5f55074c5ee92a`, observed on read-only website main `ba8803aea4b6a067c1f9c60d5eb3ac33c7358567`. The initial Rust slice accepts a registry root public key supplied outside the API and verifies a root-signed delegated keyset. It checks canonical padded base64, the SHA-256 key IDs, Ed25519, closed keyset fields, duplicate JSON keys, safe integers and the one-year validity window. Canonical JSON follows [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) for the contract's safe-integer subset, including UTF-16 property ordering.
+
+The synthetic keyset in `tests/fixtures/registry-keys-v1.json` was signed and verified by the website's `src/lib/registry-crypto.ts` reference. Rust verifies the same envelope and canonical payload. The website generator stays in ignored local test evidence; fixed synthetic seeds in Rust tests are test data, not production credentials. The tracked JSON fixture contains only synthetic public keys and a signature. Tampering, a wrong root, duplicate decoded fields and expiry fail. The application updater and old catalog keys were not used.
+
+The verifier is not connected to production: no registry root has been independently provisioned. Signed security snapshots, release manifests, persistent revision floors, retained hash decisions and download/launch gates remain to be implemented. Production registry downloads must stay unavailable until those checks are complete.

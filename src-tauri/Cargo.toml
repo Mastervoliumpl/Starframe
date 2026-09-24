@@ -33,6 +33,7 @@ tauri-plugin-updater = { version = "=2.11.0", default-features = false, features
 semver = { version = "1", features = ["serde"] }
 httpdate = "=1.0.3"
 time = { version = "=0.3.55", features = ["parsing", "formatting"] }
+ring = "=0.17.14"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "=0.61.3", features = ["Win32_System_Registry", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading", "Win32_Storage_FileSystem", "Win32_Security_Credentials"] }
