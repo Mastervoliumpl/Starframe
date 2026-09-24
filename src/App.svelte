@@ -5,6 +5,7 @@
   import DiagnosticList from './features/DiagnosticList.svelte';
   import GameSettings from './features/GameSettings.svelte';
   import AppUpdates from './features/AppUpdates.svelte';
+  import AuthSettings from './features/AuthSettings.svelte';
   import LaunchBar from './features/LaunchBar.svelte';
   import ModList from './features/ModList.svelte';
   import Collections from './features/Collections.svelte';
@@ -12,6 +13,7 @@
   import PackageDownloads from './features/PackageDownloads.svelte';
   import { createManagement, confirmedFinding } from './lib/management';
   import { createDesktop } from './lib/state';
+  import { createAuth } from './lib/auth';
   import { getTransport } from './lib/native';
 
   const pages = [
@@ -25,6 +27,7 @@
   type Page = (typeof pages)[number]['id'];
   let page = $state<Page>('mods');
   let desktop = $state(createDesktop(null));
+  let auth = $state(createAuth(null));
   let manager = $state(createManagement(null));
   let drawer: HTMLDialogElement;
   let menu: HTMLButtonElement;
@@ -80,6 +83,8 @@
     void getTransport().then((transport) => {
       if (disposed) return;
       desktop = createDesktop(transport);
+      auth = createAuth(transport);
+      void auth.restore();
       manager = createManagement(transport);
       stopManagement = manager.start();
       stop = desktop.startWatching();
@@ -93,6 +98,7 @@
     };
     wide.addEventListener('change', closeDrawer);
     return () => {
+      auth.stop();
       disposed = true;
       stop?.();
       stopManagement?.();
@@ -327,6 +333,7 @@
         {/if}
       </section>
       <section class="page" hidden={page !== 'settings'} aria-label="Settings">
+        <AuthSettings {auth} unavailable={$desktop.connection === 'preview'} />
         <div class="settings-section">
           <h2>Saved data</h2>
           {#if $desktop.snapshot?.savedData.status === 'ready'}

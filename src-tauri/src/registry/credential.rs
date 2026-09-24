@@ -40,6 +40,16 @@ impl CredentialStore {
         }
     }
 
+    #[cfg(debug_assertions)]
+    pub fn isolated(root: &std::path::Path) -> Self {
+        use sha2::{Digest, Sha256};
+        let digest = Sha256::digest(root.to_string_lossy().as_bytes());
+        let suffix: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+        Self {
+            target: format!("Starframe:fixture:{suffix}"),
+        }
+    }
+
     #[cfg(test)]
     pub(super) fn fixture() -> Self {
         Self {
@@ -152,5 +162,14 @@ mod tests {
         assert_eq!(store.load().unwrap().unwrap().token, token.token);
         store.delete().unwrap();
         assert!(store.load().unwrap().is_none());
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn debug_data_roots_never_use_the_production_target() {
+        let first = CredentialStore::isolated(std::path::Path::new("fixture-one"));
+        let second = CredentialStore::isolated(std::path::Path::new("fixture-two"));
+        assert_ne!(first.target, CredentialStore::production().target);
+        assert_ne!(first.target, second.target);
     }
 }

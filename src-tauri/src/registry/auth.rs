@@ -37,7 +37,8 @@ pub struct ChallengeView {
     pub interval_seconds: u8,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Poll {
     Waiting,
     SignedIn,
@@ -589,6 +590,82 @@ mod tests {
         let (_sender, cancel) = watch::channel(false);
         assert!(auth.restore(cancel).await.unwrap().is_none());
         assert!(auth.store.as_ref().unwrap().load().unwrap().is_none());
+        server.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn cancellation_and_expiry_remove_the_private_challenge() {
+        let client =
+            Client::new(Config::new("http://127.0.0.1:1/v1", "http://127.0.0.1:1/", true).unwrap())
+                .unwrap();
+        let mut auth = Auth::new(client);
+        let (_sender, cancel) = watch::channel(false);
+        auth.pending = Some(Pending {
+            id: Uuid::new_v4(),
+            verifier: "A".repeat(43),
+            expires: OffsetDateTime::now_utc() + time::Duration::minutes(1),
+            next_poll: Instant::now(),
+        });
+        auth.cancel();
+        assert!(matches!(
+            auth.poll(cancel.clone()).await,
+            Err(AuthError::NoChallenge)
+        ));
+        auth.pending = Some(Pending {
+            id: Uuid::new_v4(),
+            verifier: "B".repeat(43),
+            expires: OffsetDateTime::now_utc() - time::Duration::seconds(1),
+            next_poll: Instant::now(),
+        });
+        assert!(matches!(auth.poll(cancel).await, Err(AuthError::Expired)));
+        assert!(auth.pending.is_none());
+    }
+
+    #[tokio::test]
+    async fn lost_exchange_response_requires_a_new_challenge() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let website = origin.clone();
+        let server = std::thread::spawn(move || {
+            for attempt in 0..2 {
+                let (mut start, _) = listener.accept().unwrap();
+                let _ = read_json(&start);
+                let expires = (OffsetDateTime::now_utc() + time::Duration::minutes(10))
+                    .format(&Rfc3339)
+                    .unwrap();
+                reply(
+                    &mut start,
+                    "201 Created",
+                    serde_json::json!({"apiVersion":1,"data":{
+                        "challengeId":"11111111-1111-4111-8111-111111111111",
+                        "displayCode":"A1B2C3D4",
+                        "verificationUri":format!("{website}/sign-in?manager=11111111-1111-4111-8111-111111111111"),
+                        "expiresAt":expires,"intervalSeconds":5
+                    }}),
+                );
+                if attempt == 0 {
+                    let (exchange, _) = listener.accept().unwrap();
+                    let _ = read_json(&exchange);
+                    drop(exchange);
+                }
+            }
+        });
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let mut auth = Auth::new(client);
+        let (_sender, cancel) = watch::channel(false);
+        auth.start(cancel.clone()).await.unwrap();
+        assert!(matches!(
+            auth.poll(cancel.clone()).await,
+            Err(AuthError::Network(_))
+        ));
+        assert!(auth.pending.is_none());
+        assert!(matches!(
+            auth.poll(cancel.clone()).await,
+            Err(AuthError::NoChallenge)
+        ));
+        auth.start(cancel).await.unwrap();
         server.join().unwrap();
     }
 }

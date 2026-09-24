@@ -1,8 +1,15 @@
 import { Channel, invoke, isTauri } from '@tauri-apps/api/core';
 import type { Snapshot } from './generated/model';
 import type { Transport } from './state';
+import type { AuthTransport } from './auth';
 
-const native: Transport = {
+const native: Transport & AuthTransport = {
+  authRestore: () => invoke('auth_restore'),
+  authInspect: () => invoke('auth_inspect'),
+  authStart: () => invoke('auth_start'),
+  authPoll: () => invoke('auth_poll'),
+  authSignOut: () => invoke('auth_sign_out'),
+  authCancel: () => invoke('auth_cancel'),
   pickLocalSource: (folder) => invoke('pick_local_source', { folder }),
   saveCollection: (text) => invoke('save_collection_file', { text }),
   sharing: (action) => invoke('sharing_action', { action }),
@@ -28,7 +35,9 @@ const native: Transport = {
   update: (action) => invoke('update_action', { action }),
 };
 
-export async function getTransport(): Promise<Transport | null> {
+export async function getTransport(): Promise<
+  (Transport & AuthTransport) | null
+> {
   if (isTauri()) return native;
   if (
     import.meta.env.DEV &&

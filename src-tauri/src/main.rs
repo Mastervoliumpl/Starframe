@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;
+mod auth_service;
 mod commands;
 mod game_service;
 mod model;
@@ -84,6 +85,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            app.manage(auth_service::AuthService::new().map_err(std::io::Error::other)?);
             let state: app::Shared = Arc::new(Mutex::new(app::Core::default()));
             app.manage(state.clone());
             app.manage(game_service::start(app.handle().clone(), state.clone()));
@@ -122,7 +124,13 @@ fn main() {
             commands::pick_local_source,
             commands::sharing_action,
             commands::save_collection_file,
-            commands::mod_action
+            commands::mod_action,
+            auth_service::auth_restore,
+            auth_service::auth_inspect,
+            auth_service::auth_start,
+            auth_service::auth_poll,
+            auth_service::auth_sign_out,
+            auth_service::auth_cancel
         ])
         .run(context)
         .expect("Starframe could not start");
