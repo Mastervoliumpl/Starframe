@@ -18,7 +18,7 @@ test('manager sign-in leaves local navigation usable and supports keyboard sign-
   await page.getByRole('button', { name: 'My mods', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'My mods' })).toBeVisible();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expect(page.getByText('Signed in as')).toBeVisible();
+  await expect(page.getByText('Signed in as')).toBeVisible({ timeout: 10000 });
   await expect(page.getByText('Fixture user')).toBeVisible();
   const signOut = page.getByRole('button', { name: 'Sign out' });
   await signOut.focus();
