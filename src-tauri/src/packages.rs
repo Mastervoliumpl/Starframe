@@ -201,6 +201,7 @@ pub struct ReceiptRequest {
 }
 
 enum RegistryEvent {
+    Cached(Result<()>),
     Transferred(
         Box<
             Result<(
@@ -209,6 +210,7 @@ enum RegistryEvent {
             )>,
         >,
     ),
+    Promoted(Result<crate::registry::Session>),
     Receipt(Result<()>),
 }
 

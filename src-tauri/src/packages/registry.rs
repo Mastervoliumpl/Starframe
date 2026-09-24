@@ -75,7 +75,7 @@ fn recover_stages(root: &Path, active: &[Uuid]) -> Result<()> {
     Ok(())
 }
 
-fn verify(path: &Path, identity: &DownloadIdentity) -> Result<()> {
+fn verify(path: &Path, identity: &DownloadIdentity, cancel: Option<&Cancel>) -> Result<()> {
     let mut file = read_file(path)?;
     if file.metadata().map_err(|e| e.to_string())?.len() != identity.bytes {
         return Err("Registry archive size changed. Retry the exact download.".into());
@@ -83,6 +83,9 @@ fn verify(path: &Path, identity: &DownloadIdentity) -> Result<()> {
     let mut digest = Sha256::new();
     let mut buffer = [0u8; 64 * 1024];
     loop {
+        if let Some(cancel) = cancel {
+            cancel.check()?;
+        }
         let count = file.read(&mut buffer).map_err(|e| e.to_string())?;
         if count == 0 {
             break;
@@ -95,13 +98,14 @@ fn verify(path: &Path, identity: &DownloadIdentity) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn cached(root: &Path, identity: &DownloadIdentity) -> Result<Option<PathBuf>> {
+#[cfg(test)]
+fn cached(root: &Path, identity: &DownloadIdentity) -> Result<Option<PathBuf>> {
     let (dir, _pin) = archive_dir(root)?;
     let path = archive_path(&dir, identity);
     if !path.exists() {
         return Ok(None);
     }
-    verify(&path, identity)?;
+    verify(&path, identity, None)?;
     Ok(Some(path))
 }
 
@@ -122,16 +126,26 @@ pub(super) fn promote(
     identity: &DownloadIdentity,
     verified: &VerifiedArchive,
     operation_id: Uuid,
+    cancel: &Cancel,
+    auth_abort: &watch::Receiver<bool>,
 ) -> Result<PathBuf> {
     if !verified.matches_identity(identity) {
         return Err("Registry transfer identity changed.".into());
     }
     let (dir, _pin) = archive_dir(root)?;
     let stage = stage_path(&dir, operation_id);
-    verify(&stage, identity)?;
+    verify(&stage, identity, Some(cancel))?;
+    cancel.check()?;
+    if *auth_abort.borrow() {
+        return Err("Sign-in changed during the download. The archive was not saved.".into());
+    }
     let target = archive_path(&dir, identity);
     if target.exists() {
-        verify(&target, identity)?;
+        verify(&target, identity, Some(cancel))?;
+        cancel.check()?;
+        if *auth_abort.borrow() {
+            return Err("Sign-in changed during the download. The archive was not saved.".into());
+        }
         fs::remove_file(stage).map_err(|e| e.to_string())?;
     } else {
         fs::rename(stage, &target).map_err(|e| e.to_string())?;
@@ -291,14 +305,52 @@ impl Packages {
             received_bytes: 0,
             total_bytes: identity.bytes,
         };
-        if cached(&root, &identity)?.is_some() {
-            operation.status = Status::Completed;
-            operation.received_bytes = identity.bytes;
-            operation.message =
-                "Exact verified archive is cached. No new download receipt was sent.".into();
+        let (archive_directory, directory_pin) = archive_dir(&root)?;
+        let cache_path = archive_path(&archive_directory, &identity);
+        if cache_path.exists() {
+            operation.message = "Checking the exact cached archive.".into();
             storage
                 .save_package(&operation)
                 .map_err(|e| e.to_string())?;
+            let cancel = Cancel::default();
+            let worker_cancel = cancel.clone();
+            let worker_auth = auth_cancel.clone();
+            let worker_identity = identity.clone();
+            let (sender, result) = mpsc::channel();
+            let worker_sender = sender.clone();
+            let worker = tauri::async_runtime::spawn_blocking(move || {
+                let _directory_pin = directory_pin;
+                let outcome = (|| {
+                    worker_cancel.check()?;
+                    if *worker_auth.borrow() {
+                        return Err("Sign-in changed before the cached archive was checked.".into());
+                    }
+                    verify(&cache_path, &worker_identity, Some(&worker_cancel))?;
+                    worker_cancel.check()?;
+                    if *worker_auth.borrow() {
+                        return Err("Sign-in changed before the cached archive was checked.".into());
+                    }
+                    Ok(())
+                })();
+                let _ = worker_sender.send(RegistryEvent::Cached(outcome));
+            });
+            self.registry_active.insert(
+                operation.id.clone(),
+                RegistryActive {
+                    operation: operation.clone(),
+                    identity,
+                    root: root_public,
+                    client,
+                    bearer,
+                    cancel,
+                    abort: auth_cancel,
+                    progress: Arc::new(AtomicU64::new(0)),
+                    sender,
+                    result,
+                    worker,
+                    claim: None,
+                },
+            );
             return Ok(operation);
         }
         let reserved = self
@@ -400,8 +452,16 @@ impl Packages {
                     self.registry_active.insert(id, active);
                     continue;
                 }
-                Err(_) if active.claim.is_some() => RegistryEvent::Receipt(Err(
-                    "The receipt worker stopped. The verified archive and claim were retained."
+                Err(_)
+                    if active.claim.is_some() && active.operation.status == Status::Completed =>
+                {
+                    RegistryEvent::Receipt(Err(
+                        "The receipt worker stopped. The verified archive and claim were retained."
+                            .into(),
+                    ))
+                }
+                Err(_) if active.claim.is_some() => RegistryEvent::Promoted(Err(
+                    "Archive verification stopped before it was saved. Retry the exact release."
                         .into(),
                 )),
                 Err(_) => RegistryEvent::Transferred(Box::new(Err(
@@ -410,6 +470,23 @@ impl Packages {
             };
             changed = true;
             match event {
+                RegistryEvent::Cached(outcome) => match outcome {
+                    Ok(()) => {
+                        active.operation.status = Status::Completed;
+                        active.operation.received_bytes = active.operation.total_bytes;
+                        active.operation.message =
+                            "Exact verified archive is cached. No new download receipt was sent."
+                                .into();
+                    }
+                    Err(message) => {
+                        active.operation.status = if message == super::CANCELLED {
+                            Status::Cancelled
+                        } else {
+                            Status::Failed
+                        };
+                        active.operation.message = message;
+                    }
+                },
                 RegistryEvent::Transferred(outcome) if outcome.is_ok() => {
                     let (verified, current) = outcome.unwrap();
                     let (claim, updated) = storage
@@ -433,35 +510,34 @@ impl Packages {
                                 OffsetDateTime::now_utc(),
                             )
                             .map_err(|e| e.to_string())?;
-                        promote(
-                            storage.package_root(),
-                            &active.identity,
-                            &verified,
-                            Uuid::parse_str(&active.operation.id).unwrap(),
-                        )?;
                         Ok(current)
                     })();
                     match outcome {
                         Ok(current) => {
-                            active.operation.status = Status::Completed;
+                            let root = storage.package_root().to_owned();
+                            let identity = active.identity.clone();
+                            let operation_id = Uuid::parse_str(&active.operation.id).unwrap();
+                            let cancel = active.cancel.clone();
+                            let auth_abort = active.abort.clone();
+                            let sender = active.sender.clone();
                             active.operation.message =
-                                "Archive verified and saved. Download receipt pending; retry when signed in. Installation remains pending."
-                                    .into();
-                            active.operation.received_bytes = active.operation.total_bytes;
+                                "Checking the complete archive before saving it.".into();
                             storage
                                 .save_package(&active.operation)
                                 .map_err(|e| e.to_string())?;
-                            let client = active.client.clone();
-                            let bearer = active.bearer.clone();
-                            let abort = active.abort.clone();
-                            let sender = active.sender.clone();
-                            active.worker = tauri::async_runtime::spawn(async move {
-                                let result = client
-                                    .retry_receipt(&claim, &current, &bearer, abort)
-                                    .await
-                                    .map(|_| ())
-                                    .map_err(network_error);
-                                let _ = sender.send(RegistryEvent::Receipt(result));
+                            active.worker = tauri::async_runtime::spawn_blocking(move || {
+                                let result = cancel.check().and_then(|_| {
+                                    promote(
+                                        &root,
+                                        &identity,
+                                        &verified,
+                                        operation_id,
+                                        &cancel,
+                                        &auth_abort,
+                                    )?;
+                                    Ok(current)
+                                });
+                                let _ = sender.send(RegistryEvent::Promoted(result));
                             });
                             self.registry_active.insert(id, active);
                             continue;
@@ -503,6 +579,54 @@ impl Packages {
                         }
                     }
                 }
+                RegistryEvent::Promoted(result) => match result {
+                    Ok(current) => {
+                        active.operation.status = Status::Completed;
+                        active.operation.message =
+                            "Archive verified and saved. Download receipt pending; retry when signed in. Installation remains pending."
+                                .into();
+                        active.operation.received_bytes = active.operation.total_bytes;
+                        storage
+                            .save_package(&active.operation)
+                            .map_err(|e| e.to_string())?;
+                        let claim = active
+                            .claim
+                            .as_ref()
+                            .ok_or("Receipt claim is missing.")?
+                            .clone();
+                        let client = active.client.clone();
+                        let bearer = active.bearer.clone();
+                        let abort = active.abort.clone();
+                        let sender = active.sender.clone();
+                        active.worker = tauri::async_runtime::spawn(async move {
+                            let result = client
+                                .retry_receipt(&claim, &current, &bearer, abort)
+                                .await
+                                .map(|_| ())
+                                .map_err(network_error);
+                            let _ = sender.send(RegistryEvent::Receipt(result));
+                        });
+                        self.registry_active.insert(id, active);
+                        continue;
+                    }
+                    Err(message) => {
+                        active.operation.status = if message == super::CANCELLED {
+                            Status::Cancelled
+                        } else {
+                            Status::Failed
+                        };
+                        active.operation.message = message;
+                        if let Err(error) = discard_stage(
+                            storage.package_root(),
+                            Uuid::parse_str(&active.operation.id).unwrap(),
+                        ) {
+                            active
+                                .operation
+                                .message
+                                .push_str(&format!(" Staging cleanup needs attention: {error}"));
+                        }
+                    }
+                },
                 RegistryEvent::Receipt(result) => {
                     active.operation.status = Status::Completed;
                     active.operation.received_bytes = active.operation.total_bytes;
@@ -876,7 +1000,40 @@ mod tests {
         drop(store);
         let mut store = Storage::open(root.path()).unwrap();
         let mut queue = Packages::open(&mut store).unwrap();
-        let cached_operation = queue
+        let cached_path = cached(root.path(), &identity).unwrap().unwrap();
+        let mut cached_operation = queue
+            .start_registry(
+                &mut store,
+                &Uuid::new_v4().to_string(),
+                RegistryRequest {
+                    mod_id,
+                    release_id,
+                    root_public,
+                    client: client.clone(),
+                    session: session.clone(),
+                    bearer: "fixture-token".into(),
+                    auth_cancel: auth_cancel.clone(),
+                },
+            )
+            .unwrap();
+        assert_eq!(cached_operation.status, Status::Preparing);
+        for _ in 0..100 {
+            queue.poll(&mut store).unwrap();
+            cached_operation = queue
+                .operations(&store)
+                .unwrap()
+                .into_iter()
+                .find(|operation| operation.id == cached_operation.id)
+                .unwrap();
+            if cached_operation.status == Status::Completed {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert_eq!(cached_operation.status, Status::Completed);
+        assert!(cached_operation.message.contains("No new download receipt"));
+        fs::write(cached_path, b"changed cached bytes").unwrap();
+        let mut corrupt_operation = queue
             .start_registry(
                 &mut store,
                 &Uuid::new_v4().to_string(),
@@ -891,8 +1048,22 @@ mod tests {
                 },
             )
             .unwrap();
-        assert_eq!(cached_operation.status, Status::Completed);
-        assert!(cached_operation.message.contains("No new download receipt"));
+        for _ in 0..100 {
+            queue.poll(&mut store).unwrap();
+            corrupt_operation = queue
+                .operations(&store)
+                .unwrap()
+                .into_iter()
+                .find(|operation| operation.id == corrupt_operation.id)
+                .unwrap();
+            if corrupt_operation.status == Status::Failed {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert_eq!(corrupt_operation.status, Status::Failed);
+        assert!(corrupt_operation.message.contains("size changed"));
+        assert!(store.pending_registry_receipts(account).unwrap().is_empty());
     }
 
     #[tokio::test]
