@@ -74,6 +74,24 @@ pub enum ErrorCode {
     ServiceUnavailable,
 }
 
+impl ErrorCode {
+    fn matches_status(&self, status: StatusCode) -> bool {
+        match self {
+            Self::ValidationFailed => status == StatusCode::BAD_REQUEST,
+            Self::Unauthenticated => status == StatusCode::UNAUTHORIZED,
+            Self::Forbidden | Self::ReleaseBlocked => status == StatusCode::FORBIDDEN,
+            Self::NotFound => status == StatusCode::NOT_FOUND,
+            Self::Conflict
+            | Self::RevisionConflict
+            | Self::DependencyUnavailable
+            | Self::SecurityStale => status == StatusCode::CONFLICT,
+            Self::ReleaseUnavailable => status == StatusCode::GONE,
+            Self::RateLimited => status == StatusCode::TOO_MANY_REQUESTS,
+            Self::ServiceUnavailable => status == StatusCode::SERVICE_UNAVAILABLE,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FieldProblem {
@@ -236,9 +254,14 @@ impl Client {
                 serde_json::from_value(value).map_err(|_| Error::Protocol)
             } else if let Ok(error) = serde_json::from_value::<ErrorEnvelope>(value) {
                 if error.api_version != 1
+                    || !error.error.code.matches_status(status)
                     || error.error.message.is_empty()
                     || error.error.message.len() > 1000
                     || error.error.problems.len() > 20
+                    || error.error.problems.iter().any(|problem| {
+                        !(1..=100).contains(&problem.field.len())
+                            || !(1..=100).contains(&problem.code.len())
+                    })
                     || error
                         .error
                         .retry_after_seconds
@@ -477,6 +500,39 @@ mod tests {
         body["data"]["releaseId"] = serde_json::json!("11111111-1111-4111-8111-111111111111");
         body["data"]["artifact"]["bytes"] = serde_json::json!(9_007_199_254_740_992u64);
         let (origin, thread) = serve("200 OK", &body.to_string(), "");
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let (_sender, cancel) = watch::channel(false);
+        assert!(matches!(
+            client.release(id, "fixture-token", cancel).await,
+            Err(Error::Protocol)
+        ));
+        thread.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn retry_after_requires_matching_structured_error() {
+        let body = serde_json::json!({"apiVersion":1,"error":{"code":"rate_limited","message":"Try again later.","requestId":"44444444-4444-4444-8444-444444444444","retryAfterSeconds":7,"problems":[]}}).to_string();
+        let id = ReleaseId(uuid::Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap());
+        let (origin, thread) = serve("429 Too Many Requests", &body, "Retry-After: 7\r\n");
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let (_sender, cancel) = watch::channel(false);
+        assert!(matches!(
+            client.release(id, "fixture-token", cancel).await,
+            Err(Error::Server(
+                StatusCode::TOO_MANY_REQUESTS,
+                ResponseError {
+                    retry_after_seconds: Some(7),
+                    ..
+                }
+            ))
+        ));
+        thread.join().unwrap();
+
+        let (origin, thread) = serve("429 Too Many Requests", &body, "Retry-After: 8\r\n");
         let client =
             Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
                 .unwrap();
