@@ -252,6 +252,46 @@ impl Client {
         Ok(result)
     }
 
+    pub async fn registry_keys(
+        &self,
+        bearer: &str,
+        cancel: watch::Receiver<bool>,
+    ) -> Result<Vec<u8>, Error> {
+        self.signed("/registry/keys", bearer, cancel).await
+    }
+
+    pub async fn registry_security(
+        &self,
+        bearer: &str,
+        cancel: watch::Receiver<bool>,
+    ) -> Result<Vec<u8>, Error> {
+        self.signed("/registry/security", bearer, cancel).await
+    }
+
+    pub async fn registry_manifest(
+        &self,
+        release_id: ReleaseId,
+        bearer: &str,
+        cancel: watch::Receiver<bool>,
+    ) -> Result<Vec<u8>, Error> {
+        self.signed(
+            &format!("/registry/releases/{}/manifest", release_id.0),
+            bearer,
+            cancel,
+        )
+        .await
+    }
+
+    async fn signed(
+        &self,
+        path: &str,
+        bearer: &str,
+        cancel: watch::Receiver<bool>,
+    ) -> Result<Vec<u8>, Error> {
+        let value: serde_json::Value = self.get(path, Some(bearer), cancel).await?;
+        serde_json::to_vec(&value).map_err(|_| Error::Protocol)
+    }
+
     async fn get<T: DeserializeOwned>(
         &self,
         path: &str,
@@ -449,6 +489,49 @@ mod tests {
             "http://localhost:3000/v1",
         ] {
             assert!(Config::new(api, "https://starframemanager.com/", true).is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn signed_registry_routes_keep_manager_bearer_on_the_api_origin() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/registry-keys-v1.json"
+        ))
+        .unwrap();
+        let release_id =
+            ReleaseId(uuid::Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap());
+        for (route, body) in [
+            ("keys", &fixture["envelope"]),
+            ("security", &fixture["securityEnvelope"]),
+            ("manifest", &fixture["releaseEnvelope"]),
+        ] {
+            let (origin, thread) = serve("200 OK", &body.to_string(), "");
+            let client = Client::new(
+                Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap(),
+            )
+            .unwrap();
+            let (_sender, cancel) = watch::channel(false);
+            let response = match route {
+                "keys" => client.registry_keys("fixture-token", cancel).await,
+                "security" => client.registry_security("fixture-token", cancel).await,
+                _ => {
+                    client
+                        .registry_manifest(release_id, "fixture-token", cancel)
+                        .await
+                }
+            }
+            .unwrap();
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&response).unwrap(),
+                *body
+            );
+            let request = thread.join().unwrap();
+            let path = match route {
+                "manifest" => format!("/v1/registry/releases/{}/manifest", release_id.0),
+                _ => format!("/v1/registry/{route}"),
+            };
+            assert!(request.starts_with(&format!("GET {path} HTTP/1.1")));
+            assert!(request.contains("fixture-token"));
         }
     }
 
