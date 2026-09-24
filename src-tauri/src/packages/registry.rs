@@ -664,7 +664,7 @@ mod tests {
         identity: &DownloadIdentity,
         archive: &[u8],
         session: &Session,
-        receipt_ok: bool,
+        receipt_ok: Option<bool>,
     ) -> (String, thread::JoinHandle<Vec<String>>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let origin = format!("http://{}", listener.local_addr().unwrap());
@@ -678,7 +678,7 @@ mod tests {
         let session = session.clone();
         let thread = thread::spawn(move || {
             let mut paths = Vec::new();
-            for step in 0..4 {
+            for step in 0..if receipt_ok.is_some() { 4 } else { 3 } {
                 let (mut stream, _) = listener.accept().unwrap();
                 let incoming = request(&mut stream);
                 paths.push(incoming.lines().next().unwrap().to_owned());
@@ -708,7 +708,7 @@ mod tests {
                             .into_bytes(),
                         String::new(),
                     ),
-                    _ if receipt_ok => (
+                    _ if receipt_ok == Some(true) => (
                         "200 OK",
                         serde_json::json!({"apiVersion":1,"data":{
                             "releaseId":release_id.0,"counted":true
@@ -784,7 +784,7 @@ mod tests {
             .into();
         let session: Session = serde_json::from_value(session).unwrap();
         let account = session.account_id;
-        let (origin, thread) = serve_download(&identity, archive, &session, true);
+        let (origin, thread) = serve_download(&identity, archive, &session, Some(true));
         let client = Client::new(
             crate::registry::Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true)
                 .unwrap(),
@@ -877,7 +877,7 @@ mod tests {
             .unwrap()
             .into();
         let session: Session = serde_json::from_value(session).unwrap();
-        let (origin, thread) = serve_download(&identity, archive, &session, false);
+        let (origin, thread) = serve_download(&identity, archive, &session, Some(false));
         let client = Client::new(
             crate::registry::Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true)
                 .unwrap(),
@@ -1117,5 +1117,193 @@ mod tests {
             release_id.0
         )));
         assert!(content.starts_with("GET /v1/downloads/"));
+    }
+
+    #[tokio::test]
+    async fn newer_signed_block_prevents_queue_promotion_after_transfer() {
+        let root = tempfile::tempdir().unwrap();
+        let mut store = Storage::open(root.path()).unwrap();
+        let archive = b"PK\x03\x04blocked after transfer";
+        let (root_public, mod_id, release_id, identity) = signed_store(&mut store, archive);
+        let fixtures: serde_json::Value =
+            serde_json::from_str(include_str!("../../../tests/fixtures/registry-v1.json")).unwrap();
+        let mut session = fixtures
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|value| value["name"] == "session")
+            .unwrap()["body"]["data"]
+            .clone();
+        session["expiresAt"] = (OffsetDateTime::now_utc() + time::Duration::hours(1))
+            .format(&Rfc3339)
+            .unwrap()
+            .into();
+        let session: Session = serde_json::from_value(session).unwrap();
+        let (origin, server) = serve_download(&identity, archive, &session, None);
+        let client = Client::new(
+            crate::registry::Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true)
+                .unwrap(),
+        )
+        .unwrap();
+        let mut queue = Packages::open(&mut store).unwrap();
+        let (_sender, cancel) = watch::channel(false);
+        let operation = queue
+            .start_registry(
+                &mut store,
+                &Uuid::new_v4().to_string(),
+                RegistryRequest {
+                    mod_id,
+                    release_id,
+                    root_public,
+                    client,
+                    session: session.clone(),
+                    bearer: "fixture-token".into(),
+                    auth_cancel: cancel,
+                },
+            )
+            .unwrap();
+        assert_eq!(server.join().unwrap().len(), 3);
+        for _ in 0..100 {
+            if queue
+                .registry_active
+                .get(&operation.id)
+                .unwrap()
+                .worker
+                .inner()
+                .is_finished()
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/registry-keys-v1.json"
+        ))
+        .unwrap();
+        let online = Ed25519KeyPair::from_seed_unchecked(&[9u8; 32]).unwrap();
+        let mut security = fixture["securityEnvelope"]["signed"].clone();
+        security["revision"] = 2.into();
+        security["decisions"] = serde_json::json!([{
+            "sha256":identity.reference.sha256.as_str(),
+            "revision":2,"status":"blocked","reason":"Fixture block"
+        }]);
+        let signed = sign(
+            security,
+            &online,
+            &fixture["envelope"]["signed"]["keys"][0]["keyId"],
+            OffsetDateTime::now_utc(),
+            12,
+        );
+        store
+            .accept_registry_security(&signed, &root_public, OffsetDateTime::now_utc())
+            .unwrap();
+        queue.poll(&mut store).unwrap();
+        let finished = queue
+            .operations(&store)
+            .unwrap()
+            .into_iter()
+            .find(|item| item.id == operation.id)
+            .unwrap();
+        assert_eq!(finished.status, Status::Failed);
+        assert!(cached(root.path(), &identity).unwrap().is_none());
+        assert!(
+            store
+                .registry_hash_blocked(&identity.reference.sha256)
+                .unwrap()
+        );
+        assert_eq!(
+            store
+                .pending_registry_receipts(session.account_id)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            !stage_path(
+                &root.path().join("registry-archives"),
+                Uuid::parse_str(&operation.id).unwrap()
+            )
+            .exists()
+        );
+        assert!(store.registry_references().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn account_change_after_transfer_keeps_claim_without_cache_promotion() {
+        let root = tempfile::tempdir().unwrap();
+        let mut store = Storage::open(root.path()).unwrap();
+        let archive = b"PK\x03\x04account-bound transfer";
+        let (root_public, mod_id, release_id, identity) = signed_store(&mut store, archive);
+        let fixtures: serde_json::Value =
+            serde_json::from_str(include_str!("../../../tests/fixtures/registry-v1.json")).unwrap();
+        let mut session = fixtures
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|value| value["name"] == "session")
+            .unwrap()["body"]["data"]
+            .clone();
+        session["expiresAt"] = (OffsetDateTime::now_utc() + time::Duration::hours(1))
+            .format(&Rfc3339)
+            .unwrap()
+            .into();
+        let session: Session = serde_json::from_value(session).unwrap();
+        let other = Session {
+            account_id: Uuid::new_v4(),
+            ..session.clone()
+        };
+        let (origin, server) = serve_download(&identity, archive, &other, None);
+        let client = Client::new(
+            crate::registry::Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true)
+                .unwrap(),
+        )
+        .unwrap();
+        let mut queue = Packages::open(&mut store).unwrap();
+        let (_sender, cancel) = watch::channel(false);
+        let operation = queue
+            .start_registry(
+                &mut store,
+                &Uuid::new_v4().to_string(),
+                RegistryRequest {
+                    mod_id,
+                    release_id,
+                    root_public,
+                    client,
+                    session: session.clone(),
+                    bearer: "fixture-token".into(),
+                    auth_cancel: cancel,
+                },
+            )
+            .unwrap();
+        assert_eq!(server.join().unwrap().len(), 3);
+        for _ in 0..100 {
+            queue.poll(&mut store).unwrap();
+            if queue.registry_active.is_empty() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        let finished = queue
+            .operations(&store)
+            .unwrap()
+            .into_iter()
+            .find(|item| item.id == operation.id)
+            .unwrap();
+        assert_eq!(finished.status, Status::Failed);
+        assert!(finished.message.contains("Sign in again"));
+        assert!(cached(root.path(), &identity).unwrap().is_none());
+        assert_eq!(
+            store
+                .pending_registry_receipts(session.account_id)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            store
+                .pending_registry_receipts(other.account_id)
+                .unwrap()
+                .is_empty()
+        );
     }
 }
