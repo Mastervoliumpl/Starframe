@@ -52,6 +52,16 @@ pub fn package_action(
     queue.operations(store)
 }
 
+pub fn registry_package_action(
+    store: &mut Storage,
+    queue: &mut Packages,
+    request_id: &str,
+    request: packages::RegistryRequest,
+) -> Result<Vec<packages::Operation>, String> {
+    queue.start_registry(store, request_id, request)?;
+    queue.operations(store)
+}
+
 pub fn poll_packages(store: &mut Storage, queue: &mut Packages) -> Result<bool, String> {
     queue.poll(store).and_then(|changed| {
         sharing::poll(store, queue).map(|imports_changed| changed || imports_changed)

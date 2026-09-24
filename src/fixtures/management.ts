@@ -88,6 +88,32 @@ export function fixtureManagement(
     cleanupErrors: [],
   };
   const operations: PackageOperation[] = [];
+  if (new URLSearchParams(location.search).has('registryArchive')) {
+    operations.push(
+      {
+        id: crypto.randomUUID(),
+        requestId: crypto.randomUUID(),
+        releaseId: '11111111-1111-4111-8111-111111111111',
+        hash: 'a'.repeat(64),
+        kind: 'registry_archive',
+        status: 'completed',
+        message: 'Verified registry archive saved.',
+        receivedBytes: 10,
+        totalBytes: 10,
+      },
+      {
+        id: crypto.randomUUID(),
+        requestId: crypto.randomUUID(),
+        releaseId: '22222222-2222-4222-8222-222222222222',
+        hash: 'b'.repeat(64),
+        kind: 'registry_archive',
+        status: 'failed',
+        message: 'The signed release is no longer available.',
+        receivedBytes: 0,
+        totalBytes: 10,
+      },
+    );
+  }
   const security = new URLSearchParams(location.search).get('security');
   if (
     populated &&
@@ -390,6 +416,7 @@ export function fixtureManagement(
           requestId: action.requestId,
           releaseId: 'local-import',
           hash: reference.hash,
+          kind: 'package',
           status: 'completed',
           message: 'Local fixture copied into the library.',
           receivedBytes: 100,
@@ -453,6 +480,7 @@ export function fixtureManagement(
           requestId: action.requestId,
           releaseId: release.id,
           hash: release.artifact.sha256,
+          kind: 'package',
           status: 'preparing',
           message: 'Downloading fixture bytes…',
           receivedBytes: 0,

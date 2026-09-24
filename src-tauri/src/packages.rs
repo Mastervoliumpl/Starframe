@@ -51,6 +51,16 @@ pub enum Status {
     Failed,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "PackageKind"))]
+pub enum Kind {
+    #[default]
+    Package,
+    RegistryArchive,
+}
+
 #[derive(Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 #[cfg_attr(test, derive(ts_rs::TS))]
@@ -82,6 +92,8 @@ pub struct Operation {
     pub request_id: String,
     pub release_id: String,
     pub hash: String,
+    #[serde(default)]
+    pub kind: Kind,
     pub status: Status,
     pub message: String,
     #[cfg_attr(test, ts(type = "number"))]
@@ -296,6 +308,7 @@ impl Packages {
             request_id: request_id.into(),
             release_id: release_id.into(),
             hash: artifact.sha256.clone(),
+            kind: Kind::Package,
             status: Status::Preparing,
             message: "Downloading and verifying the approved package.".into(),
             received_bytes: 0,
@@ -416,6 +429,7 @@ impl Packages {
             request_id: Uuid::new_v4().to_string(),
             release_id: "local-verification".into(),
             hash: reference.hash.clone(),
+            kind: Kind::Package,
             status: Status::Preparing,
             message: "Verifying matching local content. No download is needed.".into(),
             received_bytes: 0,

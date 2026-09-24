@@ -6,8 +6,8 @@
 
 <h2 class="download-title">Downloads and imports</h2>
 <p>
-  Completed downloads and imports are verified in your library. Enable them in
-  My mods; game readiness is shown in the launch area.
+  Installed releases and local imports appear in My mods. A verified registry
+  archive needs an approved install plan before it can join your library.
 </p>
 {#if !$manager.operations.length}<p class="result-count">
     No downloads or imports yet. Install a release from Catalog or import a
@@ -21,7 +21,9 @@
           </h3>
           <span
             >{op.status === 'completed'
-              ? 'Installed in library'
+              ? op.kind === 'registry_archive'
+                ? 'Archive saved'
+                : 'Installed in library'
               : op.status}</span
           >
         </div>
@@ -53,7 +55,7 @@
                 ? 'Cancel import'
                 : 'Cancel download'}</button
           >
-        {:else if (op.status === 'failed' || op.status === 'cancelled') && op.releaseId !== 'local-import' && op.releaseId !== 'local-verification'}<button
+        {:else if (op.status === 'failed' || op.status === 'cancelled') && op.kind !== 'registry_archive' && op.releaseId !== 'local-import' && op.releaseId !== 'local-verification'}<button
             disabled={unavailable ||
               $manager.pending.includes(`install:${op.releaseId}`)}
             onclick={() => manager.install(op.releaseId)}
@@ -62,6 +64,11 @@
         {#if (op.status === 'failed' || op.status === 'cancelled') && op.releaseId === 'local-import'}<p
           >
             Fix the source, then use Import local mod in My mods to retry.
+          </p>
+        {:else if (op.status === 'failed' || op.status === 'cancelled') && op.kind === 'registry_archive'}<p
+          >
+            The archive was not saved. Retry this release when registry
+            downloads are available.
           </p>
         {:else if op.status === 'failed' && op.releaseId !== 'local-verification'}<p
           >

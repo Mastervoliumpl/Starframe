@@ -143,6 +143,7 @@ fn migration_watches_unambiguous_sources_and_reimport_selects_an_ambiguous_sourc
                 request_id: Uuid::new_v4().to_string(),
                 release_id: "local-import".into(),
                 hash: next.prepared.hash.clone(),
+                kind: crate::packages::Kind::Package,
                 status: Status::Completed,
                 message: "Reimport fixture".into(),
                 received_bytes: 1,

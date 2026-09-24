@@ -44,6 +44,11 @@ enum Request {
         packages::Action,
         tokio::sync::oneshot::Sender<Result<Vec<packages::Operation>, String>>,
     ),
+    RegistryPackage(
+        String,
+        Box<packages::RegistryRequest>,
+        tokio::sync::oneshot::Sender<Result<Vec<packages::Operation>, String>>,
+    ),
     Discover,
     Setup,
     Launch,
@@ -130,6 +135,31 @@ impl GameService {
                 )
             })?
             .map_err(|message| CommandError::new("package_failed", &message))
+    }
+    pub async fn registry_package(
+        &self,
+        request_id: String,
+        request: packages::RegistryRequest,
+    ) -> Result<Vec<packages::Operation>, CommandError> {
+        let (reply, result) = tokio::sync::oneshot::channel();
+        self.sender
+            .try_send(Request::RegistryPackage(
+                request_id,
+                Box::new(request),
+                reply,
+            ))
+            .map_err(|_| {
+                CommandError::new("package_busy", "The storage worker is busy. Retry shortly.")
+            })?;
+        result
+            .await
+            .map_err(|_| {
+                CommandError::new(
+                    "package_unavailable",
+                    "Package preparation is unavailable. Restart Starframe.",
+                )
+            })?
+            .map_err(|message| CommandError::new("registry_download_failed", &message))
     }
     pub fn writing(&self) -> bool {
         self.writing.load(Ordering::SeqCst)

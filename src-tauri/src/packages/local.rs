@@ -70,6 +70,7 @@ impl Packages {
             request_id: request_id.into(),
             release_id: "local-import".into(),
             hash: "0".repeat(64),
+            kind: Kind::Package,
             status: Status::Preparing,
             message: "Copying and verifying the local source. See Downloads for the result.".into(),
             received_bytes: 0,

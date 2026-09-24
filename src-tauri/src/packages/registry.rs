@@ -1,6 +1,6 @@
 use super::{
-    Cancel, Operation, Packages, RegistryActive, RegistryEvent, RegistryRequest, Result, Status,
-    read_file,
+    Cancel, Kind, Operation, Packages, RegistryActive, RegistryEvent, RegistryRequest, Result,
+    Status, read_file,
 };
 use crate::{
     filesystem::pin,
@@ -277,6 +277,7 @@ impl Packages {
             request_id: request_id.into(),
             release_id: release_id.0.to_string(),
             hash: identity.reference.sha256.as_str().into(),
+            kind: Kind::RegistryArchive,
             status: Status::Preparing,
             message: "Downloading the exact signed registry archive.".into(),
             received_bytes: 0,
@@ -792,21 +793,25 @@ mod tests {
         .unwrap();
         let mut queue = Packages::open(&mut store).unwrap();
         let (_auth_sender, auth_cancel) = watch::channel(false);
-        let started = queue
-            .start_registry(
-                &mut store,
-                &Uuid::new_v4().to_string(),
-                RegistryRequest {
-                    mod_id,
-                    release_id,
-                    root_public,
-                    client: client.clone(),
-                    session: session.clone(),
-                    bearer: "fixture-token".into(),
-                    auth_cancel: auth_cancel.clone(),
-                },
-            )
-            .unwrap();
+        let request_id = Uuid::new_v4().to_string();
+        let started = crate::backend::registry_package_action(
+            &mut store,
+            &mut queue,
+            &request_id,
+            RegistryRequest {
+                mod_id,
+                release_id,
+                root_public,
+                client: client.clone(),
+                session: session.clone(),
+                bearer: "fixture-token".into(),
+                auth_cancel: auth_cancel.clone(),
+            },
+        )
+        .unwrap()
+        .into_iter()
+        .find(|operation| operation.request_id == request_id)
+        .unwrap();
         let mut final_operation = started;
         for _ in 0..100 {
             queue.poll(&mut store).unwrap();

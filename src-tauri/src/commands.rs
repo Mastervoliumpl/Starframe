@@ -112,6 +112,25 @@ pub async fn package_action(
 }
 
 #[tauri::command]
+pub async fn registry_download(
+    service: State<'_, crate::game_service::GameService>,
+    auth: State<'_, crate::auth_service::AuthService>,
+    request_id: String,
+    mod_id: u64,
+    release_id: String,
+) -> Result<Vec<starframe::packages::Operation>, CommandError> {
+    uuid::Uuid::parse_str(&request_id)
+        .map_err(|_| CommandError::new("registry_request", "Invalid download request ID."))?;
+    let mod_id = starframe::registry::ModId::try_from(mod_id)
+        .map_err(|_| CommandError::new("registry_mod", "Invalid registry ModID."))?;
+    let release_id = uuid::Uuid::parse_str(&release_id)
+        .map(starframe::registry::ReleaseId)
+        .map_err(|_| CommandError::new("registry_release", "Invalid registry ReleaseID."))?;
+    let request = auth.registry_request(mod_id, release_id).await?;
+    service.registry_package(request_id, request).await
+}
+
+#[tauri::command]
 pub fn game_action(
     app: tauri::AppHandle,
     service: State<'_, crate::game_service::GameService>,

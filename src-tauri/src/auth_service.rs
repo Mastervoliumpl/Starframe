@@ -1,7 +1,9 @@
 use crate::model::CommandError;
 use serde::Serialize;
+use starframe::packages::RegistryRequest;
 use starframe::registry::{
-    Auth, AuthError, ChallengeView, Client, Config, CredentialStore, Error, Poll, Session, SignOut,
+    Auth, AuthError, ChallengeView, Client, Config, CredentialStore, Error, ModId, Poll, ReleaseId,
+    Session, SignOut,
 };
 use std::sync::Mutex;
 use tauri::State;
@@ -10,8 +12,11 @@ use tokio::sync::{Mutex as AsyncMutex, watch};
 
 pub struct AuthService {
     auth: AsyncMutex<Auth>,
+    client: Client,
     cancel: Mutex<watch::Sender<bool>>,
 }
+
+const PRODUCTION_REGISTRY_ROOT: Option<[u8; 32]> = None;
 
 impl AuthService {
     pub fn new() -> Result<Self, String> {
@@ -34,8 +39,44 @@ impl AuthService {
             CredentialStore::production()
         };
         Ok(Self {
-            auth: AsyncMutex::new(Auth::with_store(client, store)),
+            auth: AsyncMutex::new(Auth::with_store(client.clone(), store)),
+            client,
             cancel: Mutex::new(cancel),
+        })
+    }
+
+    pub async fn registry_request(
+        &self,
+        mod_id: ModId,
+        release_id: ReleaseId,
+    ) -> Result<RegistryRequest, CommandError> {
+        let root_public = PRODUCTION_REGISTRY_ROOT.ok_or_else(|| {
+            CommandError::new(
+                "registry_trust_unavailable",
+                "This Starframe build has no independently provisioned registry root. Registry downloads are unavailable; local mods remain usable.",
+            )
+        })?;
+        let cancel = self.receiver();
+        let mut auth = self.auth.lock().await;
+        let session = auth
+            .inspect(cancel.clone())
+            .await
+            .map_err(failure)?
+            .ok_or_else(|| {
+                CommandError::new("auth_required", "Sign in to download this release.")
+            })?;
+        let bearer = auth
+            .token()
+            .ok_or_else(|| CommandError::new("auth_required", "Sign in to download this release."))?
+            .to_owned();
+        Ok(RegistryRequest {
+            mod_id,
+            release_id,
+            root_public,
+            client: self.client.clone(),
+            session,
+            bearer,
+            auth_cancel: cancel,
         })
     }
 
@@ -170,4 +211,21 @@ pub async fn auth_cancel(service: State<'_, AuthService>) -> Result<(), CommandE
     service.stop();
     service.auth.lock().await.cancel();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn production_download_refuses_an_unprovisioned_registry_root() {
+        let service = AuthService::new().unwrap();
+        let error = service
+            .registry_request(ModId::try_from(1).unwrap(), ReleaseId(uuid::Uuid::new_v4()))
+            .await
+            .err()
+            .unwrap();
+        assert_eq!(error.code, "registry_trust_unavailable");
+        assert!(error.message.contains("local mods remain usable"));
+    }
 }
