@@ -373,6 +373,11 @@ fn depth(value: &Value, level: usize) -> Result<()> {
 
 // serde_json::Value otherwise keeps the last duplicate key, hiding malformed contracts.
 struct Strict(Value);
+pub fn unique_json(bytes: &[u8]) -> Result<Value> {
+    let Strict(value) = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+    depth(&value, 0)?;
+    Ok(value)
+}
 impl<'de> Deserialize<'de> for Strict {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         struct StrictVisitor;

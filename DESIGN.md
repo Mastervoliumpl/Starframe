@@ -1,14 +1,14 @@
 # Starframe: design direction
 
-Status: revision 0.13, 17 September 2026. Product name: Starframe. This revision records the owner's proportionate verification policy and reduced alpha acceptance scope. The app-update channel defaults, installer identity, automatic runtime lifecycle, uninstall data default, deferred Windows certificate signing and catalog expiry decisions remain in effect.
+Status: revision 0.14, 24 September 2026. Product name: Starframe. Milestone 0.7.0 replaces the pre-release GitHub catalog with the website registry. The 0.6.0 verification policy, app-update channel defaults, installer identity, runtime lifecycle, uninstall data default and deferred Windows certificate signing remain in effect. Catalog-specific passages below describe the completed pre-release design until their 0.7.0 replacements land.
 
 This is the accepted design handoff. The user authorized milestone 0.1.0 on 6 September 2026, including desktop navigation and live state in issue #8. Later feature screens remain planned. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
 ## 1. Confirmed direction
 
-Build Starframe, an installable desktop mod manager for Sanctuary: Shattered Sun, Windows first. Users can download approved releases, manage installed mods, create and share collections, and launch the game. The owner curates individual releases. Downloads come from authors' locations; the app does not host mod binaries.
+Build Starframe, an installable desktop mod manager for Sanctuary: Shattered Sun, Windows first. Users can download approved releases, manage installed mods, create and share collections, and launch the game. The owner curates individual releases. In 0.7.0, the website registry supplies exact approved releases and authenticated archive downloads. The website's signed installation metadata must declare supported code entry points and content placement before the manager installs a registry release. Starframe must not infer missing fields. No website deployment or app release is part of this milestone.
 
-Local imports are managed mods too. Developers must be able to load and manage their own local builds. Label their origin clearly as `Local import`; provide the same management controls without online catalog version checks. Watch imported sources and prepare updated copies as described in [ARCHITECTURE.md](ARCHITECTURE.md).
+Local imports are managed mods too. Developers must be able to load and manage their own local builds. Label their origin clearly as `Local import`; provide the same management controls without online registry version checks. Watch imported sources and prepare updated copies as described in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Starframe owns its in-game mod runtime and settings UI, initially using BepInEx for bootstrap. Keep the desktop manager usable above the game's planned native mod support when that becomes available. Its interface is not yet published; supported controls must follow the active integration's capabilities.
 
@@ -29,7 +29,7 @@ The user supplied these six colors:
 | Light gray | `#CBD5E1` | Body text and secondary labels |
 | White | `#F8FAFC` | Titles and strongest text |
 
-Game compatibility and mod releases are separate concepts. Warn when a catalog mod was made for an older game version, while still allowing the user to enable it and try launching. Collections contain a name and an ordered list of mod references. Sharing preserves those releases and their order, without mod settings. Refresh catalog data independently on launch and every five minutes while the desktop app is open; this does not require an app update.
+Game compatibility and mod releases are separate concepts. Warn when a registry mod was made for an older game version, while still allowing the user to enable it and try launching. Collections contain a name and an ordered list of exact mod references. A website release reference pins its numeric ModID, UUID ReleaseID and SHA-256; its version label is display text. Sharing preserves those releases and their order, without mod settings. Registry data and security decisions refresh independently of app updates. Installed mods, local imports and game launching remain usable when the manager session or website is unavailable.
 
 ### Verification priorities
 

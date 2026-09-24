@@ -9,6 +9,7 @@ pub mod maintenance;
 pub mod mods;
 pub mod ordering;
 pub mod packages;
+pub mod registry;
 pub mod runtime_contract;
 pub mod sharing;
 pub mod space;
