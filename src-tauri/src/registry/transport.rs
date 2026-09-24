@@ -153,6 +153,34 @@ pub struct VerifiedArchive {
     grant: DownloadGrant,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReceiptClaim {
+    pub(crate) account_id: uuid::Uuid,
+    pub(crate) download_id: uuid::Uuid,
+    pub(crate) release_id: ReleaseId,
+    pub(crate) sha256: super::Sha256,
+    pub(crate) bytes: u64,
+}
+
+impl VerifiedArchive {
+    pub(crate) fn receipt_claim(&self) -> ReceiptClaim {
+        ReceiptClaim {
+            account_id: self.grant.account_id,
+            download_id: self.grant.download_id,
+            release_id: self.grant.reference.release_id,
+            sha256: self.grant.reference.sha256.clone(),
+            bytes: self.grant.bytes,
+        }
+    }
+}
+
+impl ReceiptClaim {
+    pub(crate) fn valid(&self) -> bool {
+        (1..=MAX_ARCHIVE_BYTES).contains(&self.bytes)
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DownloadReceipt {
@@ -570,26 +598,33 @@ impl Client {
         bearer: &str,
         cancel: watch::Receiver<bool>,
     ) -> Result<DownloadReceipt, Error> {
-        if !can_download(session) || session.account_id != verified.grant.account_id {
+        self.retry_receipt(&verified.receipt_claim(), session, bearer, cancel)
+            .await
+    }
+
+    pub async fn retry_receipt(
+        &self,
+        claim: &ReceiptClaim,
+        session: &Session,
+        bearer: &str,
+        cancel: watch::Receiver<bool>,
+    ) -> Result<DownloadReceipt, Error> {
+        if !can_download(session) || session.account_id != claim.account_id {
             return Err(Error::InvalidToken);
         }
-        let grant = &verified.grant;
         let (status, response): (StatusCode, ApiResponse<DownloadReceipt>) = self
             .post_with_bearer(
-                &format!(
-                    "/registry/releases/{}/receipts",
-                    grant.reference.release_id.0
-                ),
+                &format!("/registry/releases/{}/receipts", claim.release_id.0),
                 &serde_json::json!({
-                    "downloadId": grant.download_id,
-                    "sha256": grant.reference.sha256.as_str(),
-                    "bytes": grant.bytes,
+                    "downloadId": claim.download_id,
+                    "sha256": claim.sha256.as_str(),
+                    "bytes": claim.bytes,
                 }),
                 Some(bearer),
                 cancel,
             )
             .await?;
-        if status != StatusCode::OK || response.data.release_id != grant.reference.release_id {
+        if status != StatusCode::OK || response.data.release_id != claim.release_id {
             return Err(Error::Protocol);
         }
         Ok(response.data)
@@ -993,6 +1028,45 @@ mod tests {
         assert!(request.starts_with(&format!("GET {} HTTP/1.1", grant.content_path)));
         assert!(!request.contains("Range: bytes="));
 
+        let data = root.path().join("receipt-data");
+        let mut store = crate::storage::Storage::open(&data).unwrap();
+        let claim = store.record_registry_receipt(&verified).unwrap();
+        assert_eq!(claim.download_id, grant.download_id);
+        drop(store);
+        let mut store = crate::storage::Storage::open(&data).unwrap();
+        let session = manager_session();
+        let mut other = session.clone();
+        other.account_id = uuid::Uuid::new_v4();
+        assert!(
+            store
+                .pending_registry_receipts(other.account_id)
+                .unwrap()
+                .is_empty()
+        );
+        let pending = store.pending_registry_receipts(session.account_id).unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].download_id, grant.download_id);
+
+        let (origin, thread) = serve("503 Service Unavailable", "", "");
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let (_sender, cancel) = watch::channel(false);
+        assert!(
+            client
+                .retry_receipt(&pending[0], &session, "fixture-token", cancel)
+                .await
+                .is_err()
+        );
+        thread.join().unwrap();
+        assert_eq!(
+            store
+                .pending_registry_receipts(session.account_id)
+                .unwrap()
+                .len(),
+            1
+        );
+
         let receipt_body = serde_json::json!({"apiVersion":1,"data":{
             "releaseId":grant.reference.release_id,"counted":true
         }});
@@ -1000,14 +1074,20 @@ mod tests {
         let client =
             Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
                 .unwrap();
-        let session = manager_session();
         let (_sender, cancel) = watch::channel(false);
         assert!(
             client
-                .download_receipt(&verified, &session, "fixture-token", cancel)
+                .retry_receipt(&pending[0], &session, "fixture-token", cancel)
                 .await
                 .unwrap()
                 .counted
+        );
+        store.clear_registry_receipt(&pending[0]).unwrap();
+        assert!(
+            store
+                .pending_registry_receipts(session.account_id)
+                .unwrap()
+                .is_empty()
         );
         let request = thread.join().unwrap();
         assert!(request.starts_with(&format!(

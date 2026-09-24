@@ -130,7 +130,7 @@ fn migration_watches_unambiguous_sources_and_reimport_selects_an_ambiguous_sourc
         drop(store);
         let db = rusqlite::Connection::open(root.path().join("data/sqlite/state.db")).unwrap();
         db.execute_batch(
-            "DROP TABLE registry_trust_streams; DROP TABLE registry_decisions; DROP TABLE registry_library; DROP TABLE app_updates; DROP TABLE catalog_security; DROP TABLE local_watches; PRAGMA user_version=11;",
+            "DROP TABLE registry_receipt_attempts; DROP TABLE registry_trust_streams; DROP TABLE registry_decisions; DROP TABLE registry_library; DROP TABLE app_updates; DROP TABLE catalog_security; DROP TABLE local_watches; PRAGMA user_version=11;",
         )
         .unwrap();
         drop(db);

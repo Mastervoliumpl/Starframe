@@ -9,6 +9,7 @@ pub use auth::{Auth, AuthError, ChallengeView, Poll, SignOut};
 #[cfg(windows)]
 pub use credential::CredentialStore;
 pub use transport::{Client, Config, Error, ErrorCode, FieldProblem, ResponseError};
+pub(crate) use transport::{ReceiptClaim, VerifiedArchive};
 pub use wire::{
     ApiResponse, Artifact, Availability, Dependency, ListQuery, Maintenance, ModList, ModSummary,
     Period, Release, ReleaseResult, Session, SessionContext, Sort,

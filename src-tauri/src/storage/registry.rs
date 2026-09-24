@@ -1,6 +1,6 @@
 use super::{Error, Result, Storage};
 use crate::registry::{
-    ExactReference, ModId, ReleaseId, Sha256,
+    ExactReference, ModId, ReceiptClaim, ReleaseId, Sha256, VerifiedArchive,
     trust::{self, Decision, DownloadIdentity, VerifiedKeyset, VerifiedRelease, VerifiedSecurity},
 };
 use rusqlite::{OptionalExtension, Transaction, params};
@@ -206,6 +206,61 @@ impl Storage {
                 "This archive is blocked by a signed registry security decision.".into(),
             ));
         }
+        Ok(())
+    }
+
+    pub fn record_registry_receipt(&mut self, verified: &VerifiedArchive) -> Result<ReceiptClaim> {
+        let claim = verified.receipt_claim();
+        if !claim.valid() {
+            return Err(Error::Invalid("Invalid verified registry receipt.".into()));
+        }
+        let record = serde_json::to_string(&claim)
+            .map_err(|_| Error::Invalid("Invalid verified registry receipt.".into()))?;
+        let tx = self.conn.transaction()?;
+        tx.execute(
+            "INSERT OR IGNORE INTO registry_receipt_attempts(download_id,account_id,record) VALUES (?,?,?)",
+            params![claim.download_id.to_string(), claim.account_id.to_string(), record],
+        )?;
+        let saved: (String, String) = tx.query_row(
+            "SELECT account_id,record FROM registry_receipt_attempts WHERE download_id=?",
+            [claim.download_id.to_string()],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        if saved != (claim.account_id.to_string(), record) {
+            return Err(Error::Invalid("Registry receipt identity changed.".into()));
+        }
+        tx.commit()?;
+        Ok(claim)
+    }
+
+    pub fn pending_registry_receipts(&self, account_id: Uuid) -> Result<Vec<ReceiptClaim>> {
+        self.conn
+            .prepare("SELECT download_id,record FROM registry_receipt_attempts WHERE account_id=? ORDER BY rowid")?
+            .query_map([account_id.to_string()], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?
+            .map(|row| {
+                let (id, record) = row?;
+                let claim: ReceiptClaim = serde_json::from_str(&record)
+                    .map_err(|_| Error::Invalid("Saved registry receipt is invalid.".into()))?;
+                if claim.download_id.to_string() != id
+                    || claim.account_id != account_id
+                    || !claim.valid()
+                {
+                    return Err(Error::Invalid("Saved registry receipt identity changed.".into()));
+                }
+                Ok(claim)
+            })
+            .collect()
+    }
+
+    pub fn clear_registry_receipt(&mut self, claim: &ReceiptClaim) -> Result<()> {
+        let record = serde_json::to_string(claim)
+            .map_err(|_| Error::Invalid("Invalid verified registry receipt.".into()))?;
+        self.conn.execute(
+            "DELETE FROM registry_receipt_attempts WHERE download_id=? AND account_id=? AND record=?",
+            params![claim.download_id.to_string(), claim.account_id.to_string(), record],
+        )?;
         Ok(())
     }
 
