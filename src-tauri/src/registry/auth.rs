@@ -593,6 +593,122 @@ mod tests {
         server.join().unwrap();
     }
 
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn switching_accounts_clears_the_old_credential_before_exchange() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let website = origin.clone();
+        let server = std::thread::spawn(move || {
+            let session = |account_id: &str| {
+                serde_json::json!({"apiVersion":1,"data":{
+                    "accountId":account_id,
+                    "profile":{"displayName":"Fixture user","avatarUrl":null},
+                    "context":"manager","authenticatedAt":"2026-09-20T00:00:00Z",
+                    "expiresAt":(OffsetDateTime::now_utc() + time::Duration::days(29)).format(&Rfc3339).unwrap(),
+                    "capabilities":["download_mod"],"isOwner":false
+                }})
+            };
+            let (mut inspect_old, _) = listener.accept().unwrap();
+            assert!(read_json(&inspect_old).is_null());
+            reply(
+                &mut inspect_old,
+                "200 OK",
+                session("11111111-1111-4111-8111-111111111111"),
+            );
+            let (mut revoke, _) = listener.accept().unwrap();
+            assert!(read_json(&revoke).is_null());
+            write!(
+                revoke,
+                "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            )
+            .unwrap();
+            let (mut start, _) = listener.accept().unwrap();
+            let challenge = read_json(&start);
+            let expected = challenge["codeChallenge"].as_str().unwrap().to_owned();
+            reply(
+                &mut start,
+                "201 Created",
+                serde_json::json!({"apiVersion":1,"data":{
+                    "challengeId":"22222222-2222-4222-8222-222222222222",
+                    "displayCode":"A1B2C3D4",
+                    "verificationUri":format!("{website}/sign-in?manager=22222222-2222-4222-8222-222222222222"),
+                    "expiresAt":(OffsetDateTime::now_utc() + time::Duration::minutes(10)).format(&Rfc3339).unwrap(),
+                    "intervalSeconds":5
+                }}),
+            );
+            let (mut exchange, _) = listener.accept().unwrap();
+            let body = read_json(&exchange);
+            assert_eq!(
+                URL_SAFE_NO_PAD.encode(Sha256::digest(
+                    body["codeVerifier"].as_str().unwrap().as_bytes()
+                )),
+                expected
+            );
+            reply(
+                &mut exchange,
+                "200 OK",
+                serde_json::json!({"apiVersion":1,"data":{
+                    "token":"B".repeat(43),"tokenType":"Bearer",
+                    "expiresAt":(OffsetDateTime::now_utc() + time::Duration::days(30)).format(&Rfc3339).unwrap()
+                }}),
+            );
+            let (mut inspect_new, _) = listener.accept().unwrap();
+            assert!(read_json(&inspect_new).is_null());
+            reply(
+                &mut inspect_new,
+                "200 OK",
+                session("33333333-3333-4333-8333-333333333333"),
+            );
+        });
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let store = CredentialStore::fixture();
+        struct Cleanup<'a>(&'a CredentialStore);
+        impl Drop for Cleanup<'_> {
+            fn drop(&mut self) {
+                let _ = self.0.delete();
+            }
+        }
+        let _cleanup = Cleanup(&store);
+        store
+            .save(&StoredToken {
+                schema_version: 1,
+                token: "A".repeat(43),
+                expires_at: (OffsetDateTime::now_utc() + time::Duration::days(30))
+                    .format(&Rfc3339)
+                    .unwrap(),
+            })
+            .unwrap();
+        let mut auth = Auth::with_store(client, store.clone());
+        let (_sender, cancel) = watch::channel(false);
+        let old = auth.restore(cancel.clone()).await.unwrap().unwrap();
+        assert_eq!(
+            old.account_id.to_string(),
+            "11111111-1111-4111-8111-111111111111"
+        );
+        assert!(matches!(
+            auth.start(cancel.clone()).await,
+            Err(AuthError::AlreadySignedIn)
+        ));
+        assert!(matches!(
+            auth.sign_out(cancel.clone()).await.unwrap(),
+            SignOut::Revoked
+        ));
+        assert!(store.load().unwrap().is_none());
+        auth.start(cancel.clone()).await.unwrap();
+        assert_eq!(auth.poll(cancel.clone()).await.unwrap(), Poll::SignedIn);
+        assert_eq!(auth.token(), Some("B".repeat(43).as_str()));
+        assert_eq!(store.load().unwrap().unwrap().token, "B".repeat(43));
+        let new = auth.inspect(cancel).await.unwrap().unwrap();
+        assert_eq!(
+            new.account_id.to_string(),
+            "33333333-3333-4333-8333-333333333333"
+        );
+        server.join().unwrap();
+    }
+
     #[tokio::test]
     async fn cancellation_and_expiry_remove_the_private_challenge() {
         let client =

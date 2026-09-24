@@ -76,11 +76,19 @@ impl AuthService {
             .await
             .map_err(failure)?
             .ok_or_else(|| {
-                CommandError::new("auth_required", "Sign in to download this release.")
+                CommandError::new(
+                    "auth_required",
+                    "Sign in to continue this registry download.",
+                )
             })?;
         let bearer = auth
             .token()
-            .ok_or_else(|| CommandError::new("auth_required", "Sign in to download this release."))?
+            .ok_or_else(|| {
+                CommandError::new(
+                    "auth_required",
+                    "Sign in to continue this registry download.",
+                )
+            })?
             .to_owned();
         Ok(ReceiptRequest {
             client: self.client.clone(),
