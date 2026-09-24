@@ -198,6 +198,17 @@ impl Storage {
         Ok(matches!(decision.status, trust::DecisionStatus::Blocked))
     }
 
+    pub fn require_registry_unblocked_hash(&self, hash: &str) -> Result<()> {
+        let hash =
+            Sha256::try_from(hash.to_owned()).map_err(|error| Error::Invalid(error.into()))?;
+        if self.registry_hash_blocked(&hash)? {
+            return Err(Error::Invalid(
+                "This archive is blocked by a signed registry security decision.".into(),
+            ));
+        }
+        Ok(())
+    }
+
     pub fn save_registry_reference(&mut self, reference: &ExactReference) -> Result<()> {
         let mod_id = u64::from(reference.mod_id) as i64;
         let release_id = reference.release_id.0.to_string();

@@ -161,6 +161,7 @@ impl Storage {
         local: Option<&crate::local_import::LocalSource>,
         advance: Option<(&str, &ModReference)>,
     ) -> Result<()> {
+        self.require_registry_unblocked_hash(&prepared.hash)?;
         let record = operation_record(operation)?;
         let manifest = prepared_record(prepared)?;
         crate::packages::supported_files(&prepared.files).map_err(Error::Invalid)?;

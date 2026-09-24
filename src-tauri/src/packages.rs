@@ -201,6 +201,9 @@ impl Packages {
             .and_then(|cache| cache.catalog)
             .ok_or("No approved catalog is available. Wait for catalog refresh.")?;
         let (entry, artifact) = resolve(&catalog, release_id)?;
+        storage
+            .require_registry_unblocked_hash(&artifact.sha256)
+            .map_err(|e| e.to_string())?;
         if let Some(security) = storage.catalog_security().map_err(|e| e.to_string())? {
             let prepared = storage
                 .prepared_artifact(&artifact.sha256)
@@ -443,6 +446,9 @@ impl Packages {
                 {
                     return Err("Release identity changed during package preparation.".into());
                 }
+                storage
+                    .require_registry_unblocked_hash(&result.prepared.hash)
+                    .map_err(|e| e.to_string())?;
                 if storage
                     .prepared_artifact(&result.prepared.hash)
                     .map_err(|e| e.to_string())?

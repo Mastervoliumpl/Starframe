@@ -338,6 +338,9 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
                     &mut BTreeSet::new(),
                 )?;
                 for reference in needed {
+                    store
+                        .require_registry_unblocked_hash(&reference.hash)
+                        .map_err(|e| e.to_string())?;
                     let prepared = store
                         .prepared_artifact(&reference.hash)
                         .map_err(|e| e.to_string())?
@@ -578,6 +581,9 @@ pub fn requested(store: &Storage) -> Result<Value> {
     let mut mods = Vec::new();
     let mut total_bytes = 0;
     for reference in &ordered {
+        store
+            .require_registry_unblocked_hash(&reference.hash)
+            .map_err(|e| e.to_string())?;
         let release = metadata(catalog.as_ref(), &locals, reference)?;
         let prepared = store
             .prepared_artifact(&reference.hash)
