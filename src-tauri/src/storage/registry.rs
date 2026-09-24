@@ -496,6 +496,22 @@ mod tests {
                 decisions[0].status,
                 trust::DecisionStatus::Blocked
             ));
+            assert!(
+                store
+                    .accept_registry_security(
+                        &security(
+                            1,
+                            vec![serde_json::json!({
+                                "sha256":hash.as_str(),"revision":1,"status":"cleared",
+                                "reason":"Conflicting same-revision decision"
+                            })],
+                        ),
+                        &root_public,
+                        now,
+                    )
+                    .is_err()
+            );
+            assert!(store.registry_hash_blocked(&hash).unwrap());
             store
                 .accept_registry_security(&security(2, vec![]), &root_public, now)
                 .unwrap();
