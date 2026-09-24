@@ -23,6 +23,7 @@ use uuid::Uuid;
 mod archive;
 mod artifacts;
 mod local;
+mod registry;
 #[cfg(test)]
 mod tests;
 mod transfer;
@@ -145,6 +146,50 @@ struct Active {
     ready: Option<Result<PreparedImport>>,
 }
 
+struct RegistryActive {
+    operation: Operation,
+    identity: crate::registry::trust::DownloadIdentity,
+    root: [u8; 32],
+    client: crate::registry::Client,
+    bearer: String,
+    cancel: Cancel,
+    abort: cancellation::Receiver<bool>,
+    progress: Arc<AtomicU64>,
+    sender: mpsc::Sender<RegistryEvent>,
+    result: mpsc::Receiver<RegistryEvent>,
+    worker: tauri::async_runtime::JoinHandle<()>,
+    claim: Option<crate::registry::ReceiptClaim>,
+}
+
+struct RegistryReceiptRetry {
+    claim: crate::registry::ReceiptClaim,
+    result: mpsc::Receiver<Result<()>>,
+    worker: tauri::async_runtime::JoinHandle<()>,
+    cancel: Cancel,
+}
+
+pub struct RegistryRequest {
+    pub mod_id: crate::registry::ModId,
+    pub release_id: crate::registry::ReleaseId,
+    pub root_public: [u8; 32],
+    pub client: crate::registry::Client,
+    pub session: crate::registry::Session,
+    pub bearer: String,
+    pub auth_cancel: cancellation::Receiver<bool>,
+}
+
+enum RegistryEvent {
+    Transferred(
+        Box<
+            Result<(
+                crate::registry::VerifiedArchive,
+                Result<crate::registry::Session>,
+            )>,
+        >,
+    ),
+    Receipt(Result<()>),
+}
+
 #[derive(Clone)]
 struct PreparedImport {
     prepared: Prepared,
@@ -156,19 +201,25 @@ struct PreparedImport {
 pub struct Packages {
     client: reqwest::Client,
     active: HashMap<String, Active>,
+    registry_active: HashMap<String, RegistryActive>,
+    registry_receipts: HashMap<Uuid, RegistryReceiptRetry>,
 }
 
 impl Packages {
     pub fn busy(&self) -> bool {
-        !self.active.is_empty()
+        !self.active.is_empty() || !self.registry_active.is_empty()
     }
     pub(crate) fn can_start(&self, hash: &str) -> bool {
-        self.active.len() < 3 && !self.busy_hash(hash)
+        self.active.len() + self.registry_active.len() < 3 && !self.busy_hash(hash)
     }
     pub fn busy_hash(&self, hash: &str) -> bool {
         self.active
             .values()
             .any(|active| active.source.is_some() || active.operation.hash == hash)
+            || self
+                .registry_active
+                .values()
+                .any(|active| active.operation.hash == hash)
     }
     pub fn open(storage: &mut Storage) -> Result<Self> {
         storage.recover_packages().map_err(|e| e.to_string())?;
@@ -176,6 +227,8 @@ impl Packages {
         Ok(Self {
             client: transfer::client()?,
             active: HashMap::new(),
+            registry_active: HashMap::new(),
+            registry_receipts: HashMap::new(),
         })
     }
 
@@ -233,7 +286,7 @@ impl Packages {
                 active.operation.id
             ));
         }
-        if self.active.len() >= 3 {
+        if self.active.len() + self.registry_active.len() >= 3 {
             return Err(
                 "Three packages are being prepared. Wait for one to finish or cancel it.".into(),
             );
@@ -311,6 +364,14 @@ impl Packages {
     }
 
     pub fn cancel(&mut self, storage: &mut Storage, operation_id: &str) -> Result<()> {
+        if let Some(active) = self.registry_active.get_mut(operation_id) {
+            active.cancel.cancel();
+            active.operation.status = Status::Cancelling;
+            active.operation.message = "Stopping the registry download.".into();
+            return storage
+                .save_package(&active.operation)
+                .map_err(|e| e.to_string());
+        }
         let active = self
             .active
             .get_mut(operation_id)
@@ -523,7 +584,8 @@ impl Packages {
             self.active.remove(&id);
             changed = true;
         }
-        Ok(changed)
+        self.poll_registry(storage)
+            .map(|registry_changed| changed || registry_changed)
     }
 
     pub fn operations(&self, storage: &Storage) -> Result<Vec<Operation>> {
@@ -540,6 +602,18 @@ impl Packages {
                 operations.push(operation);
             }
         }
+        for active in self.registry_active.values() {
+            if let Some(operation) = operations
+                .iter_mut()
+                .find(|op| op.id == active.operation.id)
+            {
+                operation.received_bytes = active.progress.load(Ordering::Relaxed);
+            } else {
+                let mut operation = active.operation.clone();
+                operation.received_bytes = active.progress.load(Ordering::Relaxed);
+                operations.push(operation);
+            }
+        }
         Ok(operations)
     }
 }
@@ -547,6 +621,12 @@ impl Drop for Packages {
     fn drop(&mut self) {
         for active in self.active.values() {
             active.cancel.cancel();
+        }
+        for active in self.registry_active.values() {
+            active.cancel.cancel();
+        }
+        for retry in self.registry_receipts.values() {
+            retry.cancel.cancel();
         }
     }
 }

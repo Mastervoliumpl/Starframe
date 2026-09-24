@@ -129,6 +129,7 @@ pub(super) struct ErrorEnvelope {
     pub(super) error: ResponseError,
 }
 
+#[derive(Clone)]
 pub struct Client {
     config: Config,
     http: reqwest::Client,
@@ -164,6 +165,13 @@ pub struct ReceiptClaim {
 }
 
 impl VerifiedArchive {
+    pub(crate) fn matches_identity(&self, identity: &super::trust::DownloadIdentity) -> bool {
+        self.grant.reference == identity.reference
+            && self.grant.bytes == identity.bytes
+            && self.grant.metadata_revision == identity.metadata_revision
+            && self.grant.security_revision == identity.security_revision
+    }
+
     pub(crate) fn receipt_claim(&self) -> ReceiptClaim {
         ReceiptClaim {
             account_id: self.grant.account_id,

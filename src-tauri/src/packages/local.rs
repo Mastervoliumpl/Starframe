@@ -50,7 +50,7 @@ impl Packages {
             }
             return Ok(operation);
         }
-        if self.active.len() >= 3
+        if self.active.len() + self.registry_active.len() >= 3
             || self
                 .active
                 .values()
