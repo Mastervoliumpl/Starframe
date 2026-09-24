@@ -1,8 +1,9 @@
-use super::{ApiResponse, ListQuery, ModList, ReleaseId, ReleaseResult, Session};
+use super::{ApiResponse, ExactReference, ListQuery, ModList, ReleaseId, ReleaseResult, Session};
 use reqwest::{StatusCode, Url, header};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio::sync::watch;
 
 const MAX_JSON_BYTES: usize = 4 * 1024 * 1024;
@@ -119,6 +120,18 @@ pub(super) struct ErrorEnvelope {
 pub struct Client {
     config: Config,
     http: reqwest::Client,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DownloadGrant {
+    pub download_id: uuid::Uuid,
+    pub reference: ExactReference,
+    pub bytes: u64,
+    pub metadata_revision: u64,
+    pub security_revision: u64,
+    pub content_path: String,
+    pub expires_at: String,
 }
 
 impl Client {
@@ -292,6 +305,45 @@ impl Client {
         serde_json::to_vec(&value).map_err(|_| Error::Protocol)
     }
 
+    pub async fn download_grant(
+        &self,
+        identity: &super::trust::DownloadIdentity,
+        bearer: &str,
+        cancel: watch::Receiver<bool>,
+    ) -> Result<DownloadGrant, Error> {
+        let (status, response): (StatusCode, ApiResponse<DownloadGrant>) = self
+            .post_with_bearer(
+                &format!(
+                    "/registry/releases/{}/downloads",
+                    identity.reference.release_id.0
+                ),
+                &serde_json::json!({
+                    "sha256": identity.reference.sha256.as_str(),
+                    "metadataRevision": identity.metadata_revision,
+                    "securityRevision": identity.security_revision,
+                }),
+                Some(bearer),
+                cancel,
+            )
+            .await?;
+        let grant = response.data;
+        let expires =
+            OffsetDateTime::parse(&grant.expires_at, &Rfc3339).map_err(|_| Error::Protocol)?;
+        let now = OffsetDateTime::now_utc();
+        if status != StatusCode::CREATED
+            || grant.reference != identity.reference
+            || grant.bytes != identity.bytes
+            || grant.metadata_revision != identity.metadata_revision
+            || grant.security_revision != identity.security_revision
+            || grant.content_path != format!("/v1/downloads/{}/content", grant.download_id)
+            || expires <= now
+            || expires > now + time::Duration::minutes(16)
+        {
+            return Err(Error::Protocol);
+        }
+        Ok(grant)
+    }
+
     async fn get<T: DeserializeOwned>(
         &self,
         path: &str,
@@ -327,6 +379,16 @@ impl Client {
         body: &serde_json::Value,
         cancel: watch::Receiver<bool>,
     ) -> Result<(StatusCode, T), Error> {
+        self.post_with_bearer(path, body, None, cancel).await
+    }
+
+    async fn post_with_bearer<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &serde_json::Value,
+        bearer: Option<&str>,
+        cancel: watch::Receiver<bool>,
+    ) -> Result<(StatusCode, T), Error> {
         let bytes = serde_json::to_vec(body).map_err(|_| Error::Protocol)?;
         if bytes.len() > 64 * 1024 {
             return Err(Error::TooLarge);
@@ -338,7 +400,7 @@ impl Client {
                 .post(url)
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(bytes),
-            None,
+            bearer,
             cancel,
         )
         .await
@@ -457,15 +519,34 @@ mod tests {
             stream
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .unwrap();
-            let mut buffer = [0; 8192];
-            let n = stream.read(&mut buffer).unwrap();
-            let request = String::from_utf8_lossy(&buffer[..n]).to_string();
+            let mut request = Vec::new();
+            loop {
+                let mut buffer = [0; 8192];
+                let n = stream.read(&mut buffer).unwrap();
+                assert!(n > 0);
+                request.extend_from_slice(&buffer[..n]);
+                if let Some(end) = request.windows(4).position(|bytes| bytes == b"\r\n\r\n") {
+                    let headers = String::from_utf8_lossy(&request[..end]);
+                    let length = headers
+                        .lines()
+                        .find_map(|line| {
+                            line.split_once(':').and_then(|(name, value)| {
+                                name.eq_ignore_ascii_case("content-length")
+                                    .then(|| value.trim().parse::<usize>().unwrap())
+                            })
+                        })
+                        .unwrap_or(0);
+                    if request.len() >= end + 4 + length {
+                        break;
+                    }
+                }
+            }
             let response = format!(
                 "HTTP/1.1 {status}\r\nContent-Length: {}\r\n{extra_headers}Connection: close\r\n\r\n{body}",
                 body.len()
             );
             stream.write_all(response.as_bytes()).unwrap();
-            request
+            String::from_utf8_lossy(&request).to_string()
         });
         (origin, thread)
     }
@@ -533,6 +614,66 @@ mod tests {
             assert!(request.starts_with(&format!("GET {path} HTTP/1.1")));
             assert!(request.contains("fixture-token"));
         }
+    }
+
+    #[tokio::test]
+    async fn download_grant_matches_exact_signed_identity_and_relative_content_path() {
+        let release_id =
+            ReleaseId(uuid::Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap());
+        let identity = super::super::trust::DownloadIdentity {
+            reference: ExactReference {
+                mod_id: super::super::ModId::try_from(1).unwrap(),
+                release_id,
+                sha256: super::super::Sha256::try_from("b".repeat(64)).unwrap(),
+            },
+            bytes: 2_147_483_648,
+            metadata_revision: 1,
+            security_revision: 1,
+        };
+        let download_id = uuid::Uuid::parse_str("33333333-3333-4333-8333-333333333333").unwrap();
+        let expires = (OffsetDateTime::now_utc() + time::Duration::minutes(5))
+            .format(&Rfc3339)
+            .unwrap();
+        let body = serde_json::json!({"apiVersion":1,"data":{
+            "downloadId":download_id,"reference":identity.reference,
+            "bytes":identity.bytes,"metadataRevision":identity.metadata_revision,
+            "securityRevision":identity.security_revision,
+            "contentPath":format!("/v1/downloads/{download_id}/content"),"expiresAt":expires
+        }});
+        let (origin, thread) = serve("201 Created", &body.to_string(), "");
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let (_sender, cancel) = watch::channel(false);
+        let grant = client
+            .download_grant(&identity, "fixture-token", cancel)
+            .await
+            .unwrap();
+        assert_eq!(grant.download_id, download_id);
+        let request = thread.join().unwrap();
+        assert!(request.starts_with(&format!(
+            "POST /v1/registry/releases/{}/downloads HTTP/1.1",
+            release_id.0
+        )));
+        assert!(request.contains("fixture-token"));
+        assert!(request.contains(&format!("\"sha256\":\"{}\"", "b".repeat(64))));
+        assert!(request.contains("\"metadataRevision\":1"));
+        assert!(request.contains("\"securityRevision\":1"));
+
+        let mut changed = body;
+        changed["data"]["contentPath"] = "https://example.invalid/content".into();
+        let (origin, thread) = serve("201 Created", &changed.to_string(), "");
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let (_sender, cancel) = watch::channel(false);
+        assert!(matches!(
+            client
+                .download_grant(&identity, "fixture-token", cancel)
+                .await,
+            Err(Error::Protocol)
+        ));
+        thread.join().unwrap();
     }
 
     #[tokio::test]

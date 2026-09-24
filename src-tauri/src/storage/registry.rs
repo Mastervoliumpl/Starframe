@@ -1,7 +1,7 @@
 use super::{Error, Result, Storage};
 use crate::registry::{
     ExactReference, ModId, ReleaseId, Sha256,
-    trust::{self, Decision, VerifiedKeyset, VerifiedRelease, VerifiedSecurity},
+    trust::{self, Decision, DownloadIdentity, VerifiedKeyset, VerifiedRelease, VerifiedSecurity},
 };
 use rusqlite::{OptionalExtension, Transaction, params};
 use time::OffsetDateTime;
@@ -99,6 +99,50 @@ impl Storage {
         )?;
         tx.commit()?;
         Ok(verified)
+    }
+
+    pub fn ready_registry_download(
+        &self,
+        root: &[u8; 32],
+        expected_mod_id: ModId,
+        expected_release_id: ReleaseId,
+        now: OffsetDateTime,
+    ) -> Result<DownloadIdentity> {
+        let keys = self
+            .registry_document("keys")?
+            .ok_or_else(|| Error::Invalid("No verified registry signing keys are saved.".into()))?;
+        let keys =
+            trust::verify_keys(&keys, root, now).map_err(|error| Error::Invalid(error.into()))?;
+        let security = self
+            .registry_document("security")?
+            .ok_or_else(|| Error::Invalid("No verified registry security is saved.".into()))?;
+        let security = trust::verify_security(&security, &keys, now)
+            .map_err(|error| Error::Invalid(error.into()))?;
+        let stream = format!("release:{}", expected_release_id.0);
+        let manifest = self
+            .registry_document(&stream)?
+            .ok_or_else(|| Error::Invalid("No verified registry release is saved.".into()))?;
+        let release = trust::verify_release(
+            &manifest,
+            &keys,
+            &security,
+            expected_mod_id,
+            expected_release_id,
+            now,
+        )
+        .map_err(|error| Error::Invalid(error.into()))?;
+        let identity = release
+            .download_identity()
+            .ok_or_else(|| Error::Invalid("Registry release is unavailable or blocked.".into()))?;
+        if self.registry_decisions()?.iter().any(|decision| {
+            decision.sha256 == identity.reference.sha256
+                && matches!(decision.status, trust::DecisionStatus::Blocked)
+        }) {
+            return Err(Error::Invalid(
+                "Registry archive is blocked by a retained security decision.".into(),
+            ));
+        }
+        Ok(identity)
     }
 
     pub fn registry_document(&self, name: &str) -> Result<Option<Vec<u8>>> {
@@ -423,6 +467,33 @@ mod tests {
             }));
         }
         let store = Storage::open(root.path()).unwrap();
+        let ready = store
+            .ready_registry_download(&root_public, mod_id, release_id, now)
+            .unwrap();
+        assert_eq!(ready.reference.sha256.as_str(), "b".repeat(64));
+        assert_eq!(ready.bytes, 2_147_483_648);
+        assert_eq!(ready.metadata_revision, 1);
+        assert_eq!(ready.security_revision, 1);
+        assert!(
+            store
+                .ready_registry_download(
+                    &root_public,
+                    mod_id,
+                    ReleaseId(Uuid::parse_str("22222222-2222-4222-8222-222222222222").unwrap()),
+                    now,
+                )
+                .is_err()
+        );
+        assert!(
+            store
+                .ready_registry_download(
+                    &root_public,
+                    mod_id,
+                    release_id,
+                    now + time::Duration::days(2),
+                )
+                .is_err()
+        );
         assert_eq!(
             store
                 .registry_document(&format!("release:{}", release_id.0))

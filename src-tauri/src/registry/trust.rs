@@ -98,8 +98,58 @@ struct ReleasePayload {
 pub struct VerifiedRelease {
     pub(crate) revision: u64,
     pub(crate) canonical: String,
+    pub(crate) security_revision: u64,
     pub release: super::ReleaseResult,
     pub(crate) reported_block: Option<Decision>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct DownloadIdentity {
+    pub(crate) reference: super::ExactReference,
+    pub(crate) bytes: u64,
+    pub(crate) metadata_revision: u64,
+    pub(crate) security_revision: u64,
+}
+
+impl DownloadIdentity {
+    pub fn reference(&self) -> &super::ExactReference {
+        &self.reference
+    }
+
+    pub fn bytes(&self) -> u64 {
+        self.bytes
+    }
+
+    pub fn metadata_revision(&self) -> u64 {
+        self.metadata_revision
+    }
+
+    pub fn security_revision(&self) -> u64 {
+        self.security_revision
+    }
+}
+
+impl VerifiedRelease {
+    pub(crate) fn download_identity(&self) -> Option<DownloadIdentity> {
+        let super::ReleaseResult::Release(release) = &self.release else {
+            return None;
+        };
+        if !matches!(&release.availability, super::Availability::Available)
+            || self.reported_block.is_some()
+        {
+            return None;
+        }
+        Some(DownloadIdentity {
+            reference: super::ExactReference {
+                mod_id: release.mod_id,
+                release_id: release.release_id,
+                sha256: release.artifact.sha256.clone(),
+            },
+            bytes: release.artifact.bytes,
+            metadata_revision: release.metadata.revision,
+            security_revision: self.security_revision,
+        })
+    }
 }
 
 #[derive(Default)]
@@ -465,6 +515,7 @@ pub fn verify_release(
     Ok(VerifiedRelease {
         revision: payload.revision,
         canonical,
+        security_revision: payload.security_revision,
         release: payload.release,
         reported_block,
     })
