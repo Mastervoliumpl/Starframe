@@ -142,6 +142,26 @@ impl Storage {
         Ok(identity)
     }
 
+    pub fn confirm_registry_download(
+        &self,
+        root: &[u8; 32],
+        original: &DownloadIdentity,
+        now: OffsetDateTime,
+    ) -> Result<()> {
+        let current = self.ready_registry_download(
+            root,
+            original.reference.mod_id,
+            original.reference.release_id,
+            now,
+        )?;
+        if current != *original {
+            return Err(Error::Invalid(
+                "Registry approval changed during download. Keep the verified bytes; refresh the exact release before installing.".into(),
+            ));
+        }
+        Ok(())
+    }
+
     pub fn registry_document(&self, name: &str) -> Result<Option<Vec<u8>>> {
         if name != "keys" && name != "security" && !name.starts_with("release:") {
             return Err(Error::Invalid("Unknown registry trust stream.".into()));
@@ -562,6 +582,9 @@ mod tests {
         assert_eq!(ready.bytes, 2_147_483_648);
         assert_eq!(ready.metadata_revision, 1);
         assert_eq!(ready.security_revision, 1);
+        store
+            .confirm_registry_download(&root_public, &ready, now)
+            .unwrap();
         assert!(
             store
                 .ready_registry_download(
@@ -587,6 +610,37 @@ mod tests {
                 .registry_document(&format!("release:{}", release_id.0))
                 .unwrap(),
             Some(manifest)
+        );
+        drop(store);
+        let mut store = Storage::open(root.path()).unwrap();
+        let changed = serde_json::json!({
+            "type":"starframe-security","schemaVersion":1,"revision":2,
+            "issuedAt":"2026-09-24T00:00:00.000Z","expiresAt":"2026-09-25T00:00:00.000Z",
+            "complete":true,"decisions":[{
+                "sha256":ready.reference.sha256.as_str(),"revision":2,
+                "status":"blocked","reason":"Fixture withdrawal"
+            }]
+        });
+        let online = Ed25519KeyPair::from_seed_unchecked(&[9u8; 32]).unwrap();
+        let signature =
+            STANDARD.encode(online.sign(&serde_json::to_vec(&changed).unwrap()).as_ref());
+        let changed = serde_json::to_vec(&serde_json::json!({"signed":changed,"signatures":[{
+            "keyId":fixture["envelope"]["signed"]["keys"][0]["keyId"],
+            "algorithm":"ed25519","signature":signature
+        }]}))
+        .unwrap();
+        store
+            .accept_registry_security(&changed, &root_public, now)
+            .unwrap();
+        assert!(
+            store
+                .confirm_registry_download(&root_public, &ready, now)
+                .is_err()
+        );
+        assert!(
+            store
+                .registry_hash_blocked(&ready.reference.sha256)
+                .unwrap()
         );
     }
 }
