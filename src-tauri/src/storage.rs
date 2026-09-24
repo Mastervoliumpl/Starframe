@@ -17,9 +17,9 @@ mod registry;
 mod sharing;
 mod updates;
 
-const SCHEMA: i64 = 15;
+const SCHEMA: i64 = 16;
 const APPLICATION_ID: i64 = 0x53544652;
-const MIGRATIONS: [&str; 15] = [
+const MIGRATIONS: [&str; 16] = [
     "CREATE TABLE metadata (id INTEGER PRIMARY KEY CHECK(id = 1), engine TEXT NOT NULL CHECK(engine = 'sqlite'), revision INTEGER NOT NULL CHECK(revision >= 0));
      INSERT INTO metadata VALUES (1, 'sqlite', 0);
      CREATE TABLE library (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author) <= 200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(mod_id, hash), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL)));
@@ -39,6 +39,7 @@ const MIGRATIONS: [&str; 15] = [
     "CREATE TABLE catalog_security (id INTEGER PRIMARY KEY CHECK(id=1), record TEXT NOT NULL CHECK(length(record)<=1049600 AND json_valid(record)));",
     "CREATE TABLE app_updates (id INTEGER PRIMARY KEY CHECK(id=1), record TEXT NOT NULL CHECK(length(record)<=70000 AND json_valid(record)));",
     "CREATE TABLE registry_library (mod_id INTEGER NOT NULL CHECK(mod_id BETWEEN 1 AND 9007199254740991), release_id TEXT NOT NULL CHECK(length(release_id)=36), sha256 TEXT NOT NULL CHECK(length(sha256)=64 AND sha256 NOT GLOB '*[^0-9a-f]*'), PRIMARY KEY(mod_id, release_id));",
+    "CREATE TABLE registry_trust_streams (name TEXT PRIMARY KEY NOT NULL CHECK(name IN ('keys','security') OR name GLOB 'release:*'), revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991), canonical TEXT NOT NULL CHECK(length(canonical)<=2097152), envelope BLOB NOT NULL CHECK(length(envelope)<=4194304)); CREATE TABLE registry_decisions (sha256 TEXT PRIMARY KEY NOT NULL CHECK(length(sha256)=64 AND sha256 NOT GLOB '*[^0-9a-f]*'), revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991), record TEXT NOT NULL CHECK(length(record)<=1200 AND json_valid(record)));",
 ];
 
 #[derive(Debug)]

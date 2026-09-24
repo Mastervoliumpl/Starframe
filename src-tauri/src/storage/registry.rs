@@ -1,9 +1,116 @@
 use super::{Error, Result, Storage};
-use crate::registry::{ExactReference, ModId, ReleaseId, Sha256};
-use rusqlite::{OptionalExtension, params};
+use crate::registry::{
+    ExactReference, ModId, ReleaseId, Sha256,
+    trust::{self, Decision, VerifiedKeyset, VerifiedSecurity},
+};
+use rusqlite::{OptionalExtension, Transaction, params};
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 impl Storage {
+    pub fn accept_registry_keys(
+        &mut self,
+        envelope: &[u8],
+        root: &[u8; 32],
+        now: OffsetDateTime,
+    ) -> Result<VerifiedKeyset> {
+        let verified = trust::verify_keys(envelope, root, now)
+            .map_err(|error| Error::Invalid(error.into()))?;
+        let tx = self.conn.transaction()?;
+        save_stream(
+            &tx,
+            "keys",
+            verified.revision,
+            &verified.canonical,
+            envelope,
+        )?;
+        tx.commit()?;
+        Ok(verified)
+    }
+
+    pub fn accept_registry_security(
+        &mut self,
+        envelope: &[u8],
+        root: &[u8; 32],
+        now: OffsetDateTime,
+    ) -> Result<VerifiedSecurity> {
+        let key_envelope = self
+            .registry_document("keys")?
+            .ok_or_else(|| Error::Invalid("No verified registry signing keys are saved.".into()))?;
+        let keys = trust::verify_keys(&key_envelope, root, now)
+            .map_err(|error| Error::Invalid(error.into()))?;
+        let verified = trust::verify_security(envelope, &keys, now)
+            .map_err(|error| Error::Invalid(error.into()))?;
+        let tx = self.conn.transaction()?;
+        check_stream(&tx, "security", verified.revision, &verified.canonical)?;
+        for decision in &verified.decisions {
+            let record = serde_json::to_string(decision)
+                .map_err(|_| Error::Invalid("Invalid registry decision.".into()))?;
+            let old: Option<(i64, String)> = tx
+                .query_row(
+                    "SELECT revision, record FROM registry_decisions WHERE sha256=?",
+                    [decision.sha256.as_str()],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .optional()?;
+            if let Some((revision, previous)) = old
+                && (decision.revision < revision as u64
+                    || (decision.revision == revision as u64 && record != previous))
+            {
+                return Err(Error::Invalid(
+                    "Registry security decision rollback or conflict.".into(),
+                ));
+            }
+            tx.execute(
+                "INSERT INTO registry_decisions (sha256,revision,record) VALUES (?,?,?) ON CONFLICT(sha256) DO UPDATE SET revision=excluded.revision,record=excluded.record",
+                params![decision.sha256.as_str(), decision.revision as i64, record],
+            )?;
+        }
+        save_stream(
+            &tx,
+            "security",
+            verified.revision,
+            &verified.canonical,
+            envelope,
+        )?;
+        tx.commit()?;
+        Ok(verified)
+    }
+
+    pub fn registry_document(&self, name: &str) -> Result<Option<Vec<u8>>> {
+        if name != "keys" && name != "security" && !name.starts_with("release:") {
+            return Err(Error::Invalid("Unknown registry trust stream.".into()));
+        }
+        self.conn
+            .query_row(
+                "SELECT envelope FROM registry_trust_streams WHERE name=?",
+                [name],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(Error::from)
+    }
+
+    pub fn registry_decisions(&self) -> Result<Vec<Decision>> {
+        self.conn
+            .prepare("SELECT sha256,record FROM registry_decisions ORDER BY sha256")?
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?
+            .map(|row| {
+                let (hash, record) = row?;
+                let decision: Decision = serde_json::from_str(&record)
+                    .map_err(|_| Error::Invalid("Saved registry decision is invalid.".into()))?;
+                if decision.sha256.as_str() != hash {
+                    return Err(Error::Invalid(
+                        "Saved registry decision hash changed.".into(),
+                    ));
+                }
+                Ok(decision)
+            })
+            .collect()
+    }
+
     pub fn save_registry_reference(&mut self, reference: &ExactReference) -> Result<()> {
         let mod_id = u64::from(reference.mod_id) as i64;
         let release_id = reference.release_id.0.to_string();
@@ -65,9 +172,45 @@ impl Storage {
     }
 }
 
+fn check_stream(tx: &Transaction<'_>, name: &str, revision: u64, canonical: &str) -> Result<()> {
+    let old: Option<(i64, String)> = tx
+        .query_row(
+            "SELECT revision,canonical FROM registry_trust_streams WHERE name=?",
+            [name],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    if let Some((previous, payload)) = old
+        && (revision < previous as u64 || (revision == previous as u64 && canonical != payload))
+    {
+        return Err(Error::Invalid(
+            "Registry metadata rollback or equal-revision conflict.".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn save_stream(
+    tx: &Transaction<'_>,
+    name: &str,
+    revision: u64,
+    canonical: &str,
+    envelope: &[u8],
+) -> Result<()> {
+    check_stream(tx, name, revision, canonical)?;
+    tx.execute(
+        "INSERT INTO registry_trust_streams (name,revision,canonical,envelope) VALUES (?,?,?,?) ON CONFLICT(name) DO UPDATE SET revision=excluded.revision,canonical=excluded.canonical,envelope=excluded.envelope",
+        params![name, revision as i64, canonical, envelope],
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use ring::signature::Ed25519KeyPair;
+    use time::format_description::well_known::Rfc3339;
 
     #[test]
     fn exact_registry_reference_survives_restart_and_cannot_change_hash() {
@@ -92,5 +235,83 @@ mod tests {
         let store = Storage::open(root.path()).unwrap();
         assert!(store.has_registry_reference(&reference).unwrap());
         assert_eq!(store.registry_references().unwrap(), vec![reference]);
+    }
+
+    #[test]
+    fn signed_security_blocks_survive_restart_omission_and_sign_out_state() {
+        let root = tempfile::tempdir().unwrap();
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/registry-keys-v1.json"
+        ))
+        .unwrap();
+        let root_public: [u8; 32] = STANDARD
+            .decode(fixture["rootPublicKey"].as_str().unwrap())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let keys = serde_json::to_vec(&fixture["envelope"]).unwrap();
+        let online = Ed25519KeyPair::from_seed_unchecked(&[9u8; 32]).unwrap();
+        let now = OffsetDateTime::parse("2026-09-24T12:00:00Z", &Rfc3339).unwrap();
+        let hash = "a".repeat(64);
+        let security = |revision: u64, decisions: Vec<serde_json::Value>| {
+            let signed = serde_json::json!({
+                "type":"starframe-security","schemaVersion":1,"revision":revision,
+                "issuedAt":"2026-09-24T00:00:00.000Z","expiresAt":"2026-09-25T00:00:00.000Z",
+                "complete":true,"decisions":decisions
+            });
+            let canonical = serde_json::to_vec(&signed).unwrap();
+            serde_json::to_vec(&serde_json::json!({"signed":signed,"signatures":[{
+                "keyId":fixture["envelope"]["signed"]["keys"][0]["keyId"],
+                "algorithm":"ed25519","signature":STANDARD.encode(online.sign(&canonical).as_ref())
+            }]}))
+            .unwrap()
+        };
+        {
+            let mut store = Storage::open(root.path()).unwrap();
+            store
+                .accept_registry_keys(&keys, &root_public, now)
+                .unwrap();
+            store
+                .accept_registry_security(
+                    &security(
+                        1,
+                        vec![serde_json::json!({
+                            "sha256":hash,"revision":1,"status":"blocked","reason":"Fixture block"
+                        })],
+                    ),
+                    &root_public,
+                    now,
+                )
+                .unwrap();
+        }
+        {
+            let mut store = Storage::open(root.path()).unwrap();
+            let decisions = store.registry_decisions().unwrap();
+            assert_eq!(decisions.len(), 1);
+            assert!(matches!(
+                decisions[0].status,
+                trust::DecisionStatus::Blocked
+            ));
+            store
+                .accept_registry_security(&security(2, vec![]), &root_public, now)
+                .unwrap();
+            assert!(matches!(
+                store.registry_decisions().unwrap()[0].status,
+                trust::DecisionStatus::Blocked
+            ));
+            assert!(
+                store
+                    .accept_registry_security(&security(1, vec![]), &root_public, now)
+                    .is_err()
+            );
+            store.accept_registry_security(&security(3, vec![serde_json::json!({
+                "sha256":hash,"revision":3,"status":"cleared","reason":"Reviewed and cleared"
+            })]), &root_public, now).unwrap();
+        }
+        let store = Storage::open(root.path()).unwrap();
+        assert!(matches!(
+            store.registry_decisions().unwrap()[0].status,
+            trust::DecisionStatus::Cleared
+        ));
     }
 }

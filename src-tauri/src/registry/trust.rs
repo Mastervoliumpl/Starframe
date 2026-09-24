@@ -3,7 +3,10 @@ use ring::signature::{ED25519, UnparsedPublicKey};
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::{collections::HashSet, fmt::Write};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Write,
+};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 const MAX_SIGNED_BYTES: usize = 4 * 1024 * 1024;
@@ -41,6 +44,96 @@ pub struct VerifiedKeyset {
     pub canonical: String,
     pub expires: OffsetDateTime,
     pub keys: Vec<([u8; 32], String)>,
+}
+
+#[derive(Clone, Debug, Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DecisionStatus {
+    Blocked,
+    Cleared,
+}
+
+#[derive(Clone, Debug, Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Decision {
+    pub sha256: super::Sha256,
+    pub revision: u64,
+    pub status: DecisionStatus,
+    pub reason: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SecurityPayload {
+    #[serde(rename = "type")]
+    kind: String,
+    schema_version: u8,
+    revision: u64,
+    issued_at: String,
+    expires_at: String,
+    complete: bool,
+    decisions: Vec<Decision>,
+}
+
+pub struct VerifiedSecurity {
+    pub revision: u64,
+    pub canonical: String,
+    pub expires: OffsetDateTime,
+    pub decisions: Vec<Decision>,
+}
+
+#[derive(Default)]
+pub struct SecurityState {
+    pub snapshot: Option<VerifiedSecurity>,
+    pub decisions: HashMap<super::Sha256, Decision>,
+}
+
+impl SecurityState {
+    pub fn accept(&mut self, next: VerifiedSecurity) -> Result<(), &'static str> {
+        if let Some(previous) = &self.snapshot {
+            revision_after(
+                previous.revision,
+                &previous.canonical,
+                next.revision,
+                &next.canonical,
+            )?;
+        }
+        let mut decisions = self.decisions.clone();
+        for decision in &next.decisions {
+            if let Some(previous) = decisions.get(&decision.sha256) {
+                let old = serde_json::to_value(previous).map_err(|_| "Invalid saved decision")?;
+                let new = serde_json::to_value(decision).map_err(|_| "Invalid new decision")?;
+                revision_after(
+                    previous.revision,
+                    &canonical_text(&old)?,
+                    decision.revision,
+                    &canonical_text(&new)?,
+                )?;
+            }
+            decisions.insert(decision.sha256.clone(), decision.clone());
+        }
+        self.decisions = decisions;
+        self.snapshot = Some(next);
+        Ok(())
+    }
+
+    pub fn blocked(&self, hash: &super::Sha256) -> bool {
+        self.decisions
+            .get(hash)
+            .is_some_and(|decision| matches!(decision.status, DecisionStatus::Blocked))
+    }
+}
+
+fn revision_after(
+    old: u64,
+    old_canonical: &str,
+    new: u64,
+    new_canonical: &str,
+) -> Result<(), &'static str> {
+    if new < old || (new == old && new_canonical != old_canonical) {
+        return Err("Signed metadata rollback or equal-revision conflict");
+    }
+    Ok(())
 }
 
 fn fields(value: &Value, expected: &[&str]) -> Result<(), &'static str> {
@@ -170,17 +263,111 @@ fn canonical_text(value: &Value) -> Result<String, &'static str> {
     Ok(output)
 }
 
-pub fn verify_keys(
-    bytes: &[u8],
-    root_public_key: &[u8; 32],
-    now: OffsetDateTime,
-) -> Result<VerifiedKeyset, &'static str> {
+fn signed_document(bytes: &[u8]) -> Result<Value, &'static str> {
     if bytes.len() > MAX_SIGNED_BYTES {
         return Err("Signed metadata is too large");
     }
     let envelope =
         crate::runtime_contract::unique_json(bytes).map_err(|_| "Invalid signed JSON")?;
     fields(&envelope, &["signed", "signatures"])?;
+    Ok(envelope)
+}
+
+fn delegated_signature(
+    envelope: &Value,
+    keys: &VerifiedKeyset,
+    now: OffsetDateTime,
+) -> Result<String, &'static str> {
+    if keys.expires <= now {
+        return Err("Registry signing keys have expired");
+    }
+    let signatures = envelope["signatures"]
+        .as_array()
+        .ok_or("Invalid signature list")?;
+    if !(1..=8).contains(&signatures.len()) {
+        return Err("Invalid signature count");
+    }
+    let encoded = canonical_text(&envelope["signed"])?;
+    let mut seen = HashSet::new();
+    let mut trusted = false;
+    for entry in signatures {
+        let signature: Signature =
+            serde_json::from_value(entry.clone()).map_err(|_| "Invalid registry signature")?;
+        if signature.algorithm != "ed25519" || !seen.insert(signature.key_id.clone()) {
+            return Err("Invalid or duplicate registry signature");
+        }
+        let bytes = decode64(&signature.signature, 64)?;
+        if let Some((public_key, _)) = keys.keys.iter().find(|(_, id)| *id == signature.key_id) {
+            trusted |= UnparsedPublicKey::new(&ED25519, public_key)
+                .verify(encoded.as_bytes(), &bytes)
+                .is_ok();
+        }
+    }
+    if !trusted {
+        return Err("No trusted registry signature");
+    }
+    Ok(encoded)
+}
+
+pub fn verify_security(
+    bytes: &[u8],
+    keys: &VerifiedKeyset,
+    now: OffsetDateTime,
+) -> Result<VerifiedSecurity, &'static str> {
+    let envelope = signed_document(bytes)?;
+    let signed = &envelope["signed"];
+    fields(
+        signed,
+        &[
+            "type",
+            "schemaVersion",
+            "revision",
+            "issuedAt",
+            "expiresAt",
+            "complete",
+            "decisions",
+        ],
+    )?;
+    let payload: SecurityPayload =
+        serde_json::from_value(signed.clone()).map_err(|_| "Invalid security snapshot")?;
+    if payload.kind != "starframe-security"
+        || payload.schema_version != 1
+        || !payload.complete
+        || !(1..=MAX_SAFE_INTEGER).contains(&payload.revision)
+        || payload.decisions.len() > 10_000
+    {
+        return Err("Invalid security snapshot");
+    }
+    let expires = freshness(
+        &payload.issued_at,
+        &payload.expires_at,
+        now,
+        time::Duration::days(1),
+    )?;
+    let encoded = delegated_signature(&envelope, keys, now)?;
+    let mut seen = HashSet::new();
+    for decision in &payload.decisions {
+        if !(1..=payload.revision).contains(&decision.revision)
+            || !(1..=1000).contains(&decision.reason.len())
+            || !seen.insert(decision.sha256.clone())
+        {
+            return Err("Invalid security decision");
+        }
+    }
+    Ok(VerifiedSecurity {
+        revision: payload.revision,
+        canonical: encoded,
+        expires,
+        decisions: payload.decisions,
+    })
+}
+
+pub fn verify_keys(
+    bytes: &[u8],
+    root_public_key: &[u8; 32],
+    now: OffsetDateTime,
+) -> Result<VerifiedKeyset, &'static str> {
+    let envelope = signed_document(bytes)?;
     let signed = &envelope["signed"];
     fields(
         signed,
@@ -269,6 +456,13 @@ mod tests {
         let accepted = verify_keys(&envelope, &root, now).unwrap();
         assert_eq!(accepted.canonical, fixture["canonical"].as_str().unwrap());
         assert_eq!(accepted.keys.len(), 1);
+        let security_envelope = serde_json::to_vec(&fixture["securityEnvelope"]).unwrap();
+        let security = verify_security(&security_envelope, &accepted, now).unwrap();
+        assert_eq!(
+            security.canonical,
+            fixture["securityCanonical"].as_str().unwrap()
+        );
+        assert_eq!(security.decisions.len(), 1);
     }
 
     #[test]
@@ -321,5 +515,88 @@ mod tests {
             .is_err()
         );
         assert!(verify_keys(&bytes, &root_public, now + time::Duration::days(31)).is_err());
+    }
+
+    #[test]
+    fn signed_security_retains_blocks_until_newer_explicit_clear() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/registry-keys-v1.json"
+        ))
+        .unwrap();
+        let root: [u8; 32] = decode64(fixture["rootPublicKey"].as_str().unwrap(), 32)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let now = OffsetDateTime::parse("2026-09-24T12:00:00Z", &Rfc3339).unwrap();
+        let keys = verify_keys(
+            &serde_json::to_vec(&fixture["envelope"]).unwrap(),
+            &root,
+            now,
+        )
+        .unwrap();
+        let online = Ed25519KeyPair::from_seed_unchecked(&[9u8; 32]).unwrap();
+        let hash = "a".repeat(64);
+        let signed = |revision: u64, decisions: Vec<Value>| {
+            let payload = serde_json::json!({
+                "type":"starframe-security","schemaVersion":1,"revision":revision,
+                "issuedAt":"2026-09-24T00:00:00.000Z","expiresAt":"2026-09-25T00:00:00.000Z",
+                "complete":true,"decisions":decisions
+            });
+            let signature = STANDARD.encode(
+                online
+                    .sign(canonical_text(&payload).unwrap().as_bytes())
+                    .as_ref(),
+            );
+            serde_json::to_vec(&serde_json::json!({"signed":payload,"signatures":[{
+                "keyId":keys.keys[0].1,"algorithm":"ed25519","signature":signature
+            }]}))
+            .unwrap()
+        };
+        let mut state = SecurityState::default();
+        let first = signed(
+            1,
+            vec![
+                serde_json::json!({"sha256":hash,"revision":1,"status":"blocked","reason":"Fixture block"}),
+            ],
+        );
+        state
+            .accept(verify_security(&first, &keys, now).unwrap())
+            .unwrap();
+        let hash = super::super::Sha256::try_from(hash).unwrap();
+        assert!(state.blocked(&hash));
+        let omitted = signed(2, vec![]);
+        state
+            .accept(verify_security(&omitted, &keys, now).unwrap())
+            .unwrap();
+        assert!(state.blocked(&hash));
+        assert!(
+            state
+                .accept(verify_security(&first, &keys, now).unwrap())
+                .is_err()
+        );
+        let changed = signed(
+            2,
+            vec![
+                serde_json::json!({"sha256":"b".repeat(64),"revision":2,"status":"blocked","reason":"Different snapshot"}),
+            ],
+        );
+        assert!(
+            state
+                .accept(verify_security(&changed, &keys, now).unwrap())
+                .is_err()
+        );
+        let clear = signed(
+            3,
+            vec![
+                serde_json::json!({"sha256":hash.as_str(),"revision":3,"status":"cleared","reason":"Reviewed and cleared"}),
+            ],
+        );
+        state
+            .accept(verify_security(&clear, &keys, now).unwrap())
+            .unwrap();
+        assert!(!state.blocked(&hash));
+        let mut tampered: Value = serde_json::from_slice(&clear).unwrap();
+        tampered["signed"]["revision"] = 4.into();
+        assert!(verify_security(&serde_json::to_vec(&tampered).unwrap(), &keys, now).is_err());
     }
 }
