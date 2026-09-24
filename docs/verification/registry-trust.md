@@ -6,6 +6,10 @@ The synthetic keyset, security snapshot, approved release and blocked release in
 
 The delegated verifier checks security snapshots and retains each hash decision through omissions. Only a newer signed `cleared` decision removes a block. SQLite schema 16 stores signed key and security envelopes, the highest accepted revision and canonical payload for each stream, and individual hash decisions. An isolated restart test proves a block survives an empty newer snapshot and rejects rollback; it later accepts an explicit clear. This is registry trust data, separate from authentication and the old catalog cache.
 
+A direct per-hash lookup reads retained blocks without requiring a session or fresh network metadata. The new-download gate uses that lookup after it verifies fresh signed metadata. Existing installed content can use the same lookup when the new-format activation path is connected.
+
+An isolated rotation test accepts a root-signed overlapping keyset, then rejects the retired key after a higher root-signed keyset removes it. No test key is provisioned as a production root.
+
 The release verifier checks a fresh security snapshot at the exact revision named by the manifest, the requested ModID and ReleaseID, the signed archive hash and byte count, and approved metadata. Schema 16 keeps a separate revision floor and canonical payload for each release. A signed manifest block is retained by hash even if the release is unavailable. The verifier is not connected to production: no registry root has been independently provisioned. Download, enable, preparation and launch gates remain to be implemented. Production registry downloads must stay unavailable until those checks are complete.
 
 The native HTTP client now fetches keysets, security snapshots and exact release manifests from the authenticated website routes. The same bounded JSON reader rejects redirects and duplicate keys before handing an envelope to the verifier. A loopback fixture checks each route and bearer placement. No website credential or live endpoint was used.

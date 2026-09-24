@@ -134,10 +134,7 @@ impl Storage {
         let identity = release
             .download_identity()
             .ok_or_else(|| Error::Invalid("Registry release is unavailable or blocked.".into()))?;
-        if self.registry_decisions()?.iter().any(|decision| {
-            decision.sha256 == identity.reference.sha256
-                && matches!(decision.status, trust::DecisionStatus::Blocked)
-        }) {
+        if self.registry_hash_blocked(&identity.reference.sha256)? {
             return Err(Error::Invalid(
                 "Registry archive is blocked by a retained security decision.".into(),
             ));
@@ -177,6 +174,28 @@ impl Storage {
                 Ok(decision)
             })
             .collect()
+    }
+
+    pub fn registry_hash_blocked(&self, hash: &Sha256) -> Result<bool> {
+        let record: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT record FROM registry_decisions WHERE sha256=?",
+                [hash.as_str()],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(record) = record else {
+            return Ok(false);
+        };
+        let decision: Decision = serde_json::from_str(&record)
+            .map_err(|_| Error::Invalid("Saved registry decision is invalid.".into()))?;
+        if decision.sha256 != *hash {
+            return Err(Error::Invalid(
+                "Saved registry decision hash changed.".into(),
+            ));
+        }
+        Ok(matches!(decision.status, trust::DecisionStatus::Blocked))
     }
 
     pub fn save_registry_reference(&mut self, reference: &ExactReference) -> Result<()> {
@@ -385,6 +404,8 @@ mod tests {
             let mut store = Storage::open(root.path()).unwrap();
             let decisions = store.registry_decisions().unwrap();
             assert_eq!(decisions.len(), 1);
+            let hash = Sha256::try_from(hash.clone()).unwrap();
+            assert!(store.registry_hash_blocked(&hash).unwrap());
             assert!(matches!(
                 decisions[0].status,
                 trust::DecisionStatus::Blocked
@@ -404,6 +425,7 @@ mod tests {
             store.accept_registry_security(&security(3, vec![serde_json::json!({
                 "sha256":hash,"revision":3,"status":"cleared","reason":"Reviewed and cleared"
             })]), &root_public, now).unwrap();
+            assert!(!store.registry_hash_blocked(&hash).unwrap());
         }
         let store = Storage::open(root.path()).unwrap();
         assert!(matches!(

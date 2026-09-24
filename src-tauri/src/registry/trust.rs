@@ -821,4 +821,52 @@ mod tests {
         tampered["signed"]["revision"] = 4.into();
         assert!(verify_security(&serde_json::to_vec(&tampered).unwrap(), &keys, now).is_err());
     }
+
+    #[test]
+    fn root_signed_rotation_accepts_overlap_then_retires_the_old_online_key() {
+        let root = Ed25519KeyPair::from_seed_unchecked(&[7u8; 32]).unwrap();
+        let old = Ed25519KeyPair::from_seed_unchecked(&[9u8; 32]).unwrap();
+        let replacement = Ed25519KeyPair::from_seed_unchecked(&[10u8; 32]).unwrap();
+        let root_public: [u8; 32] = root.public_key().as_ref().try_into().unwrap();
+        let now = OffsetDateTime::parse("2026-09-24T12:00:00Z", &Rfc3339).unwrap();
+        let keyset = |revision: u64, signers: &[&Ed25519KeyPair]| {
+            let keys: Vec<_> = signers
+                .iter()
+                .map(|signer| {
+                    serde_json::json!({
+                        "keyId":format!("{:x}", Sha256::digest(signer.public_key().as_ref())),
+                        "publicKey":STANDARD.encode(signer.public_key().as_ref())
+                    })
+                })
+                .collect();
+            let payload = serde_json::json!({
+                "type":"starframe-registry-keys","schemaVersion":1,"revision":revision,
+                "issuedAt":"2026-09-24T00:00:00.000Z","expiresAt":"2026-10-24T00:00:00.000Z",
+                "keys":keys
+            });
+            let signature = root.sign(canonical_text(&payload).unwrap().as_bytes());
+            serde_json::to_vec(&serde_json::json!({"signed":payload,"signatures":[{
+                "keyId":format!("{:x}", Sha256::digest(root.public_key().as_ref())),
+                "algorithm":"ed25519","signature":STANDARD.encode(signature.as_ref())
+            }]}))
+            .unwrap()
+        };
+        let first = verify_keys(&keyset(1, &[&old]), &root_public, now).unwrap();
+        let overlap = verify_keys(&keyset(2, &[&old, &replacement]), &root_public, now).unwrap();
+        let retired = verify_keys(&keyset(3, &[&replacement]), &root_public, now).unwrap();
+        let payload = serde_json::json!({
+            "type":"starframe-security","schemaVersion":1,"revision":1,
+            "issuedAt":"2026-09-24T00:00:00.000Z","expiresAt":"2026-09-25T00:00:00.000Z",
+            "complete":true,"decisions":[]
+        });
+        let signature = old.sign(canonical_text(&payload).unwrap().as_bytes());
+        let signed = serde_json::to_vec(&serde_json::json!({"signed":payload,"signatures":[{
+            "keyId":format!("{:x}", Sha256::digest(old.public_key().as_ref())),
+            "algorithm":"ed25519","signature":STANDARD.encode(signature.as_ref())
+        }]}))
+        .unwrap();
+        assert!(verify_security(&signed, &first, now).is_ok());
+        assert!(verify_security(&signed, &overlap, now).is_ok());
+        assert!(verify_security(&signed, &retired, now).is_err());
+    }
 }
