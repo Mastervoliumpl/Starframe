@@ -1,4 +1,7 @@
-use super::{ApiResponse, ExactReference, ListQuery, ModList, ReleaseId, ReleaseResult, Session};
+use super::{
+    ApiResponse, ExactReference, ListQuery, ModList, ReleaseId, ReleaseResult, Session,
+    SessionContext,
+};
 use reqwest::{StatusCode, Url, header};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -132,7 +135,7 @@ pub struct Client {
     content_http: reqwest::Client,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DownloadGrant {
     pub download_id: uuid::Uuid,
@@ -142,6 +145,29 @@ pub struct DownloadGrant {
     pub security_revision: u64,
     pub content_path: String,
     pub expires_at: String,
+    #[serde(skip)]
+    account_id: uuid::Uuid,
+}
+
+pub struct VerifiedArchive {
+    grant: DownloadGrant,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DownloadReceipt {
+    pub release_id: ReleaseId,
+    pub counted: bool,
+}
+
+fn can_download(session: &Session) -> bool {
+    matches!(session.context, SessionContext::Manager)
+        && session
+            .capabilities
+            .iter()
+            .any(|capability| matches!(capability, super::wire::Capability::DownloadMod))
+        && OffsetDateTime::parse(&session.expires_at, &Rfc3339)
+            .is_ok_and(|expires| expires > OffsetDateTime::now_utc())
 }
 
 impl Client {
@@ -329,9 +355,13 @@ impl Client {
     pub async fn download_grant(
         &self,
         identity: &super::trust::DownloadIdentity,
+        session: &Session,
         bearer: &str,
         cancel: watch::Receiver<bool>,
     ) -> Result<DownloadGrant, Error> {
+        if !can_download(session) {
+            return Err(Error::InvalidToken);
+        }
         let (status, response): (StatusCode, ApiResponse<DownloadGrant>) = self
             .post_with_bearer(
                 &format!(
@@ -347,7 +377,7 @@ impl Client {
                 cancel,
             )
             .await?;
-        let grant = response.data;
+        let mut grant = response.data;
         let expires =
             OffsetDateTime::parse(&grant.expires_at, &Rfc3339).map_err(|_| Error::Protocol)?;
         let now = OffsetDateTime::now_utc();
@@ -363,6 +393,7 @@ impl Client {
         {
             return Err(Error::Protocol);
         }
+        grant.account_id = session.account_id;
         Ok(grant)
     }
 
@@ -374,7 +405,7 @@ impl Client {
         start: u64,
         progress: &AtomicU64,
         mut cancel: watch::Receiver<bool>,
-    ) -> Result<(), Error> {
+    ) -> Result<VerifiedArchive, Error> {
         if bearer.is_empty()
             || bearer.len() > 4096
             || grant.bytes == 0
@@ -476,12 +507,46 @@ impl Client {
                 return Err(Error::Integrity);
             }
             file.sync_all().await.map_err(|_| Error::Integrity)?;
-            Ok(())
+            Ok(VerifiedArchive {
+                grant: grant.clone(),
+            })
         };
         tokio::select! {
             result = exchange => result,
             _ = cancel.changed() => Err(Error::Cancelled),
         }
+    }
+
+    pub async fn download_receipt(
+        &self,
+        verified: &VerifiedArchive,
+        session: &Session,
+        bearer: &str,
+        cancel: watch::Receiver<bool>,
+    ) -> Result<DownloadReceipt, Error> {
+        if !can_download(session) || session.account_id != verified.grant.account_id {
+            return Err(Error::InvalidToken);
+        }
+        let grant = &verified.grant;
+        let (status, response): (StatusCode, ApiResponse<DownloadReceipt>) = self
+            .post_with_bearer(
+                &format!(
+                    "/registry/releases/{}/receipts",
+                    grant.reference.release_id.0
+                ),
+                &serde_json::json!({
+                    "downloadId": grant.download_id,
+                    "sha256": grant.reference.sha256.as_str(),
+                    "bytes": grant.bytes,
+                }),
+                Some(bearer),
+                cancel,
+            )
+            .await?;
+        if status != StatusCode::OK || response.data.release_id != grant.reference.release_id {
+            return Err(Error::Protocol);
+        }
+        Ok(response.data)
     }
 
     async fn get<T: DeserializeOwned>(
@@ -645,6 +710,15 @@ mod tests {
         .unwrap()
     }
 
+    fn manager_session() -> Session {
+        let mut value: serde_json::Value = serde_json::from_str(&fixture("session")).unwrap();
+        value["data"]["expiresAt"] = (OffsetDateTime::now_utc() + time::Duration::hours(1))
+            .format(&Rfc3339)
+            .unwrap()
+            .into();
+        serde_json::from_value(value["data"].clone()).unwrap()
+    }
+
     fn serve(
         status: &str,
         body: &str,
@@ -786,8 +860,9 @@ mod tests {
             Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
                 .unwrap();
         let (_sender, cancel) = watch::channel(false);
+        let session = manager_session();
         let grant = client
-            .download_grant(&identity, "fixture-token", cancel)
+            .download_grant(&identity, &session, "fixture-token", cancel)
             .await
             .unwrap();
         assert_eq!(grant.download_id, download_id);
@@ -810,7 +885,7 @@ mod tests {
         let (_sender, cancel) = watch::channel(false);
         assert!(matches!(
             client
-                .download_grant(&identity, "fixture-token", cancel)
+                .download_grant(&identity, &session, "fixture-token", cancel)
                 .await,
             Err(Error::Protocol)
         ));
@@ -838,6 +913,7 @@ mod tests {
             expires_at: (OffsetDateTime::now_utc() + time::Duration::minutes(5))
                 .format(&Rfc3339)
                 .unwrap(),
+            account_id: manager_session().account_id,
         };
         let headers = format!("ETag: \"sha256-{hash}\"\r\nAccept-Ranges: bytes\r\n");
         let root = tempfile::tempdir().unwrap();
@@ -856,7 +932,7 @@ mod tests {
             .await
             .unwrap();
         let (_sender, cancel) = watch::channel(false);
-        client
+        let verified = client
             .download_content(&grant, "fixture-token", &mut file, 0, &progress, cancel)
             .await
             .unwrap();
@@ -865,6 +941,55 @@ mod tests {
         let request = thread.join().unwrap();
         assert!(request.starts_with(&format!("GET {} HTTP/1.1", grant.content_path)));
         assert!(!request.contains("Range: bytes="));
+
+        let receipt_body = serde_json::json!({"apiVersion":1,"data":{
+            "releaseId":grant.reference.release_id,"counted":true
+        }});
+        let (origin, thread) = serve("200 OK", &receipt_body.to_string(), "");
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let session = manager_session();
+        let (_sender, cancel) = watch::channel(false);
+        assert!(
+            client
+                .download_receipt(&verified, &session, "fixture-token", cancel)
+                .await
+                .unwrap()
+                .counted
+        );
+        let request = thread.join().unwrap();
+        assert!(request.starts_with(&format!(
+            "POST /v1/registry/releases/{}/receipts HTTP/1.1",
+            grant.reference.release_id.0
+        )));
+        assert!(request.contains(&grant.download_id.to_string()));
+        assert!(request.contains(&hash));
+        let duplicate = serde_json::json!({"apiVersion":1,"data":{
+            "releaseId":grant.reference.release_id,"counted":false
+        }});
+        let (origin, thread) = serve("200 OK", &duplicate.to_string(), "");
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let (_sender, cancel) = watch::channel(false);
+        assert!(
+            !client
+                .download_receipt(&verified, &session, "fixture-token", cancel)
+                .await
+                .unwrap()
+                .counted
+        );
+        thread.join().unwrap();
+        let mut other = manager_session();
+        other.account_id = uuid::Uuid::new_v4();
+        let (_sender, cancel) = watch::channel(false);
+        assert!(matches!(
+            client
+                .download_receipt(&verified, &other, "fixture-token", cancel)
+                .await,
+            Err(Error::InvalidToken)
+        ));
 
         let prefix = 7;
         tokio::fs::write(&path, &archive.as_bytes()[..prefix])
