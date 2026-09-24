@@ -1,7 +1,7 @@
 use super::{Error, Result, Storage};
 use crate::registry::{
     ExactReference, ModId, ReleaseId, Sha256,
-    trust::{self, Decision, VerifiedKeyset, VerifiedSecurity},
+    trust::{self, Decision, VerifiedKeyset, VerifiedRelease, VerifiedSecurity},
 };
 use rusqlite::{OptionalExtension, Transaction, params};
 use time::OffsetDateTime;
@@ -44,31 +44,55 @@ impl Storage {
         let tx = self.conn.transaction()?;
         check_stream(&tx, "security", verified.revision, &verified.canonical)?;
         for decision in &verified.decisions {
-            let record = serde_json::to_string(decision)
-                .map_err(|_| Error::Invalid("Invalid registry decision.".into()))?;
-            let old: Option<(i64, String)> = tx
-                .query_row(
-                    "SELECT revision, record FROM registry_decisions WHERE sha256=?",
-                    [decision.sha256.as_str()],
-                    |row| Ok((row.get(0)?, row.get(1)?)),
-                )
-                .optional()?;
-            if let Some((revision, previous)) = old
-                && (decision.revision < revision as u64
-                    || (decision.revision == revision as u64 && record != previous))
-            {
-                return Err(Error::Invalid(
-                    "Registry security decision rollback or conflict.".into(),
-                ));
-            }
-            tx.execute(
-                "INSERT INTO registry_decisions (sha256,revision,record) VALUES (?,?,?) ON CONFLICT(sha256) DO UPDATE SET revision=excluded.revision,record=excluded.record",
-                params![decision.sha256.as_str(), decision.revision as i64, record],
-            )?;
+            save_decision(&tx, decision, true)?;
         }
         save_stream(
             &tx,
             "security",
+            verified.revision,
+            &verified.canonical,
+            envelope,
+        )?;
+        tx.commit()?;
+        Ok(verified)
+    }
+
+    pub fn accept_registry_release(
+        &mut self,
+        envelope: &[u8],
+        root: &[u8; 32],
+        expected_mod_id: ModId,
+        expected_release_id: ReleaseId,
+        now: OffsetDateTime,
+    ) -> Result<VerifiedRelease> {
+        let key_envelope = self
+            .registry_document("keys")?
+            .ok_or_else(|| Error::Invalid("No verified registry signing keys are saved.".into()))?;
+        let keys = trust::verify_keys(&key_envelope, root, now)
+            .map_err(|error| Error::Invalid(error.into()))?;
+        let security_envelope = self
+            .registry_document("security")?
+            .ok_or_else(|| Error::Invalid("No verified registry security is saved.".into()))?;
+        let security = trust::verify_security(&security_envelope, &keys, now)
+            .map_err(|error| Error::Invalid(error.into()))?;
+        let verified = trust::verify_release(
+            envelope,
+            &keys,
+            &security,
+            expected_mod_id,
+            expected_release_id,
+            now,
+        )
+        .map_err(|error| Error::Invalid(error.into()))?;
+        let stream = format!("release:{}", expected_release_id.0);
+        let tx = self.conn.transaction()?;
+        check_stream(&tx, &stream, verified.revision, &verified.canonical)?;
+        if let Some(block) = &verified.reported_block {
+            save_decision(&tx, block, false)?;
+        }
+        save_stream(
+            &tx,
+            &stream,
             verified.revision,
             &verified.canonical,
             envelope,
@@ -187,6 +211,35 @@ fn check_stream(tx: &Transaction<'_>, name: &str, revision: u64, canonical: &str
             "Registry metadata rollback or equal-revision conflict.".into(),
         ));
     }
+    Ok(())
+}
+
+fn save_decision(tx: &Transaction<'_>, decision: &Decision, strict: bool) -> Result<()> {
+    let record = serde_json::to_string(decision)
+        .map_err(|_| Error::Invalid("Invalid registry decision.".into()))?;
+    let old: Option<(i64, String)> = tx
+        .query_row(
+            "SELECT revision, record FROM registry_decisions WHERE sha256=?",
+            [decision.sha256.as_str()],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    if let Some((revision, previous)) = old {
+        if decision.revision < revision as u64 && !strict {
+            return Ok(());
+        }
+        if decision.revision < revision as u64
+            || (decision.revision == revision as u64 && record != previous)
+        {
+            return Err(Error::Invalid(
+                "Registry security decision rollback or conflict.".into(),
+            ));
+        }
+    }
+    tx.execute(
+        "INSERT INTO registry_decisions (sha256,revision,record) VALUES (?,?,?) ON CONFLICT(sha256) DO UPDATE SET revision=excluded.revision,record=excluded.record",
+        params![decision.sha256.as_str(), decision.revision as i64, record],
+    )?;
     Ok(())
 }
 
@@ -313,5 +366,68 @@ mod tests {
             store.registry_decisions().unwrap()[0].status,
             trust::DecisionStatus::Cleared
         ));
+    }
+
+    #[test]
+    fn website_signed_manifest_is_bound_to_request_and_saved_per_release() {
+        let root = tempfile::tempdir().unwrap();
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/registry-keys-v1.json"
+        ))
+        .unwrap();
+        let root_public: [u8; 32] = STANDARD
+            .decode(fixture["rootPublicKey"].as_str().unwrap())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let keys = serde_json::to_vec(&fixture["envelope"]).unwrap();
+        let security = serde_json::to_vec(&fixture["securityEnvelope"]).unwrap();
+        let manifest = serde_json::to_vec(&fixture["releaseEnvelope"]).unwrap();
+        let blocked_manifest = serde_json::to_vec(&fixture["blockedReleaseEnvelope"]).unwrap();
+        let now = OffsetDateTime::parse("2026-09-24T12:00:00Z", &Rfc3339).unwrap();
+        let mod_id = ModId::try_from(1).unwrap();
+        let release_id =
+            ReleaseId(Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap());
+        {
+            let mut store = Storage::open(root.path()).unwrap();
+            store
+                .accept_registry_keys(&keys, &root_public, now)
+                .unwrap();
+            store
+                .accept_registry_security(&security, &root_public, now)
+                .unwrap();
+            let accepted = store
+                .accept_registry_release(&manifest, &root_public, mod_id, release_id, now)
+                .unwrap();
+            assert_eq!(accepted.revision, 1);
+            assert!(accepted.reported_block.is_none());
+            assert!(
+                store
+                    .accept_registry_release(
+                        &manifest,
+                        &root_public,
+                        ModId::try_from(2).unwrap(),
+                        release_id,
+                        now,
+                    )
+                    .is_err()
+            );
+            let blocked_id =
+                ReleaseId(Uuid::parse_str("22222222-2222-4222-8222-222222222222").unwrap());
+            store
+                .accept_registry_release(&blocked_manifest, &root_public, mod_id, blocked_id, now)
+                .unwrap();
+            assert!(store.registry_decisions().unwrap().iter().any(|decision| {
+                decision.sha256.as_str() == "c".repeat(64)
+                    && matches!(decision.status, trust::DecisionStatus::Blocked)
+            }));
+        }
+        let store = Storage::open(root.path()).unwrap();
+        assert_eq!(
+            store
+                .registry_document(&format!("release:{}", release_id.0))
+                .unwrap(),
+            Some(manifest)
+        );
     }
 }

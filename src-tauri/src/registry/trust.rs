@@ -40,10 +40,10 @@ pub struct Keyset {
 }
 
 pub struct VerifiedKeyset {
-    pub revision: u64,
-    pub canonical: String,
-    pub expires: OffsetDateTime,
-    pub keys: Vec<([u8; 32], String)>,
+    pub(crate) revision: u64,
+    pub(crate) canonical: String,
+    pub(crate) expires: OffsetDateTime,
+    pub(crate) keys: Vec<([u8; 32], String)>,
 }
 
 #[derive(Clone, Debug, Deserialize, serde::Serialize)]
@@ -76,10 +76,30 @@ struct SecurityPayload {
 }
 
 pub struct VerifiedSecurity {
-    pub revision: u64,
-    pub canonical: String,
-    pub expires: OffsetDateTime,
-    pub decisions: Vec<Decision>,
+    pub(crate) revision: u64,
+    pub(crate) canonical: String,
+    pub(crate) expires: OffsetDateTime,
+    pub(crate) decisions: Vec<Decision>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ReleasePayload {
+    #[serde(rename = "type")]
+    kind: String,
+    schema_version: u8,
+    revision: u64,
+    issued_at: String,
+    expires_at: String,
+    security_revision: u64,
+    release: super::ReleaseResult,
+}
+
+pub struct VerifiedRelease {
+    pub(crate) revision: u64,
+    pub(crate) canonical: String,
+    pub release: super::ReleaseResult,
+    pub(crate) reported_block: Option<Decision>,
 }
 
 #[derive(Default)]
@@ -348,7 +368,7 @@ pub fn verify_security(
     let mut seen = HashSet::new();
     for decision in &payload.decisions {
         if !(1..=payload.revision).contains(&decision.revision)
-            || !(1..=1000).contains(&decision.reason.len())
+            || !(1..=1000).contains(&decision.reason.chars().count())
             || !seen.insert(decision.sha256.clone())
         {
             return Err("Invalid security decision");
@@ -359,6 +379,94 @@ pub fn verify_security(
         canonical: encoded,
         expires,
         decisions: payload.decisions,
+    })
+}
+
+pub fn verify_release(
+    bytes: &[u8],
+    keys: &VerifiedKeyset,
+    security: &VerifiedSecurity,
+    expected_mod_id: super::ModId,
+    expected_release_id: super::ReleaseId,
+    now: OffsetDateTime,
+) -> Result<VerifiedRelease, &'static str> {
+    if security.expires <= now {
+        return Err("Registry security snapshot has expired");
+    }
+    let envelope = signed_document(bytes)?;
+    let signed = &envelope["signed"];
+    fields(
+        signed,
+        &[
+            "type",
+            "schemaVersion",
+            "revision",
+            "issuedAt",
+            "expiresAt",
+            "securityRevision",
+            "release",
+        ],
+    )?;
+    let payload: ReleasePayload =
+        serde_json::from_value(signed.clone()).map_err(|_| "Invalid release manifest")?;
+    if payload.kind != "starframe-release"
+        || payload.schema_version != 1
+        || !(1..=MAX_SAFE_INTEGER).contains(&payload.revision)
+        || payload.security_revision != security.revision
+        || !payload.release.valid()
+    {
+        return Err("Invalid or mismatched release manifest");
+    }
+    freshness(
+        &payload.issued_at,
+        &payload.expires_at,
+        now,
+        time::Duration::days(1),
+    )?;
+    let (mod_id, release_id, reported_block) = match &payload.release {
+        super::ReleaseResult::Release(release) => {
+            if release.security.revision > security.revision {
+                return Err("Invalid manifest security revision");
+            }
+            let block = if matches!(
+                release.security.status,
+                super::wire::SecurityStatus::Blocked
+            ) {
+                let reason = release
+                    .security
+                    .reason
+                    .as_ref()
+                    .ok_or("Missing block reason")?;
+                if !(1..=security.revision).contains(&release.security.revision) {
+                    return Err("Invalid manifest security revision");
+                }
+                Some(Decision {
+                    sha256: release.artifact.sha256.clone(),
+                    revision: release.security.revision,
+                    status: DecisionStatus::Blocked,
+                    reason: reason.clone(),
+                })
+            } else {
+                None
+            };
+            (release.mod_id, release.release_id, block)
+        }
+        super::ReleaseResult::Tombstone(tombstone) => {
+            if tombstone.security_revision > security.revision {
+                return Err("Invalid tombstone security revision");
+            }
+            (tombstone.mod_id, tombstone.release_id, None)
+        }
+    };
+    if mod_id != expected_mod_id || release_id != expected_release_id {
+        return Err("Wrong exact release manifest");
+    }
+    let canonical = delegated_signature(&envelope, keys, now)?;
+    Ok(VerifiedRelease {
+        revision: payload.revision,
+        canonical,
+        release: payload.release,
+        reported_block,
     })
 }
 
@@ -463,6 +571,69 @@ mod tests {
             fixture["securityCanonical"].as_str().unwrap()
         );
         assert_eq!(security.decisions.len(), 1);
+        let release_envelope = serde_json::to_vec(&fixture["releaseEnvelope"]).unwrap();
+        let mod_id = super::super::ModId::try_from(1).unwrap();
+        let release_id = super::super::ReleaseId(
+            uuid::Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap(),
+        );
+        let release = verify_release(
+            &release_envelope,
+            &accepted,
+            &security,
+            mod_id,
+            release_id,
+            now,
+        )
+        .unwrap();
+        assert_eq!(
+            release.canonical,
+            fixture["releaseCanonical"].as_str().unwrap()
+        );
+        assert!(release.reported_block.is_none());
+        assert!(
+            verify_release(
+                &release_envelope,
+                &accepted,
+                &security,
+                super::super::ModId::try_from(2).unwrap(),
+                release_id,
+                now,
+            )
+            .is_err()
+        );
+        let mut changed = fixture["releaseEnvelope"].clone();
+        changed["signed"]["release"]["artifact"]["bytes"] = 1.into();
+        assert!(
+            verify_release(
+                &serde_json::to_vec(&changed).unwrap(),
+                &accepted,
+                &security,
+                mod_id,
+                release_id,
+                now,
+            )
+            .is_err()
+        );
+        let blocked_id = super::super::ReleaseId(
+            uuid::Uuid::parse_str("22222222-2222-4222-8222-222222222222").unwrap(),
+        );
+        let blocked = verify_release(
+            &serde_json::to_vec(&fixture["blockedReleaseEnvelope"]).unwrap(),
+            &accepted,
+            &security,
+            mod_id,
+            blocked_id,
+            now,
+        )
+        .unwrap();
+        assert_eq!(
+            blocked.canonical,
+            fixture["blockedReleaseCanonical"].as_str().unwrap()
+        );
+        assert_eq!(
+            blocked.reported_block.unwrap().sha256.as_str(),
+            "c".repeat(64)
+        );
     }
 
     #[test]
