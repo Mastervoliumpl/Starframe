@@ -591,6 +591,22 @@ impl Client {
         Err(Error::Transport)
     }
 
+    pub async fn confirm_download_session(
+        &self,
+        original: &Session,
+        bearer: &str,
+        cancel: watch::Receiver<bool>,
+    ) -> Result<Session, Error> {
+        let current = self
+            .session(bearer, cancel)
+            .await?
+            .ok_or(Error::InvalidToken)?;
+        if current.account_id != original.account_id || !can_download(&current) {
+            return Err(Error::InvalidToken);
+        }
+        Ok(current)
+    }
+
     pub async fn download_receipt(
         &self,
         verified: &VerifiedArchive,
@@ -798,6 +814,42 @@ mod tests {
             .unwrap()
             .into();
         serde_json::from_value(value["data"].clone()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn completion_session_keeps_the_original_account_and_download_capability() {
+        let original = manager_session();
+        for (current, accepted) in [
+            (original.clone(), true),
+            (
+                Session {
+                    account_id: uuid::Uuid::new_v4(),
+                    ..original.clone()
+                },
+                false,
+            ),
+            (
+                Session {
+                    capabilities: Vec::new(),
+                    ..original.clone()
+                },
+                false,
+            ),
+        ] {
+            let body = serde_json::json!({"apiVersion": 1, "data": current}).to_string();
+            let (origin, thread) = serve("200 OK", &body, "");
+            let client = Client::new(
+                Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap(),
+            )
+            .unwrap();
+            let (_sender, cancel) = watch::channel(false);
+            let result = client
+                .confirm_download_session(&original, "fixture-token", cancel)
+                .await;
+            assert_eq!(result.is_ok(), accepted);
+            let request = thread.join().unwrap();
+            assert!(request.starts_with("GET /v1/session HTTP/1.1"));
+        }
     }
 
     fn read_request(stream: &mut TcpStream) -> String {
