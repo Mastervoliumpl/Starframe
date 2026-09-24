@@ -1428,6 +1428,94 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn interrupted_transfer_resumes_a_server_recorded_prefix() {
+        let archive = b"PK\x03\x04resume a recorded prefix";
+        let prefix = 9;
+        let hash = format!("{:x}", Sha256::digest(archive));
+        let release_id =
+            ReleaseId(uuid::Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap());
+        let identity = super::super::trust::DownloadIdentity {
+            reference: ExactReference {
+                mod_id: super::super::ModId::try_from(1).unwrap(),
+                release_id,
+                sha256: super::super::Sha256::try_from(hash.clone()).unwrap(),
+            },
+            bytes: archive.len() as u64,
+            metadata_revision: 1,
+            security_revision: 1,
+        };
+        let ids = [
+            uuid::Uuid::parse_str("33333333-3333-4333-8333-333333333333").unwrap(),
+            uuid::Uuid::parse_str("44444444-4444-4444-8444-444444444444").unwrap(),
+        ];
+        let expires = (OffsetDateTime::now_utc() + time::Duration::minutes(5))
+            .format(&Rfc3339)
+            .unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let reference = identity.reference.clone();
+        let thread = std::thread::spawn(move || {
+            let mut requests = Vec::new();
+            for step in 0..4 {
+                let (mut stream, _) = listener.accept().unwrap();
+                requests.push(read_request(&mut stream));
+                match step {
+                    0 | 2 => {
+                        let id = ids[step / 2];
+                        let body = serde_json::json!({"apiVersion":1,"data":{
+                            "downloadId":id,"reference":reference,"bytes":archive.len(),
+                            "metadataRevision":1,"securityRevision":1,
+                            "contentPath":format!("/v1/downloads/{id}/content"),
+                            "expiresAt":expires
+                        }})
+                        .to_string();
+                        write!(stream, "HTTP/1.1 201 Created\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+                    }
+                    1 => {
+                        write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nETag: \"sha256-{hash}\"\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n", archive.len()).unwrap();
+                        stream.write_all(&archive[..prefix]).unwrap();
+                    }
+                    _ => {
+                        write!(stream, "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes {prefix}-{}/{}\r\nETag: \"sha256-{hash}\"\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n", archive.len() - prefix, archive.len() - 1, archive.len()).unwrap();
+                        stream.write_all(&archive[prefix..]).unwrap();
+                    }
+                }
+            }
+            requests
+        });
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("resumed.part");
+        let mut file = tokio::fs::OpenOptions::new()
+            .create_new(true)
+            .read(true)
+            .write(true)
+            .open(&path)
+            .await
+            .unwrap();
+        let progress = AtomicU64::new(0);
+        let (_sender, cancel) = watch::channel(false);
+        let (grant, _) = client
+            .download_with_renewal(
+                &identity,
+                &manager_session(),
+                "fixture-token",
+                &mut file,
+                &progress,
+                cancel,
+            )
+            .await
+            .unwrap();
+        assert_eq!(grant.download_id, ids[1]);
+        assert_eq!(tokio::fs::read(path).await.unwrap(), archive);
+        let requests = thread.join().unwrap();
+        assert_eq!(requests.len(), 4);
+        assert!(requests[3].contains(&format!("bytes={prefix}-")));
+    }
+
+    #[tokio::test]
     async fn reads_pinned_release_without_leaking_token_to_redirects() {
         let (origin, thread) = serve("200 OK", &fixture("approved"), "");
         let client =
