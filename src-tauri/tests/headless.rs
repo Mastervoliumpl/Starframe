@@ -51,6 +51,15 @@ fn headless_and_gui_share_local_operations_and_storage_ownership() {
     let (ok, import) = command(&data, "import", &[source.to_str().unwrap()]);
     assert!(ok, "{import}");
     assert_eq!(import["data"]["status"], "completed");
+    let (ok, missing_release) = command(&data, "prepare-package", &["missing-release"]);
+    assert!(!ok);
+    assert_eq!(missing_release["error"]["code"], "package_failed");
+    assert!(
+        missing_release["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("No approved catalog")
+    );
     let (ok, created) = command(&data, "collection-create", &["Headless collection"]);
     assert!(ok, "{created}");
     let id = created["data"]["collections"][0]["id"].as_str().unwrap();
