@@ -1,10 +1,16 @@
+mod auth;
+#[cfg(windows)]
+mod credential;
 mod transport;
 mod wire;
 
+pub use auth::{Auth, AuthError, ChallengeView, Poll, SignOut};
+#[cfg(windows)]
+pub use credential::CredentialStore;
 pub use transport::{Client, Config, Error, ErrorCode, FieldProblem, ResponseError};
 pub use wire::{
     ApiResponse, Artifact, Availability, Dependency, ListQuery, Maintenance, ModList, ModSummary,
-    Period, Release, ReleaseResult, Sort,
+    Period, Release, ReleaseResult, Session, SessionContext, Sort,
 };
 
 use serde::{Deserialize, Serialize};

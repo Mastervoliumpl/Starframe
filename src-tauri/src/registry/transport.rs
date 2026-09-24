@@ -1,4 +1,4 @@
-use super::{ApiResponse, ListQuery, ModList, ReleaseId, ReleaseResult};
+use super::{ApiResponse, ListQuery, ModList, ReleaseId, ReleaseResult, Session};
 use reqwest::{StatusCode, Url, header};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -134,6 +134,67 @@ impl Client {
         Ok(Self { config, http })
     }
 
+    pub(super) fn website(&self) -> &Url {
+        self.config.website()
+    }
+
+    pub(super) async fn session(
+        &self,
+        bearer: &str,
+        cancel: watch::Receiver<bool>,
+    ) -> Result<Option<Session>, Error> {
+        let result: ApiResponse<Option<Session>> =
+            self.get("/session", Some(bearer), cancel).await?;
+        Ok(result.data)
+    }
+
+    pub(super) async fn revoke(
+        &self,
+        bearer: &str,
+        mut cancel: watch::Receiver<bool>,
+    ) -> Result<(), Error> {
+        if bearer.len() != 43
+            || !bearer
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+        {
+            return Err(Error::InvalidToken);
+        }
+        let mut url = self.config.api.clone();
+        url.set_path("/v1/session");
+        if *cancel.borrow() {
+            return Err(Error::Cancelled);
+        }
+        let exchange = async {
+            let response = self
+                .http
+                .delete(url)
+                .bearer_auth(bearer)
+                .send()
+                .await
+                .map_err(|_| Error::Transport)?;
+            if response.status() != StatusCode::NO_CONTENT {
+                return Err(Error::Http(response.status()));
+            }
+            if response.content_length().is_some_and(|size| size != 0) {
+                return Err(Error::Protocol);
+            }
+            if !response
+                .bytes()
+                .await
+                .map_err(|_| Error::Transport)?
+                .is_empty()
+            {
+                return Err(Error::Protocol);
+            }
+            Ok(())
+        };
+        tokio::select! {
+            result = exchange => result,
+            _ = cancel.changed() => Err(Error::Cancelled),
+        }
+    }
+
     pub async fn list_mods(
         &self,
         query: &ListQuery,
@@ -213,12 +274,43 @@ impl Client {
         &self,
         url: Url,
         bearer: Option<&str>,
-        mut cancel: watch::Receiver<bool>,
+        cancel: watch::Receiver<bool>,
     ) -> Result<T, Error> {
-        let mut request = self
-            .http
-            .get(url)
-            .header(header::ACCEPT, "application/json");
+        self.exchange_request(self.http.get(url), bearer, cancel)
+            .await
+            .map(|(_, value)| value)
+    }
+
+    pub(super) async fn post<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &serde_json::Value,
+        cancel: watch::Receiver<bool>,
+    ) -> Result<(StatusCode, T), Error> {
+        let bytes = serde_json::to_vec(body).map_err(|_| Error::Protocol)?;
+        if bytes.len() > 64 * 1024 {
+            return Err(Error::TooLarge);
+        }
+        let mut url = self.config.api.clone();
+        url.set_path(&format!("/v1{path}"));
+        self.exchange_request(
+            self.http
+                .post(url)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(bytes),
+            None,
+            cancel,
+        )
+        .await
+    }
+
+    async fn exchange_request<T: DeserializeOwned>(
+        &self,
+        mut request: reqwest::RequestBuilder,
+        bearer: Option<&str>,
+        mut cancel: watch::Receiver<bool>,
+    ) -> Result<(StatusCode, T), Error> {
+        request = request.header(header::ACCEPT, "application/json");
         if let Some(token) = bearer {
             if token.is_empty() || token.len() > 4096 {
                 return Err(Error::InvalidToken);
@@ -251,7 +343,9 @@ impl Client {
             let value =
                 crate::runtime_contract::unique_json(&bytes).map_err(|_| Error::Protocol)?;
             if status.is_success() {
-                serde_json::from_value(value).map_err(|_| Error::Protocol)
+                serde_json::from_value(value)
+                    .map(|value| (status, value))
+                    .map_err(|_| Error::Protocol)
             } else if let Ok(error) = serde_json::from_value::<ErrorEnvelope>(value) {
                 if error.api_version != 1
                     || !error.error.code.matches_status(status)

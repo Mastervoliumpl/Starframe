@@ -197,6 +197,37 @@ pub struct Profile {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Session {
+    pub account_id: uuid::Uuid,
+    pub profile: Profile,
+    pub context: SessionContext,
+    pub authenticated_at: String,
+    pub expires_at: String,
+    pub capabilities: Vec<Capability>,
+    pub is_owner: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionContext {
+    Website,
+    Manager,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Capability {
+    CreateMod,
+    SubmitRelease,
+    EditMod,
+    DownloadMod,
+    Comment,
+    Like,
+    Report,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ModSummary {
     pub mod_id: ModId,
     pub name: String,

@@ -3690,8 +3690,10 @@ name = "starframe"
 version = "0.7.0-dev.1"
 dependencies = [
  "aws-lc-rs",
+ "base64 0.22.1",
  "flate2",
  "futures-util",
+ "getrandom 0.4.3",
  "httpdate",
  "keyvalues-parser",
  "minisign-verify",
@@ -3708,6 +3710,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "tempfile",
+ "time",
  "tokio",
  "tough",
  "ts-rs",
