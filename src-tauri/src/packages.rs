@@ -94,6 +94,9 @@ pub struct Operation {
     pub hash: String,
     #[serde(default)]
     pub kind: Kind,
+    #[serde(default)]
+    #[cfg_attr(test, ts(type = "string | null"))]
+    pub receipt_id: Option<Uuid>,
     pub status: Status,
     pub message: String,
     #[cfg_attr(test, ts(type = "number"))]
@@ -184,6 +187,13 @@ pub struct RegistryRequest {
     pub mod_id: crate::registry::ModId,
     pub release_id: crate::registry::ReleaseId,
     pub root_public: [u8; 32],
+    pub client: crate::registry::Client,
+    pub session: crate::registry::Session,
+    pub bearer: String,
+    pub auth_cancel: cancellation::Receiver<bool>,
+}
+
+pub struct ReceiptRequest {
     pub client: crate::registry::Client,
     pub session: crate::registry::Session,
     pub bearer: String,
@@ -309,6 +319,7 @@ impl Packages {
             release_id: release_id.into(),
             hash: artifact.sha256.clone(),
             kind: Kind::Package,
+            receipt_id: None,
             status: Status::Preparing,
             message: "Downloading and verifying the approved package.".into(),
             received_bytes: 0,
@@ -430,6 +441,7 @@ impl Packages {
             release_id: "local-verification".into(),
             hash: reference.hash.clone(),
             kind: Kind::Package,
+            receipt_id: None,
             status: Status::Preparing,
             message: "Verifying matching local content. No download is needed.".into(),
             received_bytes: 0,

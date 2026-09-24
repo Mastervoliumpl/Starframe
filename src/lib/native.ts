@@ -15,6 +15,7 @@ const native: Transport & AuthTransport = {
   sharing: (action) => invoke('sharing_action', { action }),
   mods: (action) => invoke('mod_action', { action }),
   packages: (action) => invoke('package_action', { action }),
+  retryRegistryReceipts: () => invoke('registry_retry_receipts'),
   async watch(receive) {
     const channel = new Channel<Snapshot>();
     channel.onmessage = receive;

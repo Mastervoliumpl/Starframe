@@ -93,6 +93,23 @@ impl Worker {
             let _ = reply.send(result);
             return;
         }
+        if let Request::RegistryReceipts(request, reply) = request {
+            let result = (|| {
+                if self.core.lock().expect("state lock").stopped {
+                    return Err("Starframe is closing.".into());
+                }
+                let queue = self
+                    .packages
+                    .as_mut()
+                    .map_err(|e| e.clone())?
+                    .as_mut()
+                    .ok_or("Package storage is unavailable.")?;
+                let store = self.storage.as_ref().ok_or("Saved data is unavailable.")?;
+                backend::registry_receipts_action(store, queue, *request)
+            })();
+            let _ = reply.send(result);
+            return;
+        }
         self.recovery_observation = None;
         self.view.error.clear();
         self.view.running = Running::Unknown;
@@ -175,6 +192,7 @@ impl Worker {
             | Request::Sharing(..)
             | Request::Package(..) => unreachable!(),
             Request::RegistryPackage(..) => unreachable!(),
+            Request::RegistryReceipts(..) => unreachable!(),
             Request::Update(..) => unreachable!(),
             Request::Discover => {
                 discover(&mut self.view);

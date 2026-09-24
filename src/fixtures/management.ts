@@ -96,6 +96,7 @@ export function fixtureManagement(
         releaseId: '11111111-1111-4111-8111-111111111111',
         hash: 'a'.repeat(64),
         kind: 'registry_archive',
+        receiptId: null,
         status: 'completed',
         message: 'Verified registry archive saved.',
         receivedBytes: 10,
@@ -107,6 +108,7 @@ export function fixtureManagement(
         releaseId: '22222222-2222-4222-8222-222222222222',
         hash: 'b'.repeat(64),
         kind: 'registry_archive',
+        receiptId: '33333333-3333-4333-8333-333333333333',
         status: 'failed',
         message: 'The signed release is no longer available.',
         receivedBytes: 0,
@@ -155,6 +157,9 @@ export function fixtureManagement(
     changed(data);
   };
   return {
+    async retryRegistryReceipts() {
+      return 0;
+    },
     async pickLocalSource(folder) {
       return folder ? 'C:\\fixture\\local-build' : 'C:\\fixture\\Local.dll';
     },
@@ -417,6 +422,7 @@ export function fixtureManagement(
           releaseId: 'local-import',
           hash: reference.hash,
           kind: 'package',
+          receiptId: null,
           status: 'completed',
           message: 'Local fixture copied into the library.',
           receivedBytes: 100,
@@ -481,6 +487,7 @@ export function fixtureManagement(
           releaseId: release.id,
           hash: release.artifact.sha256,
           kind: 'package',
+          receiptId: null,
           status: 'preparing',
           message: 'Downloading fixture bytes…',
           receivedBytes: 0,

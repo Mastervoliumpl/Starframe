@@ -21,6 +21,9 @@ test('registry archive status does not claim installation or offer catalog retry
     failed.getByRole('button', { name: 'Retry exact release' }),
   ).toHaveCount(0);
   await expect(failed.getByText(/Retry this release/)).toBeVisible();
+  await expect(
+    downloads.getByRole('button', { name: 'Retry pending receipts' }),
+  ).toBeEnabled();
 });
 
 test('selection, warnings, enable and confirmed uninstall remain separate', async ({

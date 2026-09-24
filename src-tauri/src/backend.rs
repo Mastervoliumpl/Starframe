@@ -62,6 +62,20 @@ pub fn registry_package_action(
     queue.operations(store)
 }
 
+pub fn registry_receipts_action(
+    store: &Storage,
+    queue: &mut Packages,
+    request: packages::ReceiptRequest,
+) -> Result<usize, String> {
+    queue.resume_registry_receipts(
+        store,
+        request.client,
+        request.session,
+        request.bearer,
+        request.auth_cancel,
+    )
+}
+
 pub fn poll_packages(store: &mut Storage, queue: &mut Packages) -> Result<bool, String> {
     queue.poll(store).and_then(|changed| {
         sharing::poll(store, queue).map(|imports_changed| changed || imports_changed)

@@ -144,6 +144,7 @@ fn migration_watches_unambiguous_sources_and_reimport_selects_an_ambiguous_sourc
                 release_id: "local-import".into(),
                 hash: next.prepared.hash.clone(),
                 kind: crate::packages::Kind::Package,
+                receipt_id: None,
                 status: Status::Completed,
                 message: "Reimport fixture".into(),
                 received_bytes: 1,

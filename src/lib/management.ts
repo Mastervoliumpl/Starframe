@@ -36,6 +36,7 @@ export interface ManagementTransport {
   sharing(action: SharingAction): Promise<SharingReply>;
   mods(action: ModAction): Promise<ModView>;
   packages(action: PackageAction): Promise<PackageOperation[]>;
+  retryRegistryReceipts(): Promise<number>;
 }
 export const key = (reference: Reference) =>
   JSON.stringify([
@@ -242,6 +243,11 @@ export function createManagement(transport: ManagementTransport | null) {
           }),
         );
         if (!stopped) update({ operations });
+      });
+    },
+    retryReceipts() {
+      return run('receipts', async () => {
+        await confirmed(transport!.retryRegistryReceipts());
       });
     },
     cancel(operationId: string) {

@@ -1,6 +1,6 @@
 use crate::model::CommandError;
 use serde::Serialize;
-use starframe::packages::RegistryRequest;
+use starframe::packages::{ReceiptRequest, RegistryRequest};
 use starframe::registry::{
     Auth, AuthError, ChallengeView, Client, Config, CredentialStore, Error, ModId, Poll, ReleaseId,
     Session, SignOut,
@@ -56,6 +56,19 @@ impl AuthService {
                 "This Starframe build has no independently provisioned registry root. Registry downloads are unavailable; local mods remain usable.",
             )
         })?;
+        let receipt = self.receipt_request().await?;
+        Ok(RegistryRequest {
+            mod_id,
+            release_id,
+            root_public,
+            client: receipt.client,
+            session: receipt.session,
+            bearer: receipt.bearer,
+            auth_cancel: receipt.auth_cancel,
+        })
+    }
+
+    pub async fn receipt_request(&self) -> Result<ReceiptRequest, CommandError> {
         let cancel = self.receiver();
         let mut auth = self.auth.lock().await;
         let session = auth
@@ -69,10 +82,7 @@ impl AuthService {
             .token()
             .ok_or_else(|| CommandError::new("auth_required", "Sign in to download this release."))?
             .to_owned();
-        Ok(RegistryRequest {
-            mod_id,
-            release_id,
-            root_public,
+        Ok(ReceiptRequest {
             client: self.client.clone(),
             session,
             bearer,

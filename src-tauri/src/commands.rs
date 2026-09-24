@@ -131,6 +131,16 @@ pub async fn registry_download(
 }
 
 #[tauri::command]
+pub async fn registry_retry_receipts(
+    service: State<'_, crate::game_service::GameService>,
+    auth: State<'_, crate::auth_service::AuthService>,
+) -> Result<usize, CommandError> {
+    service
+        .registry_receipts(auth.receipt_request().await?)
+        .await
+}
+
+#[tauri::command]
 pub fn game_action(
     app: tauri::AppHandle,
     service: State<'_, crate::game_service::GameService>,

@@ -9,6 +9,18 @@
   Installed releases and local imports appear in My mods. A verified registry
   archive needs an approved install plan before it can join your library.
 </p>
+{#if $manager.operations.some((op) => op.kind === 'registry_archive' && op.receiptId)}<div
+  >
+    <p>
+      A completed archive transfer still needs a download receipt. Sign in with
+      the account used for the download to retry it. No archive bytes are sent
+      again.
+    </p>
+    <button
+      disabled={unavailable || $manager.pending.includes('receipts')}
+      onclick={() => manager.retryReceipts()}>Retry pending receipts</button
+    >
+  </div>{/if}
 {#if !$manager.operations.length}<p class="result-count">
     No downloads or imports yet. Install a release from Catalog or import a
     local mod in My mods.

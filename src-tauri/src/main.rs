@@ -122,6 +122,7 @@ fn main() {
             commands::game_action,
             commands::package_action,
             commands::registry_download,
+            commands::registry_retry_receipts,
             commands::pick_local_source,
             commands::sharing_action,
             commands::save_collection_file,

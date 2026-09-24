@@ -196,7 +196,14 @@ impl Packages {
             .pending_registry_receipts(session.account_id)
             .map_err(|e| e.to_string())?
         {
-            if self.registry_receipts.contains_key(&claim.download_id) {
+            if self.registry_receipts.contains_key(&claim.download_id)
+                || self.registry_active.values().any(|active| {
+                    active
+                        .claim
+                        .as_ref()
+                        .is_some_and(|current| current.download_id == claim.download_id)
+                })
+            {
                 continue;
             }
             let (sender, result) = mpsc::channel();
@@ -278,6 +285,7 @@ impl Packages {
             release_id: release_id.0.to_string(),
             hash: identity.reference.sha256.as_str().into(),
             kind: Kind::RegistryArchive,
+            receipt_id: None,
             status: Status::Preparing,
             message: "Downloading the exact signed registry archive.".into(),
             received_bytes: 0,
@@ -404,14 +412,18 @@ impl Packages {
             match event {
                 RegistryEvent::Transferred(outcome) if outcome.is_ok() => {
                     let (verified, current) = outcome.unwrap();
-                    let claim = storage
-                        .record_registry_receipt(&verified)
+                    let (claim, updated) = storage
+                        .record_registry_receipt_operation(&verified, &active.operation)
                         .map_err(|e| e.to_string())?;
                     active.claim = Some(claim.clone());
+                    active.operation = updated;
                     let outcome = (|| {
                         active.cancel.check()?;
                         if *active.abort.borrow() {
-                            return Err("Sign-in changed during the download. The receipt claim remains with its original account; the archive was not saved.".into());
+                            return Err(
+                                "Sign-in changed during the download. The archive was not saved."
+                                    .into(),
+                            );
                         }
                         let current = current?;
                         storage
@@ -492,19 +504,22 @@ impl Packages {
                     }
                 }
                 RegistryEvent::Receipt(result) => {
-                    if result.is_ok()
-                        && let Some(claim) = &active.claim
-                    {
-                        storage
-                            .clear_registry_receipt(claim)
-                            .map_err(|e| e.to_string())?;
-                    }
                     active.operation.status = Status::Completed;
                     active.operation.received_bytes = active.operation.total_bytes;
-                    active.operation.message = match result {
-                        Ok(()) => "Verified registry archive saved. Download receipt confirmed. Installation remains pending.".into(),
-                        Err(error) => format!("Verified registry archive saved. Download receipt is pending: {error}"),
-                    };
+                    match result {
+                        Ok(()) => {
+                            let claim = active.claim.as_ref().ok_or("Receipt claim is missing.")?;
+                            active.operation = storage
+                                .finish_registry_receipt(claim, Some(&active.operation))
+                                .map_err(|e| e.to_string())?
+                                .ok_or("Receipt operation is missing.")?;
+                        }
+                        Err(error) => {
+                            active.operation.message = format!(
+                                "Verified registry archive saved. Download receipt is pending: {error}"
+                            );
+                        }
+                    }
                 }
             }
             storage
@@ -523,12 +538,30 @@ impl Packages {
             };
             match received {
                 Ok(Ok(())) => {
+                    let operation = storage
+                        .package_receipt_operation(retry.claim.download_id)
+                        .map_err(|e| e.to_string())?;
                     storage
-                        .clear_registry_receipt(&retry.claim)
+                        .finish_registry_receipt(&retry.claim, operation.as_ref())
                         .map_err(|e| e.to_string())?;
                     changed = true;
                 }
-                Ok(Err(_)) | Err(mpsc::TryRecvError::Disconnected) => (),
+                Ok(Err(error)) => {
+                    if let Some(mut operation) = storage
+                        .package_receipt_operation(retry.claim.download_id)
+                        .map_err(|e| e.to_string())?
+                        && operation.status == Status::Completed
+                    {
+                        operation.message = format!(
+                            "Verified registry archive saved. Download receipt is pending: {error}"
+                        );
+                        storage
+                            .save_package(&operation)
+                            .map_err(|e| e.to_string())?;
+                        changed = true;
+                    }
+                }
+                Err(mpsc::TryRecvError::Disconnected) => (),
                 Err(mpsc::TryRecvError::Empty) if retry.worker.inner().is_finished() => (),
                 Err(mpsc::TryRecvError::Empty) => {
                     self.registry_receipts.insert(id, retry);
@@ -920,6 +953,7 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
         assert!(operation.message.contains("receipt is pending"));
+        assert!(operation.receipt_id.is_some());
         assert_eq!(
             store
                 .pending_registry_receipts(session.account_id)
@@ -984,6 +1018,13 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+        let confirmed = store
+            .package_request(&operation.request_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(confirmed.status, Status::Completed);
+        assert_eq!(confirmed.receipt_id, None);
+        assert!(confirmed.message.contains("receipt confirmed"));
         assert!(retry.join().unwrap().starts_with(&format!(
             "POST /v1/registry/releases/{}/receipts HTTP/1.1",
             release_id.0
