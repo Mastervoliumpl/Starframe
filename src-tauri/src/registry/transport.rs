@@ -2,11 +2,19 @@ use super::{ApiResponse, ExactReference, ListQuery, ModList, ReleaseId, ReleaseR
 use reqwest::{StatusCode, Url, header};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use sha2::{Digest, Sha256};
+use std::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
-use tokio::sync::watch;
+use tokio::{
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
+    sync::watch,
+};
 
 const MAX_JSON_BYTES: usize = 4 * 1024 * 1024;
+const MAX_ARCHIVE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -54,6 +62,7 @@ pub enum Error {
     Cancelled,
     TooLarge,
     Protocol,
+    Integrity,
     Server(StatusCode, ResponseError),
     Http(StatusCode),
 }
@@ -120,6 +129,7 @@ pub(super) struct ErrorEnvelope {
 pub struct Client {
     config: Config,
     http: reqwest::Client,
+    content_http: reqwest::Client,
 }
 
 #[derive(Debug, Deserialize)]
@@ -144,7 +154,18 @@ impl Client {
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(|_| Error::Configuration)?;
-        Ok(Self { config, http })
+        let content_http = reqwest::Client::builder()
+            .user_agent("Starframe registry/1")
+            .redirect(reqwest::redirect::Policy::none())
+            .retry(reqwest::retry::never())
+            .connect_timeout(Duration::from_secs(5))
+            .build()
+            .map_err(|_| Error::Configuration)?;
+        Ok(Self {
+            config,
+            http,
+            content_http,
+        })
     }
 
     pub(super) fn website(&self) -> &Url {
@@ -333,6 +354,7 @@ impl Client {
         if status != StatusCode::CREATED
             || grant.reference != identity.reference
             || grant.bytes != identity.bytes
+            || grant.bytes > MAX_ARCHIVE_BYTES
             || grant.metadata_revision != identity.metadata_revision
             || grant.security_revision != identity.security_revision
             || grant.content_path != format!("/v1/downloads/{}/content", grant.download_id)
@@ -342,6 +364,124 @@ impl Client {
             return Err(Error::Protocol);
         }
         Ok(grant)
+    }
+
+    pub async fn download_content(
+        &self,
+        grant: &DownloadGrant,
+        bearer: &str,
+        file: &mut tokio::fs::File,
+        start: u64,
+        progress: &AtomicU64,
+        mut cancel: watch::Receiver<bool>,
+    ) -> Result<(), Error> {
+        if bearer.is_empty()
+            || bearer.len() > 4096
+            || grant.bytes == 0
+            || grant.bytes > MAX_ARCHIVE_BYTES
+            || start >= grant.bytes
+            || grant.content_path != format!("/v1/downloads/{}/content", grant.download_id)
+            || file.metadata().await.map_err(|_| Error::Integrity)?.len() != start
+            || OffsetDateTime::parse(&grant.expires_at, &Rfc3339).map_err(|_| Error::Protocol)?
+                <= OffsetDateTime::now_utc()
+        {
+            return Err(Error::Protocol);
+        }
+        if *cancel.borrow() {
+            return Err(Error::Cancelled);
+        }
+        let mut url = self.config.api.clone();
+        url.set_path(&grant.content_path);
+        let etag = format!("\"sha256-{}\"", grant.reference.sha256.as_str());
+        let mut request = self
+            .content_http
+            .get(url)
+            .bearer_auth(bearer)
+            .header(header::ACCEPT_ENCODING, "identity");
+        if start > 0 {
+            request = request
+                .header(header::RANGE, format!("bytes={start}-"))
+                .header(header::IF_RANGE, &etag);
+        }
+        let exchange = async {
+            let mut response = request.send().await.map_err(|_| Error::Transport)?;
+            let status = response.status();
+            if status != StatusCode::OK && status != StatusCode::PARTIAL_CONTENT {
+                return Err(Error::Http(status));
+            }
+            let offset = if status == StatusCode::OK { 0 } else { start };
+            let expected_length = grant.bytes - offset;
+            let expected_range = format!("bytes {offset}-{}/{}", grant.bytes - 1, grant.bytes);
+            if response
+                .headers()
+                .get(header::ETAG)
+                .and_then(|v| v.to_str().ok())
+                != Some(etag.as_str())
+                || response
+                    .headers()
+                    .get(header::ACCEPT_RANGES)
+                    .and_then(|v| v.to_str().ok())
+                    != Some("bytes")
+                || response.content_length() != Some(expected_length)
+                || response
+                    .headers()
+                    .get(header::CONTENT_ENCODING)
+                    .is_some_and(|v| v != "identity")
+                || (status == StatusCode::PARTIAL_CONTENT
+                    && response
+                        .headers()
+                        .get(header::CONTENT_RANGE)
+                        .and_then(|v| v.to_str().ok())
+                        != Some(expected_range.as_str()))
+                || (status == StatusCode::OK
+                    && response.headers().contains_key(header::CONTENT_RANGE))
+            {
+                return Err(Error::Protocol);
+            }
+            if offset == 0 {
+                file.set_len(0).await.map_err(|_| Error::Integrity)?;
+            }
+            file.seek(std::io::SeekFrom::Start(offset))
+                .await
+                .map_err(|_| Error::Integrity)?;
+            progress.store(offset, Ordering::SeqCst);
+            let mut received = offset;
+            while let Some(chunk) = response.chunk().await.map_err(|_| Error::Transport)? {
+                received = received
+                    .checked_add(chunk.len() as u64)
+                    .ok_or(Error::TooLarge)?;
+                if received > grant.bytes {
+                    return Err(Error::TooLarge);
+                }
+                file.write_all(&chunk).await.map_err(|_| Error::Integrity)?;
+                progress.store(received, Ordering::SeqCst);
+            }
+            if received != grant.bytes {
+                return Err(Error::Integrity);
+            }
+            file.flush().await.map_err(|_| Error::Integrity)?;
+            file.seek(std::io::SeekFrom::Start(0))
+                .await
+                .map_err(|_| Error::Integrity)?;
+            let mut digest = Sha256::new();
+            let mut buffer = [0u8; 64 * 1024];
+            loop {
+                let count = file.read(&mut buffer).await.map_err(|_| Error::Integrity)?;
+                if count == 0 {
+                    break;
+                }
+                digest.update(&buffer[..count]);
+            }
+            if format!("{:x}", digest.finalize()) != grant.reference.sha256.as_str() {
+                return Err(Error::Integrity);
+            }
+            file.sync_all().await.map_err(|_| Error::Integrity)?;
+            Ok(())
+        };
+        tokio::select! {
+            result = exchange => result,
+            _ = cancel.changed() => Err(Error::Cancelled),
+        }
     }
 
     async fn get<T: DeserializeOwned>(
@@ -489,6 +629,7 @@ mod tests {
     use crate::registry::{ApiResponse, ReleaseResult};
     use std::io::{Read, Write};
     use std::net::TcpListener;
+    use std::sync::atomic::AtomicU64;
 
     fn fixture(name: &str) -> String {
         let fixtures: serde_json::Value =
@@ -674,6 +815,142 @@ mod tests {
             Err(Error::Protocol)
         ));
         thread.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn content_stream_restarts_resumes_and_rejects_changed_bytes() {
+        let archive = "PK\u{0003}\u{0004}fixture archive bytes";
+        let hash = format!("{:x}", Sha256::digest(archive.as_bytes()));
+        let download_id = uuid::Uuid::parse_str("33333333-3333-4333-8333-333333333333").unwrap();
+        let grant = DownloadGrant {
+            download_id,
+            reference: ExactReference {
+                mod_id: super::super::ModId::try_from(1).unwrap(),
+                release_id: ReleaseId(
+                    uuid::Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap(),
+                ),
+                sha256: super::super::Sha256::try_from(hash.clone()).unwrap(),
+            },
+            bytes: archive.len() as u64,
+            metadata_revision: 1,
+            security_revision: 1,
+            content_path: format!("/v1/downloads/{download_id}/content"),
+            expires_at: (OffsetDateTime::now_utc() + time::Duration::minutes(5))
+                .format(&Rfc3339)
+                .unwrap(),
+        };
+        let headers = format!("ETag: \"sha256-{hash}\"\r\nAccept-Ranges: bytes\r\n");
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("part.zip");
+        let progress = AtomicU64::new(0);
+        let (origin, thread) = serve("200 OK", archive, &headers);
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let mut file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .read(true)
+            .write(true)
+            .open(&path)
+            .await
+            .unwrap();
+        let (_sender, cancel) = watch::channel(false);
+        client
+            .download_content(&grant, "fixture-token", &mut file, 0, &progress, cancel)
+            .await
+            .unwrap();
+        assert_eq!(tokio::fs::read(&path).await.unwrap(), archive.as_bytes());
+        assert_eq!(progress.load(Ordering::SeqCst), grant.bytes);
+        let request = thread.join().unwrap();
+        assert!(request.starts_with(&format!("GET {} HTTP/1.1", grant.content_path)));
+        assert!(!request.contains("Range: bytes="));
+
+        let prefix = 7;
+        tokio::fs::write(&path, &archive.as_bytes()[..prefix])
+            .await
+            .unwrap();
+        let range_headers = format!(
+            "{headers}Content-Range: bytes {prefix}-{}/{}\r\n",
+            grant.bytes - 1,
+            grant.bytes
+        );
+        let (origin, thread) = serve("206 Partial Content", &archive[prefix..], &range_headers);
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let (_sender, cancel) = watch::channel(false);
+        client
+            .download_content(
+                &grant,
+                "fixture-token",
+                &mut file,
+                prefix as u64,
+                &progress,
+                cancel,
+            )
+            .await
+            .unwrap();
+        assert_eq!(tokio::fs::read(&path).await.unwrap(), archive.as_bytes());
+        let request = thread.join().unwrap();
+        assert!(request.contains(&format!("bytes={prefix}-")));
+        assert!(request.contains(&format!("\"sha256-{hash}\"")));
+
+        tokio::fs::write(&path, b"old").await.unwrap();
+        let (origin, thread) = serve("200 OK", archive, &headers);
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let (_sender, cancel) = watch::channel(false);
+        client
+            .download_content(&grant, "fixture-token", &mut file, 3, &progress, cancel)
+            .await
+            .unwrap();
+        assert_eq!(tokio::fs::read(&path).await.unwrap(), archive.as_bytes());
+        thread.join().unwrap();
+
+        tokio::fs::write(&path, b"").await.unwrap();
+        let changed = "X".repeat(archive.len());
+        let (origin, thread) = serve("200 OK", &changed, &headers);
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let (_sender, cancel) = watch::channel(false);
+        assert!(matches!(
+            client
+                .download_content(&grant, "fixture-token", &mut file, 0, &progress, cancel)
+                .await,
+            Err(Error::Integrity)
+        ));
+        thread.join().unwrap();
+
+        tokio::fs::write(&path, b"").await.unwrap();
+        let (origin, thread) = serve(
+            "416 Range Not Satisfiable",
+            "",
+            &format!("Content-Range: bytes */{}\r\n", grant.bytes),
+        );
+        let client =
+            Client::new(Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap())
+                .unwrap();
+        let (_sender, cancel) = watch::channel(false);
+        assert!(matches!(
+            client
+                .download_content(&grant, "fixture-token", &mut file, 0, &progress, cancel)
+                .await,
+            Err(Error::Http(StatusCode::RANGE_NOT_SATISFIABLE))
+        ));
+        thread.join().unwrap();
+        assert!(tokio::fs::read(&path).await.unwrap().is_empty());
+
+        let (sender, cancel) = watch::channel(false);
+        sender.send_replace(true);
+        assert!(matches!(
+            client
+                .download_content(&grant, "fixture-token", &mut file, 0, &progress, cancel)
+                .await,
+            Err(Error::Cancelled)
+        ));
     }
 
     #[tokio::test]
