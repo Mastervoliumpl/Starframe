@@ -540,19 +540,24 @@ impl Client {
                 file.set_len(0).await.map_err(|_| Error::Integrity)?;
                 start = 0;
             }
-            match self
-                .download_content(&grant, bearer, file, start, progress, cancel.clone())
-                .await
-            {
-                Ok(verified) => return Ok((grant, verified)),
-                Err(Error::Transport | Error::Http(StatusCode::GONE)) if attempt < 2 => (),
-                Err(Error::Http(StatusCode::CONFLICT | StatusCode::RANGE_NOT_SATISFIABLE))
-                    if attempt < 2 =>
+            let mut restarted = false;
+            loop {
+                match self
+                    .download_content(&grant, bearer, file, start, progress, cancel.clone())
+                    .await
                 {
-                    file.set_len(0).await.map_err(|_| Error::Integrity)?;
-                    progress.store(0, Ordering::SeqCst);
+                    Ok(verified) => return Ok((grant, verified)),
+                    Err(Error::Http(StatusCode::CONFLICT | StatusCode::RANGE_NOT_SATISFIABLE))
+                        if start > 0 && !restarted =>
+                    {
+                        file.set_len(0).await.map_err(|_| Error::Integrity)?;
+                        progress.store(0, Ordering::SeqCst);
+                        start = 0;
+                        restarted = true;
+                    }
+                    Err(Error::Transport | Error::Http(StatusCode::GONE)) if attempt < 2 => break,
+                    Err(error) => return Err(error),
                 }
-                Err(error) => return Err(error),
             }
         }
         Err(Error::Transport)
@@ -1194,7 +1199,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn interrupted_transfer_renews_grant_and_resumes_same_account_prefix() {
+    async fn interrupted_transfer_renews_grant_and_restarts_after_unrecorded_prefix() {
         let archive = "PK\u{0003}\u{0004}resume this complete archive";
         let prefix = 9;
         let hash = format!("{:x}", Sha256::digest(archive.as_bytes()));
@@ -1225,7 +1230,7 @@ mod tests {
         let archive = archive.to_string();
         let thread = std::thread::spawn(move || {
             let mut requests = Vec::new();
-            for step in 0..4 {
+            for step in 0..5 {
                 let (mut stream, _) = listener.accept().unwrap();
                 requests.push(read_request(&mut stream));
                 match step {
@@ -1244,10 +1249,11 @@ mod tests {
                         write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nETag: \"sha256-{hash}\"\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n", archive.len()).unwrap();
                         stream.write_all(&archive.as_bytes()[..prefix]).unwrap();
                     }
+                    3 => {
+                        write!(stream, "HTTP/1.1 409 Conflict\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+                    }
                     _ => {
-                        let rest = &archive[prefix..];
-                        write!(stream, "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nETag: \"sha256-{hash}\"\r\nAccept-Ranges: bytes\r\nContent-Range: bytes {prefix}-{}/{}\r\nConnection: close\r\n\r\n", rest.len(), archive.len()-1, archive.len()).unwrap();
-                        stream.write_all(rest.as_bytes()).unwrap();
+                        write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nETag: \"sha256-{hash}\"\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n{archive}", archive.len()).unwrap();
                     }
                 }
             }
@@ -1284,8 +1290,9 @@ mod tests {
             expected_archive.as_bytes()
         );
         let requests = thread.join().unwrap();
-        assert_eq!(requests.len(), 4);
+        assert_eq!(requests.len(), 5);
         assert!(requests[3].contains(&format!("bytes={prefix}-")));
+        assert!(!requests[4].contains("range:"));
     }
 
     #[tokio::test]
