@@ -135,7 +135,6 @@ fn local_constraints_keep_required_precedence_and_never_map_catalog_dependencies
         .contains("cycle")
     );
     second.manifest.load_before.clear();
-    second.manifest.requires[0].origin = Origin::Catalog;
     second.manifest.requires[0].release_id = Some("old.catalog".into());
     assert!(
         resolve_mixed(
@@ -144,7 +143,7 @@ fn local_constraints_keep_required_precedence_and_never_map_catalog_dependencies
             &requested
         )
         .unwrap_err()
-        .contains("obsolete catalog")
+        .contains("release ID")
     );
     let collision = local("registry.1");
     let local_reference = Reference::Local(LocalReference {

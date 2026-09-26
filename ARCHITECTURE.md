@@ -79,8 +79,6 @@ Starframe/
 ├── ARCHITECTURE.md
 ├── CONTEXT.md
 ├── LICENSE
-├── catalog/
-│   └── releases.json            Curated release metadata, no mod binaries
 ├── src/
 │   ├── App.svelte               Window composition and navigation
 │   ├── lib/
@@ -90,7 +88,7 @@ Starframe/
 │   │   └── ui/                  Reused controls with accessible behavior
 │   ├── features/
 │   │   ├── mods/                My mods, mod details, local imports
-│   │   ├── catalog/             Approved releases and install review
+│   │   ├── registry/            Native discovery, release details and explicit installs
 │   │   ├── collections/         Collection editing and import review
 │   │   ├── downloads/           Operation progress and errors
 │   │   └── settings/            Game setup, app updates, help and logs
@@ -247,51 +245,35 @@ Keep database schema versions separate from catalog and collection-file format v
 
 The initial managed runtime and process-bound reports are implemented in #13. [Activation verification](docs/verification/runtime-activation.md) distinguishes verified managed fixtures from unsupported content and conventional plugin activation. The core targets .NET Standard 2.0 for complete Mono dependency packaging; the Unity bootstrap targets 2.1 against installed references.
 
-## 6. Catalog and downloads
+## 6. Registry and downloads
 
-Keep `catalog/releases.json` in the Starframe repository and publish it independently of desktop releases. Issue #16 implements the initial empty metadata file and fixes the client endpoint at `https://raw.githubusercontent.com/Mastervoliumpl/Starframe/main/catalog/releases.json`; publication awaits merge to main. [Catalog schema and publication](catalog/README.md) define validation, retained identities, HTTP limits and the SQLite cache. A maintainer's catalog commit becomes available at that endpoint without rebuilding or updating the app. GitHub/CDN cache timing can delay visibility; the app must not claim instant global propagation.
+The website owns discovery, author declarations, owner approval and signed release metadata. The desktop uses its closed v1 API, Steam manager session and independently supplied Ed25519 registry root. Installation schema 1 inside full signed release schema 2 binds exact archive bytes, declared destinations, code entry points and dependencies. The pinned website revision and cross-language fixtures are recorded in [registry installation](docs/verification/registry-installation.md).
 
-Each approved artifact records a stable release ID, exact URL, SHA-256, expected archive layout, dependencies, ordering metadata, and tested game builds. Separate `schemaVersion`, which controls how to read the file, from `catalogRevision`, which changes when entries change. Adding releases within a supported schema needs no app update. Display author versions as labels; do not assume every author uses semantic versioning.
+Native Mods discovery runs after the shell is usable and every five minutes while it remains open. Search, filters, paging, details and history preserve user state. Installing an update or dependency requires an explicit exact-release choice and separate collection selection. No refresh changes a pinned collection.
 
-```mermaid
-flowchart LR
-    Author[Author publishes artifact] --> Review[Maintainer reviews exact artifact]
-    Review --> Entry[Catalog entry with URL and hash]
-    Entry --> Catalog[Published Starframe catalog]
-    Catalog --> Client[Starframe reads approved metadata]
-    Author -->|Direct artifact download| Stage[Local staging]
-    Client -->|Selected release| Stage
-    Stage --> Check[Hash and archive checks]
-    Check --> Library[Local library]
-```
+Before an authenticated grant, the backend verifies fresh signed keysets, security and release metadata, exact ModID/ReleaseID/hash/size, installation intent and retained security decisions. Transfers use bounded chunks and origin checks; redirects, malformed identity and changed bytes fail. The shared three-operation queue keeps cancellation, durable status and account-bound receipt retry. Cache reuse rechecks bytes and approval. See [downloads](docs/verification/registry-downloads.md) and [trust](docs/verification/registry-trust.md).
 
-Catalog changes go through a reviewable Git commit. Automated checks validate IDs, schema, supported layouts, dependency references and cycles; they do not claim to perform a malware review. A changed artifact requires new review and metadata, even when its URL or version label stays the same.
+Installed registry/local records remain usable offline without authentication, subject to retained hash blocks, valid dependencies and local deployment checks. A newer signed explicit clear can remove a hash block; omissions, expiry or sign-out cannot. Disable and uninstall remain available. Compatibility, withdrawal and security decisions are separate facts. Curation does not guarantee benign code.
 
-The installed app trusts a fixed maintainer-controlled HTTPS catalog location and validates its contents. Expected artifact hashes detect unexpected download changes; they do not prove that approved code is benign or protect against a compromised catalog publisher. Imported collections cannot add trusted download sources. Invalid catalog data leaves the last valid cache in use with a visible status.
+The old GitHub catalog client, source/root files, cache/security API and publisher are retired under #89. No catalog reader, fallback, ID mapping or old-format conversion is supplied. Schema 20 creates only current registry/local records. Schema 19 cleanup backs up the database, drops catalog-only rows/tables/history in one checked transaction, and preserves current collections, local metadata, trust, receipts and deployment records. Earlier databases are rejected with their files retained. Original sources and game files are not deleted. See [retirement](docs/verification/catalog-retirement.md).
 
-Use one async HTTP client with timeouts, bounded transfers, and bounded retries. Permit expected download-host redirects, but reject HTTPS downgrades and unexpected local/private destinations; enforce that policy on every redirect. No embedded GitHub token is needed for public downloads. Follow server retry instructions and use conditional requests where supported. [reqwest](https://docs.rs/reqwest/latest/reqwest/), [GitHub request guidance](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api)
-
-Fetch the catalog on launch and every five minutes while the desktop app is open, separately from app-update checks. Use the HTTP validator where available, then validate a changed catalog and replace the cached revision in one record transaction. Publish the resulting state to the UI immediately. The user does not press Refresh, restart, or install a new app version. Offline mode keeps the last valid revision and its last-check time.
-
-The owner approved the expired-metadata behavior for #46 on 9 September 2026: pause new catalog downloads until a valid signed refresh succeeds. Installed mods remain usable offline, subject to cached confirmed security findings. The desktop uses the embedded TUF root and persistent `catalog-trust` state, commits verified catalog/advisory targets together in schema 13, and displays stale, unknown and corrected findings. New downloads require freshness at both start and completion; existing verified files can be reused offline. Confirmed-finding checks cover matching catalog archives and local payloads. The [publisher](docs/catalog-publishing.md) is enabled with daily renewal and thirty-day validity. See the [verification record](docs/verification/catalog-authentication.md) and [review/reporting process](docs/catalog-review.md).
-
-A newly approved mod release appears live, but never silently replaces versions pinned in a collection. A withdrawn release is marked and blocks new downloads; keep its stable identity so old collections still explain what they reference. Do not delete or renumber release IDs. Mirrors may change only if they provide the same approved bytes and hash. Authors can still remove artifacts, so permanent download availability cannot be guaranteed. Invalid or unsupported catalog schemas retain the last valid cache and show the specific problem.
+Application release/update signing keeps its separate authority. Production registry downloads remain unavailable until an independently approved registry root is provisioned; synthetic fixture keys do not enter release configuration.
 
 ### Game-version warnings
 
-When a detected game build changes, recalculate the displayed compatibility evidence for each catalog mod. Show `Not tested with this version` unless evidence establishes a specific incompatibility, and show tested/current builds in details. An unmaintained mod stays usable with a maintenance label. Maintenance, compatibility, download availability and security findings are separate facts; [security scope](SECURITY.md) defines their behavior and implementation phases. A failed request does not establish withdrawal, and ordinary withdrawal does not block activation of a verified installed copy.
+When a detected game build changes, recalculate the displayed compatibility evidence for each registry mod. Show `Not tested with this version` unless evidence establishes a specific incompatibility, and show tested/current builds in details. An unmaintained mod stays usable with a maintenance label. Maintenance, compatibility, download availability and security findings are separate facts; [security scope](SECURITY.md) defines their behavior and implementation phases. A failed request does not establish withdrawal, and ordinary withdrawal does not block activation of a verified installed copy.
 
 These warnings do not disable a mod, remove it from the collection, or prevent trying a launch. The launch area can summarize warnings with a route to details while keeping launch available. Missing executable files, an unusable loader, missing required dependencies, invalid activation contracts, or an incomplete deployment are separate actionable failures. Do not disguise a game-version mismatch as a hard dependency failure to bypass the warning policy.
 
-Local imports skip catalog release and compatibility-version checks. They still participate in dependency, load-order and structural validation. Preserve any author version label as metadata without turning it into an online update check.
+Local imports skip registry release and compatibility-version checks. They still participate in dependency, load-order and structural validation. Preserve any author version label as metadata without turning it into an online update check.
 
 ### Package preparation
 
-Issue #17 implements `packages.rs` and its transfer helper for approved `starframe_managed_zip` artifacts. The existing storage worker owns a three-worker preparation queue and schema-7 operation/file records. A focused `package_action` command accepts release IDs, request IDs and cancellation intent. Files move from private staging to the content-addressed library before a single completion transaction; game deployment remains separate. [Package verification](docs/verification/packages.md) defines enforced limits, recovery and remaining format support.
+`packages.rs` owns local import/verification and registry preparation on the background storage worker. Registry operations enter through authenticated signed approval, not a catalog release-ID command. Verified bytes move from private staging to content-addressed storage before an atomic record commit; deployment remains separate. [Package verification](docs/verification/packages.md) records the original extraction protections; [registry installation](docs/verification/registry-installation.md) records current declared preparation.
 
 Extract into private staging, never directly into the game folder. Reject absolute paths, parent traversal, link entries, Windows device/alternate-stream paths, case-insensitive target collisions, and archives exceeding configured file-count or expanded-size limits. Check the final destination and reparse points as well as archive strings. Never run archive-supplied scripts or load a DLL into Starframe to inspect it.
 
-Initial support covers reviewed ZIP layouts and explicit local DLL/folder imports using supported activation contracts. Starframe-managed mods, conventional BepInEx plugins, content overlays, and bootstrap packages have different capabilities. An arbitrary DLL is not automatically compatible with Starframe's lifecycle. Unknown layouts receive an actionable unsupported result rather than a guessed destination. Required downloaded dependencies resolve to approved exact releases; a matching explicitly imported local dependency can satisfy a compatible requirement without becoming a catalog release.
+Initial support covers reviewed ZIP layouts and explicit local DLL/folder imports using supported activation contracts. Starframe-managed mods, conventional BepInEx plugins, content overlays, and bootstrap packages have different capabilities. An arbitrary DLL is not automatically compatible with Starframe's lifecycle. Unknown layouts receive an actionable unsupported result rather than a guessed destination. Required downloaded dependencies resolve to approved exact releases; a matching explicitly imported local dependency can satisfy a compatible requirement without becoming a registry release.
 
 ## 7. Deploying a collection safely
 
@@ -478,7 +460,7 @@ The Windows uninstaller invokes the same ownership/recovery code before deleting
 
 After successful game cleanup, full uninstall deletes Starframe-managed app data by default. An unchecked `Keep my library, collections and settings` option preserves it. Upgrades and repair/reinstall always preserve app data. Preserve original import sources, game saves, external plugins, unowned mod configuration and unexpected files. Never recursively delete a game installation or follow links into external folders. Test the default-delete and explicit-keep paths separately, including interruption before cleanup completes.
 
-Windows Authenticode is deferred by the owner on 9 September 2026. Initial alpha artifacts may lack a Windows publisher signature, but release artifacts and Tauri updates still require private/public-key signatures and catalog/advisory authority remains separate. A public key beside a download does not by itself authenticate a first installation: publish its fingerprint through the project's documented trust channel and describe independent verification. When Authenticode is added later, sign Windows files before generating signatures over the final installer bytes.
+Windows Authenticode is deferred by the owner on 9 September 2026. Initial alpha artifacts may lack a Windows publisher signature, but release artifacts and Tauri updates still require private/public-key signatures and registry metadata authority remains separate. A public key beside a download does not by itself authenticate a first installation: publish its fingerprint through the project's documented trust channel and describe independent verification. When Authenticode is added later, sign Windows files before generating signatures over the final installer bytes.
 
 An explicitly requested installer may run to replace the app after its process exits; that is a finite installation step, not a persistent update checker. No service, scheduled task, autostart agent, or hidden tray mode is installed. Ordinary close cancels checks and exits Starframe. Closing Starframe leaves an already-running game alone.
 

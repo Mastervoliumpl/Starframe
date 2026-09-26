@@ -19,11 +19,21 @@ pub(super) fn operation_record(operation: &Operation) -> Result<String> {
     {
         return Err(Error::Invalid("Invalid saved package operation.".into()));
     }
+    if matches!(operation.kind, Kind::Package)
+        && !matches!(
+            operation.release_id.as_str(),
+            "local-import" | "local-verification"
+        )
+    {
+        return Err(Error::Invalid(
+            "Unsupported saved package operation.".into(),
+        ));
+    }
     validate_reference(&ModReference {
         mod_id: operation.release_id.clone(),
         hash: operation.hash.clone(),
-        origin: Origin::Catalog,
-        release_id: Some(operation.release_id.clone()),
+        origin: Origin::LocalImport,
+        release_id: None,
     })?;
     serde_json::to_string(operation).map_err(|e| Error::Invalid(e.to_string()))
 }
@@ -265,7 +275,7 @@ impl Storage {
         operation: &Operation,
         entry: &LibraryEntry,
         prepared: &Prepared,
-        local: Option<&crate::local_import::LocalSource>,
+        local: &crate::local_import::LocalSource,
     ) -> Result<()> {
         self.commit_import(operation, entry, prepared, local, None)
     }
@@ -275,7 +285,7 @@ impl Storage {
         operation: &Operation,
         entry: &LibraryEntry,
         prepared: &Prepared,
-        local: Option<&crate::local_import::LocalSource>,
+        local: &crate::local_import::LocalSource,
         advance: Option<(&str, &ModReference)>,
     ) -> Result<()> {
         self.require_registry_unblocked_hash(&prepared.hash)?;
@@ -288,22 +298,15 @@ impl Storage {
         if operation.status != Status::Completed
             || operation.hash != prepared.hash
             || entry.reference.hash != prepared.hash
-            || match local {
-                Some(source) => source.entry() != *entry || operation.release_id != "local-import",
-                None => {
-                    entry.reference.origin != Origin::Catalog
-                        || entry.reference.release_id.as_ref() != Some(&operation.release_id)
-                }
-            }
+            || local.entry() != *entry
+            || operation.release_id != "local-import"
             || entry.author.chars().count() > 200
         {
             return Err(Error::Invalid(
                 "Prepared package does not match its operation.".into(),
             ));
         }
-        if let Some(source) = local {
-            source.validate().map_err(Error::Invalid)?;
-        }
+        local.validate().map_err(Error::Invalid)?;
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -321,9 +324,8 @@ impl Storage {
         }
         tx.execute("INSERT INTO prepared_artifacts (hash, record) VALUES (?, ?) ON CONFLICT(hash) DO NOTHING", rusqlite::params![prepared.hash, manifest])?;
         tx.execute("INSERT INTO library (mod_id, hash, origin, release_id, name, author, version) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING", rusqlite::params![entry.reference.mod_id, prepared.hash, entry.reference.origin.as_str(), entry.reference.release_id, entry.name, entry.author, entry.version])?;
-        if let Some(source) = local {
-            let record =
-                serde_json::to_string(source).map_err(|e| Error::Invalid(e.to_string()))?;
+        {
+            let record = serde_json::to_string(local).map_err(|e| Error::Invalid(e.to_string()))?;
             tx.execute("INSERT INTO local_sources (mod_id,hash,record) VALUES (?,?,?) ON CONFLICT(mod_id,hash) DO UPDATE SET record=excluded.record", rusqlite::params![entry.reference.mod_id, prepared.hash, record])?;
             tx.execute("INSERT INTO local_watches(mod_id,hash) VALUES (?,?) ON CONFLICT(mod_id) DO UPDATE SET hash=excluded.hash,state='watching',message='Verified build saved. Active local collections apply when the game is closed.'", rusqlite::params![entry.reference.mod_id, prepared.hash])?;
         }

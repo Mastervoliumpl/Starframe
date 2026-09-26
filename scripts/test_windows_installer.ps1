@@ -1,4 +1,4 @@
-param([string] $BaselineExecutable = '')
+param()
 
 $ErrorActionPreference = 'Stop'
 $taskRepository = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -10,13 +10,6 @@ $taskData = Join-Path $env:LOCALAPPDATA $taskIdentifier
 $taskRoaming = Join-Path $env:APPDATA $taskIdentifier
 $taskCurrentExecutable = Join-Path $taskRepository 'src-tauri/target/release/starframe.exe'
 $taskCurrentHash = (Get-FileHash -LiteralPath $taskCurrentExecutable).Hash
-if ($BaselineExecutable) {
-    $BaselineExecutable = (Resolve-Path -LiteralPath $BaselineExecutable).Path
-    if ([IO.Path]::GetFileName($BaselineExecutable) -ne 'starframe.exe' -or [Diagnostics.FileVersionInfo]::GetVersionInfo($BaselineExecutable).ProductVersion -ne '0.6.0-dev.0') {
-        throw 'Expected an older Starframe executable built as 0.6.0-dev.0.'
-    }
-    if ((Get-FileHash -LiteralPath $BaselineExecutable).Hash -eq $taskCurrentHash) { throw 'Cross-build upgrade needs different executables.' }
-}
 $taskAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if ($taskAdmin) { throw 'Run this installer check as an ordinary user.' }
 if (Get-Process -Name starframe -ErrorAction SilentlyContinue) { throw 'Close Starframe before running installer fixtures.' }
@@ -75,28 +68,12 @@ try {
             & (Join-Path $PSScriptRoot 'test_installer_maintenance.ps1')
         }
         $taskInstaller = Join-Path $taskRepository "src-tauri/target/release/bundle/nsis/${taskProduct}_${taskVersion}_x64-setup.exe"
-        if ($BaselineExecutable -and $taskVersion -eq '0.6.0-dev.0') {
-            $taskNsisDirectory = Join-Path $taskRepository 'src-tauri/target/release/nsis/x64'
-            $taskRendered = [IO.File]::ReadAllText((Join-Path $taskNsisDirectory 'installer.nsi'))
-            $taskDefinition = [regex]'(?m)^!define MAINBINARYSRCPATH ".*"\r?$'
-            if ($taskDefinition.Matches($taskRendered).Count -ne 1) { throw 'Unexpected generated NSIS executable declaration.' }
-            $taskRendered = $taskDefinition.Replace($taskRendered, [System.Text.RegularExpressions.MatchEvaluator]{ param($match) '!define MAINBINARYSRCPATH "' + $BaselineExecutable.Replace('$', '$$') + '"' })
-            $taskBaselineScript = Join-Path $taskNsisDirectory 'installer-upgrade-baseline.nsi'
-            [IO.File]::WriteAllText($taskBaselineScript, $taskRendered)
-            Push-Location $taskNsisDirectory
-            try {
-                & (Join-Path $env:LOCALAPPDATA 'tauri/NSIS/makensis.exe') '/V2' $taskBaselineScript *> (Join-Path $taskEvidence 'baseline-nsis.log')
-                if ($LASTEXITCODE -ne 0) { throw 'Baseline NSIS compilation failed; inspect the local log.' }
-                Copy-Item -LiteralPath 'nsis-output.exe' -Destination $taskInstaller
-            }
-            finally { Pop-Location }
-        }
         if ([Diagnostics.FileVersionInfo]::GetVersionInfo($taskInstaller).ProductName -ne $taskProduct) {
             throw 'Refusing to run an installer without the isolated fixture identity.'
         }
         $taskProcess = Start-Process -FilePath $taskInstaller -ArgumentList @('/S', '/NS', "/D=$taskInstall") -WindowStyle Hidden -PassThru -Wait
         if ($taskProcess.ExitCode -ne 0) { throw "Fixture install failed: $($taskProcess.ExitCode)" }
-        $taskExpectedExecutable = if ($BaselineExecutable -and $taskVersion -eq '0.6.0-dev.0') { $BaselineExecutable } else { $taskCurrentExecutable }
+        $taskExpectedExecutable = $taskCurrentExecutable
         & python scripts/installer_upgrade_fixture.py binary $taskExpectedExecutable (Join-Path $taskInstall 'starframe.exe')
         if ($LASTEXITCODE -ne 0) { throw 'Installed executable differs from the expected build.' }
         $taskRegistration = Get-ItemProperty -LiteralPath $taskUninstallKey
@@ -135,22 +112,6 @@ try {
                 [IO.File]::WriteAllText($taskFile, $taskEntry.Value)
             }
             [IO.File]::WriteAllText((Join-Path $taskInstall 'unowned.txt'), 'unowned fixture')
-            if ($BaselineExecutable) {
-                & python scripts/installer_upgrade_fixture.py seed $taskEvidence
-                if ($LASTEXITCODE -ne 0) { throw 'Populated upgrade fixture failed.' }
-                $taskOriginalSourceHash = (Get-FileHash -LiteralPath (Join-Path $taskEvidence 'original-source.dll')).Hash
-                $taskOldOpen = Start-Process -FilePath (Join-Path $taskInstall 'starframe.exe') -ArgumentList @('--installer-uninstall', $taskIdentifier, 'keep') -WindowStyle Hidden -PassThru -Wait
-                if ($taskOldOpen.ExitCode -ne 0) { throw 'The older installed build rejected its populated fixture.' }
-            }
-        }
-        elseif ($BaselineExecutable) {
-            # With no deployment records, this finite command only opens/migrates and retains fixture data.
-            for ($taskOpen = 0; $taskOpen -lt 2; $taskOpen++) {
-                $taskMigrate = Start-Process -FilePath (Join-Path $taskInstall 'starframe.exe') -ArgumentList @('--installer-uninstall', $taskIdentifier, 'keep') -WindowStyle Hidden -PassThru -Wait
-                if ($taskMigrate.ExitCode -ne 0) { throw 'New installed build could not open the older data.' }
-                & python scripts/installer_upgrade_fixture.py verify $taskEvidence
-                if ($LASTEXITCODE -ne 0) { throw 'Populated data migration or restart verification failed.' }
-            }
         }
         Assert-Retained
         Write-Output "Verified install and retained fixtures: $taskVersion"
@@ -222,7 +183,6 @@ try {
     }
     Assert-Retained
     Invoke-GameFixture 'removed'
-    if ($BaselineExecutable -and (Get-FileHash -LiteralPath (Join-Path $taskEvidence 'original-source.dll')).Hash -ne $taskOriginalSourceHash) { throw 'Uninstall changed the original source fixture.' }
     $taskRemaining = @(Get-ChildItem -LiteralPath $taskInstall -File -Recurse)
     if ($taskRemaining.Count -ne 1 -or $taskRemaining[0].Name -ne 'unowned.txt') {
         throw 'Owned installation files remain after uninstall.'
@@ -246,8 +206,6 @@ try {
     Invoke-GameFixture 'removed'
     @{
         ordinaryUser = $true
-        crossBuildSchemaMigration = [bool]$BaselineExecutable
-        baselineExecutableSha256 = $(if ($BaselineExecutable) { (Get-FileHash -LiteralPath $BaselineExecutable).Hash } else { $null })
         currentExecutableSha256 = $taskCurrentHash
         versions = @('0.6.0-dev.0', '0.6.0-dev.1')
         runtimeHashesMatched = $true
@@ -266,7 +224,7 @@ try {
         appAndRegistrationRemoved = $true
         runningAppRetained = $true
         gameLaunched = $false
-        limitation = $(if ($BaselineExecutable) { 'Different app builds and populated schema 12-to-14 migration through the finite maintenance entry point. No desktop first-start, interactive UI or absent-WebView2 test.' } else { 'NSIS metadata upgrade over the same executable. No application/database migration, interactive UI or absent-WebView2 test.' })
+        limitation = 'NSIS metadata upgrade over the same executable. No application/database migration, interactive UI or absent-WebView2 test.'
     } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $taskEvidence 'result.json')
 
     Remove-Item -LiteralPath (Join-Path $taskProductKey $taskProduct)

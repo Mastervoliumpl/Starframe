@@ -680,7 +680,7 @@ fn external_dll(
 }
 
 /// Development entry: deploy an explicitly selected, hash-inventoried runtime package.
-/// Author downloads must pass catalog/package approval before using this boundary.
+/// Registry downloads must pass signed release approval before using this boundary.
 pub fn install_runtime(
     store: &mut Storage,
     game: &game::Installation,

@@ -7,9 +7,6 @@ use std::{
 };
 use uuid::Uuid;
 
-mod catalog;
-pub use catalog::CatalogSecurity;
-
 mod local_import;
 mod mods;
 mod packages;
@@ -18,33 +15,37 @@ pub use registry::{RegistryDisplay, RegistryLibraryEntry};
 mod sharing;
 mod updates;
 
-const SCHEMA: i64 = 19;
+const SCHEMA: i64 = 20;
 const APPLICATION_ID: i64 = 0x53544652;
-const MIGRATIONS: [&str; 19] = [
-    "CREATE TABLE metadata (id INTEGER PRIMARY KEY CHECK(id = 1), engine TEXT NOT NULL CHECK(engine = 'sqlite'), revision INTEGER NOT NULL CHECK(revision >= 0));
-     INSERT INTO metadata VALUES (1, 'sqlite', 0);
-     CREATE TABLE library (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author) <= 200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(mod_id, hash), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL)));
-     CREATE TABLE collections (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), revision INTEGER NOT NULL CHECK(revision > 0));
-     CREATE TABLE collection_entries (collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE, position INTEGER NOT NULL CHECK(position >= 0), mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(collection_id, position), UNIQUE(collection_id, mod_id), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL)));",
-    "CREATE TABLE preferences (id INTEGER PRIMARY KEY CHECK(id = 1), active_collection TEXT REFERENCES collections(id)); INSERT INTO preferences VALUES (1, NULL);",
-    "CREATE TABLE game_selection (singleton INTEGER PRIMARY KEY CHECK(singleton = 1), installation_id TEXT NOT NULL, path TEXT NOT NULL CHECK(length(path) BETWEEN 1 AND 32768));",
-    "SELECT 1;",
-    "CREATE TABLE deployments (root TEXT PRIMARY KEY NOT NULL, record TEXT NOT NULL CHECK(length(record) <= 1048576 AND json_valid(record))); CREATE TABLE deployment_blobs (hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash)=64), bytes BLOB NOT NULL CHECK(length(bytes)<=8388608));",
-    "CREATE TABLE catalog_cache (id INTEGER PRIMARY KEY CHECK(id=1), record TEXT NOT NULL CHECK(length(record)<=2105344 AND json_valid(record)));",
-    "CREATE TABLE package_operations (id TEXT PRIMARY KEY NOT NULL, request_id TEXT UNIQUE NOT NULL, record TEXT NOT NULL CHECK(length(record)<=8192 AND json_valid(record))); CREATE TABLE prepared_artifacts (hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash)=64 AND hash NOT GLOB '*[^0-9a-f]*'), record TEXT NOT NULL CHECK(length(record)<=2097152 AND json_valid(record)));",
-    "CREATE TABLE pending_removals (hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash)=64 AND hash NOT GLOB '*[^0-9a-f]*'), error TEXT NOT NULL DEFAULT '');",
-    "CREATE TABLE collection_imports (collection_id TEXT PRIMARY KEY NOT NULL REFERENCES collections(id) ON DELETE CASCADE, record TEXT NOT NULL CHECK(length(record)<=1048576 AND json_valid(record)));",
-    "CREATE TABLE library_new (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author) <= 200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(mod_id, hash, origin, release_id), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL))); INSERT INTO library_new SELECT * FROM library; DROP TABLE library; ALTER TABLE library_new RENAME TO library; CREATE UNIQUE INDEX local_library_identity ON library(mod_id, hash) WHERE origin = 'local_import';",
-    "CREATE TABLE local_sources (mod_id TEXT NOT NULL, hash TEXT NOT NULL, record TEXT NOT NULL CHECK(length(record)<=131072 AND json_valid(record)), PRIMARY KEY(mod_id, hash));",
-    "CREATE TABLE local_watches (mod_id TEXT PRIMARY KEY NOT NULL, hash TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'watching' CHECK(state IN ('watching','settling','error')), message TEXT NOT NULL DEFAULT 'Watching the source while Starframe is open.'); INSERT INTO local_watches(mod_id,hash) SELECT mod_id,min(hash) FROM local_sources GROUP BY mod_id HAVING count(*)=1;",
-    "CREATE TABLE catalog_security (id INTEGER PRIMARY KEY CHECK(id=1), record TEXT NOT NULL CHECK(length(record)<=1049600 AND json_valid(record)));",
-    "CREATE TABLE app_updates (id INTEGER PRIMARY KEY CHECK(id=1), record TEXT NOT NULL CHECK(length(record)<=70000 AND json_valid(record)));",
-    "CREATE TABLE registry_library (mod_id INTEGER NOT NULL CHECK(mod_id BETWEEN 1 AND 9007199254740991), release_id TEXT NOT NULL CHECK(length(release_id)=36), sha256 TEXT NOT NULL CHECK(length(sha256)=64 AND sha256 NOT GLOB '*[^0-9a-f]*'), PRIMARY KEY(mod_id, release_id));",
-    "CREATE TABLE registry_trust_streams (name TEXT PRIMARY KEY NOT NULL CHECK(name IN ('keys','security') OR name GLOB 'release:*'), revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991), canonical TEXT NOT NULL CHECK(length(canonical)<=2097152), envelope BLOB NOT NULL CHECK(length(envelope)<=4194304)); CREATE TABLE registry_decisions (sha256 TEXT PRIMARY KEY NOT NULL CHECK(length(sha256)=64 AND sha256 NOT GLOB '*[^0-9a-f]*'), revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991), record TEXT NOT NULL CHECK(length(record)<=8192 AND json_valid(record)));",
-    "CREATE TABLE registry_receipt_attempts (download_id TEXT PRIMARY KEY NOT NULL CHECK(length(download_id)=36), account_id TEXT NOT NULL CHECK(length(account_id)=36), record TEXT NOT NULL CHECK(length(record)<=4096 AND json_valid(record))); CREATE INDEX registry_receipt_account ON registry_receipt_attempts(account_id);",
-    "ALTER TABLE registry_library ADD COLUMN installation_record TEXT CHECK(installation_record IS NULL OR (length(installation_record)<=131072 AND json_valid(installation_record)));",
-    "DROP TABLE collection_imports; DROP TABLE collection_entries; UPDATE preferences SET active_collection=NULL; DELETE FROM collections; CREATE TABLE collection_entries (collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE, position INTEGER NOT NULL CHECK(position>=0), runtime_key TEXT NOT NULL CHECK(length(runtime_key) BETWEEN 1 AND 128), record TEXT NOT NULL CHECK(length(record)<=4096 AND json_valid(record)), PRIMARY KEY(collection_id,position), UNIQUE(collection_id,runtime_key)); CREATE TABLE collection_imports (collection_id TEXT PRIMARY KEY NOT NULL REFERENCES collections(id) ON DELETE CASCADE, record TEXT NOT NULL CHECK(length(record)<=1048576 AND json_valid(record)));",
-];
+const BASELINE: &str = r#"CREATE TABLE metadata (id INTEGER PRIMARY KEY CHECK(id = 1), engine TEXT NOT NULL CHECK(engine = 'sqlite'), revision INTEGER NOT NULL CHECK(revision >= 0));
+INSERT INTO metadata VALUES (1,'sqlite',0);
+CREATE TABLE collections (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), revision INTEGER NOT NULL CHECK(revision > 0));
+CREATE TABLE preferences (id INTEGER PRIMARY KEY CHECK(id = 1), active_collection TEXT REFERENCES collections(id));
+INSERT INTO preferences VALUES (1,NULL);
+CREATE TABLE game_selection (singleton INTEGER PRIMARY KEY CHECK(singleton = 1), installation_id TEXT NOT NULL, path TEXT NOT NULL CHECK(length(path) BETWEEN 1 AND 32768));
+CREATE TABLE deployments (root TEXT PRIMARY KEY NOT NULL, record TEXT NOT NULL CHECK(length(record) <= 1048576 AND json_valid(record)));
+CREATE TABLE deployment_blobs (hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash)=64), bytes BLOB NOT NULL CHECK(length(bytes)<=8388608));
+CREATE TABLE package_operations (id TEXT PRIMARY KEY NOT NULL, request_id TEXT UNIQUE NOT NULL, record TEXT NOT NULL CHECK(length(record)<=8192 AND json_valid(record)));
+CREATE TABLE prepared_artifacts (hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash)=64 AND hash NOT GLOB '*[^0-9a-f]*'), record TEXT NOT NULL CHECK(length(record)<=2097152 AND json_valid(record)));
+CREATE TABLE pending_removals (hash TEXT PRIMARY KEY NOT NULL CHECK(length(hash)=64 AND hash NOT GLOB '*[^0-9a-f]*'), error TEXT NOT NULL DEFAULT '');
+CREATE TABLE library (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash)=64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author)<=200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin='local_import'), release_id TEXT CHECK(release_id IS NULL), PRIMARY KEY(mod_id,hash));
+CREATE TABLE local_sources (mod_id TEXT NOT NULL, hash TEXT NOT NULL, record TEXT NOT NULL CHECK(length(record)<=131072 AND json_valid(record)), PRIMARY KEY(mod_id, hash));
+CREATE TABLE local_watches (mod_id TEXT PRIMARY KEY NOT NULL, hash TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'watching' CHECK(state IN ('watching','settling','error')), message TEXT NOT NULL DEFAULT 'Watching the source while Starframe is open.');
+CREATE TABLE app_updates (id INTEGER PRIMARY KEY CHECK(id=1), record TEXT NOT NULL CHECK(length(record)<=70000 AND json_valid(record)));
+CREATE TABLE registry_library (mod_id INTEGER NOT NULL CHECK(mod_id BETWEEN 1 AND 9007199254740991), release_id TEXT NOT NULL CHECK(length(release_id)=36), sha256 TEXT NOT NULL CHECK(length(sha256)=64 AND sha256 NOT GLOB '*[^0-9a-f]*'), installation_record TEXT CHECK(installation_record IS NULL OR (length(installation_record)<=131072 AND json_valid(installation_record))), PRIMARY KEY(mod_id, release_id));
+CREATE TABLE registry_trust_streams (name TEXT PRIMARY KEY NOT NULL CHECK(name IN ('keys','security') OR name GLOB 'release:*'), revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991), canonical TEXT NOT NULL CHECK(length(canonical)<=2097152), envelope BLOB NOT NULL CHECK(length(envelope)<=4194304));
+CREATE TABLE registry_decisions (sha256 TEXT PRIMARY KEY NOT NULL CHECK(length(sha256)=64 AND sha256 NOT GLOB '*[^0-9a-f]*'), revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991), record TEXT NOT NULL CHECK(length(record)<=8192 AND json_valid(record)));
+CREATE TABLE registry_receipt_attempts (download_id TEXT PRIMARY KEY NOT NULL CHECK(length(download_id)=36), account_id TEXT NOT NULL CHECK(length(account_id)=36), record TEXT NOT NULL CHECK(length(record)<=4096 AND json_valid(record)));
+CREATE INDEX registry_receipt_account ON registry_receipt_attempts(account_id);
+CREATE TABLE collection_entries (collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE, position INTEGER NOT NULL CHECK(position>=0), runtime_key TEXT NOT NULL CHECK(length(runtime_key) BETWEEN 1 AND 128), record TEXT NOT NULL CHECK(length(record)<=4096 AND json_valid(record)), PRIMARY KEY(collection_id,position), UNIQUE(collection_id,runtime_key));
+CREATE TABLE collection_imports (collection_id TEXT PRIMARY KEY NOT NULL REFERENCES collections(id) ON DELETE CASCADE, record TEXT NOT NULL CHECK(length(record)<=1048576 AND json_valid(record)));"#;
+const RETIRE_CATALOG: &str = r#"CREATE TABLE local_library (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash)=64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author)<=200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin='local_import'), release_id TEXT CHECK(release_id IS NULL), PRIMARY KEY(mod_id,hash));
+INSERT INTO local_library SELECT * FROM library WHERE origin='local_import';
+DROP TABLE library;
+ALTER TABLE local_library RENAME TO library;
+DROP TABLE IF EXISTS catalog_cache;
+DROP TABLE IF EXISTS catalog_security;
+DELETE FROM package_operations WHERE COALESCE(json_extract(record,'$.kind'),'package')='package' AND json_extract(record,'$.releaseId') NOT IN ('local-import','local-verification');"#;
 
 #[derive(Debug)]
 pub enum Error {
@@ -82,19 +83,16 @@ type Result<T> = std::result::Result<T, Error>;
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub enum Origin {
-    Catalog,
     LocalImport,
 }
 impl Origin {
     fn as_str(&self) -> &str {
         match self {
-            Self::Catalog => "catalog",
             Self::LocalImport => "local_import",
         }
     }
     fn parse(value: String) -> Result<Self> {
         match value.as_str() {
-            "catalog" => Ok(Self::Catalog),
             "local_import" => Ok(Self::LocalImport),
             _ => Err(Error::Invalid("The saved mod origin is invalid.".into())),
         }
@@ -313,49 +311,36 @@ impl Storage {
         let active = root.join("sqlite");
         if !active.exists() {
             let staging = root.join(format!("sqlite-staging-{}", Uuid::new_v4()));
-            if root.join("state.db").exists() {
-                conversion::convert_locked(root, &staging, None).map_err(|e| {
-                    Error::Invalid(format!(
-                        "Saved-data conversion failed: {e}. Original files were retained."
-                    ))
-                })?;
-            } else {
-                if root.join("state.db-wal").exists() {
-                    return Err(Error::Invalid(
-                        "Saved data is missing its database. The WAL was retained for recovery."
-                            .into(),
-                    ));
-                }
-                fs::create_dir(&staging)?;
-                let mut conn = Connection::open(staging.join("state.db"))?;
-                conn.execute_batch("PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;")?;
-                let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-                for sql in MIGRATIONS {
-                    tx.execute_batch(sql)?;
-                }
-                tx.execute_batch(&format!(
-                    "PRAGMA application_id={APPLICATION_ID}; PRAGMA user_version={SCHEMA};"
-                ))?;
-                tx.commit()?;
-                drop(conn);
-                OpenOptions::new()
-                    .write(true)
-                    .open(staging.join("state.db"))?
-                    .sync_all()?;
-                File::create(staging.join("complete"))?.sync_all()?;
+            if root.join("state.db").exists() || root.join("state.db-wal").exists() {
+                return Err(Error::Invalid("Obsolete saved-data formats are unsupported. Original files were retained; use a new data directory.".into()));
             }
-            conversion::pause("before-switch", None, root)
+            fs::create_dir(&staging)?;
+            let mut conn = Connection::open(staging.join("state.db"))?;
+            conn.execute_batch("PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;")?;
+            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            tx.execute_batch(BASELINE)?;
+            tx.execute_batch(&format!(
+                "PRAGMA application_id={APPLICATION_ID}; PRAGMA user_version={SCHEMA};"
+            ))?;
+            tx.commit()?;
+            drop(conn);
+            OpenOptions::new()
+                .write(true)
+                .open(staging.join("state.db"))?
+                .sync_all()?;
+            File::create(staging.join("complete"))?.sync_all()?;
+            validation::pause("before-switch", None, root)
                 .map_err(|e| Error::Invalid(e.to_string()))?;
             fs::rename(&staging, &active)?;
-            conversion::pause("after-switch", None, root)
+            validation::pause("after-switch", None, root)
                 .map_err(|e| Error::Invalid(e.to_string()))?;
         }
-        conversion::regular(&active.join("complete")).map_err(|e| {
+        validation::regular(&active.join("complete")).map_err(|e| {
             Error::Invalid(format!(
                 "The SQLite destination is incomplete: {e}. Its files were retained."
             ))
         })?;
-        conversion::regular(&active.join("state.db")).map_err(|e| Error::Invalid(e.to_string()))?;
+        validation::regular(&active.join("state.db")).map_err(|e| Error::Invalid(e.to_string()))?;
         let mut header = [0u8; 100];
         use std::io::Read;
         File::open(active.join("state.db"))?.read_exact(&mut header)?;
@@ -383,7 +368,9 @@ impl Storage {
                 "Saved data belongs to a newer Starframe version. Its files were retained.".into(),
             ));
         }
-        if version < 1 || integer(&conn, "PRAGMA application_id")? != APPLICATION_ID {
+        if !(19..=SCHEMA).contains(&version)
+            || integer(&conn, "PRAGMA application_id")? != APPLICATION_ID
+        {
             return Err(Error::Invalid(
                 "This database is not supported Starframe data. Its files were retained.".into(),
             ));
@@ -403,9 +390,9 @@ impl Storage {
         store.check_integrity()?;
         if version < SCHEMA {
             store.backup()?;
-            store.migrate(version, SCHEMA)?;
+            store.apply_migration(SCHEMA, RETIRE_CATALOG)?;
         }
-        conversion::validate_records(&store.conn).map_err(|e| Error::Invalid(e.to_string()))?;
+        validation::validate_records(&store.conn).map_err(|e| Error::Invalid(e.to_string()))?;
         store.load()?;
         let journal: String = store
             .conn
@@ -428,20 +415,6 @@ impl Storage {
         Ok(())
     }
 
-    fn migrate(&mut self, from: i64, to: i64) -> Result<()> {
-        for version in from..to {
-            self.apply_migration(
-                version + 1,
-                if version == 3 {
-                    "SELECT 1;"
-                } else {
-                    MIGRATIONS[version as usize]
-                },
-            )?;
-        }
-        Ok(())
-    }
-
     fn apply_migration(&mut self, version: i64, sql: &str) -> Result<()> {
         let tx = self
             .conn
@@ -451,6 +424,7 @@ impl Storage {
             tx.execute_batch(&format!(
                 "PRAGMA application_id = {APPLICATION_ID}; PRAGMA user_version = {version};"
             ))?;
+            validation::validate_records(&tx).map_err(|e| Error::Invalid(e.to_string()))?;
             Ok(())
         })();
         finish(tx, result)
@@ -621,24 +595,24 @@ impl Storage {
         self.conn.backup("main", folder.join("state.db"), None)?;
         let copy = Connection::open(folder.join("state.db"))?;
         if integer(&copy, "PRAGMA user_version")? == SCHEMA {
-            conversion::validate_records(&copy).map_err(|e| Error::Invalid(e.to_string()))?;
+            validation::validate_records(&copy).map_err(|e| Error::Invalid(e.to_string()))?;
         }
         drop(copy);
         OpenOptions::new()
             .write(true)
             .open(folder.join("state.db"))?
             .sync_all()?;
-        conversion::pause("backup-written", None, &folder)
+        validation::pause("backup-written", None, &folder)
             .map_err(|e| Error::Invalid(e.to_string()))?;
         File::create(folder.join("complete"))?.sync_all()?;
-        conversion::pause("backup-complete", None, &folder)
+        validation::pause("backup-complete", None, &folder)
             .map_err(|e| Error::Invalid(e.to_string()))?;
         Ok(folder)
     }
 
     /// Restore into a new directory; the damaged database and original backup remain untouched.
     pub fn restore_into(backup: &Path, destination: &Path) -> Result<Self> {
-        conversion::regular(&backup.join("complete"))
+        validation::regular(&backup.join("complete"))
             .map_err(|_| Error::Invalid("The backup is incomplete.".into()))?;
         if destination.exists() && fs::read_dir(destination)?.next().is_some() {
             return Err(Error::Invalid(
@@ -656,40 +630,31 @@ impl Storage {
         )?;
         let engine: String =
             copy.query_row("SELECT engine FROM metadata WHERE id=1", [], |r| r.get(0))?;
-        if engine == "turso" {
-            drop(copy);
-            let converted = destination.join(format!("converted-{}", Uuid::new_v4()));
-            conversion::convert_locked(&staging, &converted, None)
-                .map_err(|e| Error::Invalid(e.to_string()))?;
-            fs::rename(converted, destination.join("sqlite"))?;
-        } else {
-            let version = integer(&copy, "PRAGMA user_version")?;
-            if engine != "sqlite"
-                || !(1..=SCHEMA).contains(&version)
-                || integer(&copy, "PRAGMA application_id")? != APPLICATION_ID
-            {
-                return Err(Error::Invalid(
-                    "The backup is not supported Starframe SQLite data. Its files were retained."
-                        .into(),
-                ));
-            }
-            if version < SCHEMA {
-                let tx = copy.transaction_with_behavior(TransactionBehavior::Immediate)?;
-                for sql in MIGRATIONS.iter().skip(version as usize) {
-                    tx.execute_batch(sql)?;
-                }
-                tx.execute_batch(&format!("PRAGMA user_version={SCHEMA};"))?;
-                tx.commit()?;
-            }
-            conversion::validate_records(&copy).map_err(|e| Error::Invalid(e.to_string()))?;
-            drop(copy);
-            OpenOptions::new()
-                .write(true)
-                .open(staging.join("state.db"))?
-                .sync_all()?;
-            File::create(staging.join("complete"))?.sync_all()?;
-            fs::rename(staging, destination.join("sqlite"))?;
+        let version = integer(&copy, "PRAGMA user_version")?;
+        if engine != "sqlite"
+            || !(19..=SCHEMA).contains(&version)
+            || integer(&copy, "PRAGMA application_id")? != APPLICATION_ID
+        {
+            return Err(Error::Invalid(
+                "The backup is not supported Starframe SQLite data. Its files were retained."
+                    .into(),
+            ));
         }
+        if version < SCHEMA {
+            let tx = copy.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            tx.execute_batch(RETIRE_CATALOG)?;
+            tx.execute_batch(&format!("PRAGMA user_version={SCHEMA};"))?;
+            validation::validate_records(&tx).map_err(|e| Error::Invalid(e.to_string()))?;
+            tx.commit()?;
+        }
+        validation::validate_records(&copy).map_err(|e| Error::Invalid(e.to_string()))?;
+        drop(copy);
+        OpenOptions::new()
+            .write(true)
+            .open(staging.join("state.db"))?
+            .sync_all()?;
+        File::create(staging.join("complete"))?.sync_all()?;
+        fs::rename(staging, destination.join("sqlite"))?;
         Self::open_locked(destination, guard)
     }
 }
@@ -698,7 +663,7 @@ fn copy_database(source: &Path, destination: &Path) -> Result<()> {
     for name in ["state.db", "state.db-wal"] {
         let path = source.join(name);
         if name == "state.db" || path.exists() {
-            conversion::regular(&path).map_err(|e| Error::Invalid(e.to_string()))?;
+            validation::regular(&path).map_err(|e| Error::Invalid(e.to_string()))?;
             let mut reader = File::open(path)?;
             let mut writer = OpenOptions::new()
                 .write(true)
@@ -741,13 +706,12 @@ pub(crate) fn validate_reference(reference: &ModReference) -> Result<()> {
             "The artifact hash must be 64 lowercase hexadecimal characters.".into(),
         ));
     }
-    match (&reference.origin, &reference.release_id) {
-        (Origin::Catalog, Some(id)) => validate_text(id, "Release ID"),
-        (Origin::LocalImport, None) => Ok(()),
-        _ => Err(Error::Invalid(
-            "Catalog references need a release ID; local imports cannot use one.".into(),
-        )),
+    if reference.release_id.is_some() {
+        return Err(Error::Invalid(
+            "Local imports cannot use a release ID.".into(),
+        ));
     }
+    Ok(())
 }
 fn check_revision(conn: &Connection, expected: i64) -> Result<()> {
     let current = integer(conn, "SELECT revision FROM metadata WHERE id = 1")?;
@@ -765,11 +729,11 @@ fn bump(conn: &Connection) -> Result<i64> {
     Ok(next)
 }
 
-mod conversion;
 #[cfg(test)]
 mod sqlite_proof;
 #[cfg(test)]
 mod tests;
+mod validation;
 
 fn write_collection_entry(
     conn: &Connection,

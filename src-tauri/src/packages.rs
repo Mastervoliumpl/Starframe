@@ -462,13 +462,8 @@ impl Packages {
                     active.operation.status = Status::Completed;
                     active.operation.received_bytes = active.operation.total_bytes;
                     active.operation.message = "Verified package saved in the library.".into();
-                    if let Err(error) = if result.local.is_some() {
-                        storage.complete_import(
-                            &active.operation,
-                            &entry,
-                            &prepared,
-                            result.local.as_ref(),
-                        )
+                    if let Err(error) = if let Some(local) = result.local.as_ref() {
+                        storage.complete_import(&active.operation, &entry, &prepared, local)
                     } else {
                         storage.save_package(&active.operation)
                     } {

@@ -150,7 +150,7 @@ impl Storage {
             &operation,
             &local.entry(),
             prepared,
-            Some(local),
+            local,
             advance.map(|c| (c.id.as_str(), &previous.reference)),
         );
         if let Err(error) = result {

@@ -28,6 +28,6 @@ The native screenshot is retained locally under ignored `test-results/native/cat
 
 ## Publication and remaining milestone work
 
-The initial [metadata file](../../catalog/releases.json) contains zero approved releases. [The schema and publication procedure](../../catalog/README.md) explain how a maintainer adds reviewed releases without changing the app version. Catalog validation is added to the required Windows CI job and compares retained identities against the pull-request base or prior main revision.
+The initial [metadata file](https://github.com/Mastervoliumpl/Starframe/blob/9c1bad48273b67bc8e55e6ede81f8fd4126568a6/catalog/releases.json) contains zero approved releases. [The schema and publication procedure](https://github.com/Mastervoliumpl/Starframe/blob/9c1bad48273b67bc8e55e6ede81f8fd4126568a6/catalog/README.md) explain how a maintainer adds reviewed releases without changing the app version. Catalog validation is added to the required Windows CI job and compares retained identities against the pull-request base or prior main revision.
 
 These were the original local checks before publication. The completed [0.3.0 milestone](milestone-0.3.0.md) adds package preparation, lifecycle operations and management screens. Its merge publishes the empty metadata file; public-endpoint verification follows that merge. This record's fixture/native checks establish local refresh behavior, independently of publication.

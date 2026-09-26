@@ -132,9 +132,7 @@ fn offline_dll_and_folder_imports_use_managed_copies_and_retain_sources_after_re
         let before = fs::read(&original).unwrap();
         let mut store = Storage::open(&data).unwrap();
         let mut queue = Packages::open(&mut store).unwrap();
-        assert!(store.catalog_cache().unwrap().is_none());
         let reference = import(&mut queue, &mut store, &chosen);
-        assert!(store.catalog_cache().unwrap().is_none());
         let revision = store.load().unwrap().revision.to_string();
         let view = mods::action(
             &mut store,

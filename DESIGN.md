@@ -59,7 +59,7 @@ Uninstall automatically removes Starframe's recorded game integration and restor
 
 Full app uninstall deletes Starframe-managed library copies, collections, app settings, caches and retained legacy app-data backups by default. Provide an unchecked **Keep my library, collections and settings** option. Installation, upgrades, repair and reinstall always preserve those data. Original imported source folders, game saves, external plugins and unowned game configuration remain untouched. Do not mistake unowned mod-created configuration for Starframe-owned app data.
 
-The owner approved proceeding without Windows Authenticode for the initial alpha. Explain the unsigned publisher and possible Windows warnings without promising that every Windows policy permits execution. Keep private/public-key verification for installer release artifacts, Tauri updates and catalog/advisory metadata. Windows certificate signing is a future issue without a milestone; publication still requires maintainer approval.
+The owner approved proceeding without Windows Authenticode for the initial alpha. Explain the unsigned publisher and possible Windows warnings without promising that every Windows policy permits execution. Keep private/public-key verification for installer release artifacts, Tauri updates and website registry metadata. Windows certificate signing is a future issue without a milestone; publication still requires maintainer approval.
 
 Reading this as a desktop mod-management tool for Sanctuary players and mod developers: precise, game-informed, dark navy, with concentrated orange emphasis. Dials: ENERGY 2 / RHYTHM 2 / MOTION 2.
 

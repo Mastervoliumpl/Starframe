@@ -4,7 +4,7 @@ The owner requested these six releases on 8 September 2026 and previously report
 
 ## Artifact review
 
-Each downloaded ModManager ZIP matches both the owner's SHA-256 and the GitHub release API's digest and size. The exact URLs, hashes, sizes and entry layouts are in [the catalog](../../catalog/releases.json).
+Each downloaded ModManager ZIP matches both the owner's SHA-256 and the GitHub release API's digest and size. The exact URLs, hashes, sizes and entry layouts are in [the catalog](https://github.com/Mastervoliumpl/Starframe/blob/9c1bad48273b67bc8e55e6ede81f8fd4126568a6/catalog/releases.json).
 
 | Archive | Bytes | SHA-256 |
 | --- | --- | --- |

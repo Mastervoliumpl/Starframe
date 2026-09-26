@@ -116,12 +116,6 @@ mod tests {
         ] {
             assert!(serde_json::from_value::<Reference>(bad).is_err());
         }
-        let old = ModReference {
-            mod_id: "old.mod".into(),
-            hash: "a".repeat(64),
-            origin: Origin::Catalog,
-            release_id: Some("old.release".into()),
-        };
-        assert!(Reference::try_from(&old).is_err());
+        assert!(serde_json::from_value::<ModReference>(json!({"modId":"old.mod","hash":"a".repeat(64),"origin":"catalog","releaseId":"old.release"})).is_err());
     }
 }

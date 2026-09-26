@@ -1,12 +1,5 @@
 import { expect } from '@playwright/test';
-import {
-  cp,
-  mkdir,
-  mkdtemp,
-  readFile,
-  unlink,
-  writeFile,
-} from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { withDesktop } from './session.mjs';
@@ -48,52 +41,27 @@ console.log(
   'Native saved-data checks passed: fresh startup, restart, corrupt/newer retention and usable navigation. All databases were temporary.',
 );
 
-for (const schema of [1, 2, 3]) {
-  const converted = await mkdtemp(join(tmpdir(), 'starframe-converted-'));
-  await cp(
-    join(
-      'src-tauri',
-      'tests',
-      'fixtures',
-      'turso-0.7.2',
-      `${schema}-populated`,
-    ),
-    converted,
-    { recursive: true },
+const obsolete = await mkdtemp(join(tmpdir(), 'starframe-obsolete-storage-'));
+await writeFile(join(obsolete, 'state.db'), 'obsolete database');
+await writeFile(join(obsolete, 'state.db-wal'), 'retained wal');
+await withDesktop(obsolete, async (page) => {
+  await expect(page.getByRole('alert')).toContainText(
+    'Obsolete saved-data formats are unsupported',
   );
-  const db = await readFile(join(converted, 'state.db'));
-  const wal = await readFile(join(converted, 'state.db-wal'));
-  for (let run = 0; run < 2; run++) {
-    await withDesktop(converted, async (page) => {
-      await page.getByRole('button', { name: 'Settings', exact: true }).click();
-      await expect(
-        page.getByText('Saved locally: 2 library entries and 0 collections.'),
-      ).toBeVisible({ timeout: 30000 });
-      await page
-        .getByRole('button', { name: 'Help & logs', exact: true })
-        .click();
-      await page
-        .getByRole('button', { name: 'Run responsiveness check' })
-        .click();
-      await page
-        .getByRole('button', { name: 'Downloads', exact: true })
-        .click();
-      await expect(page.getByRole('progressbar')).toHaveCount(3);
-    });
-  }
-  expect(await readFile(join(converted, 'state.db'))).toEqual(db);
-  expect(await readFile(join(converted, 'state.db-wal'))).toEqual(wal);
-}
-console.log(
-  'Native conversion checks passed: legacy schemas 1-3, restart, retained originals and usable diagnostics.',
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Help & logs', exact: true }).click();
+  await page.getByRole('button', { name: 'Run responsiveness check' }).click();
+  await page.getByRole('button', { name: 'Downloads', exact: true }).click();
+  await expect(page.getByRole('progressbar')).toHaveCount(3);
+});
+expect(await readFile(join(obsolete, 'state.db'), 'utf8')).toBe(
+  'obsolete database',
+);
+expect(await readFile(join(obsolete, 'state.db-wal'), 'utf8')).toBe(
+  'retained wal',
 );
 
-const delayed = await mkdtemp(join(tmpdir(), 'starframe-delayed-conversion-'));
-await cp(
-  join('src-tauri', 'tests', 'fixtures', 'turso-0.7.2', '3-populated'),
-  delayed,
-  { recursive: true },
-);
+const delayed = await mkdtemp(join(tmpdir(), 'starframe-delayed-storage-'));
 await writeFile(join(delayed, 'hold-storage-startup'), '');
 await withDesktop(delayed, async (page) => {
   await page.getByRole('button', { name: 'Help & logs', exact: true }).click();
@@ -104,7 +72,7 @@ await withDesktop(delayed, async (page) => {
   await expect(page.getByText('Opening saved data…')).toBeVisible();
   await unlink(join(delayed, 'hold-storage-startup'));
   await expect(
-    page.getByText('Saved locally: 2 library entries and 0 collections.'),
+    page.getByText('Saved locally: 0 library entries and 0 collections.'),
   ).toBeVisible({ timeout: 30000 });
 });
 console.log(

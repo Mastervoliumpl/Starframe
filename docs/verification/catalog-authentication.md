@@ -46,7 +46,7 @@ The focused Rust fixtures create fresh Ed25519 keys in memory and sign real TUF 
 
 ## Advisory records and saved state
 
-The [advisory validator](../../src-tauri/src/catalog/advisories.rs) accepts schema 1 documents up to 1 MiB, with a positive decimal revision and at most 256 advisories. Each advisory retains an ID, title, exact release/archive identities, optional known payload hashes, and chronological evidence, explanation, state and recommended-action entries. The states are `suspected`, `confirmed` and `cleared`. Matching uses archive or payload hashes, including local copies with different filenames or import identities. It does not classify a changed, unknown binary as safe.
+The [advisory validator](https://github.com/Mastervoliumpl/Starframe/blob/9c1bad48273b67bc8e55e6ede81f8fd4126568a6/src-tauri/src/catalog/advisories.rs) accepts schema 1 documents up to 1 MiB, with a positive decimal revision and at most 256 advisories. Each advisory retains an ID, title, exact release/archive identities, optional known payload hashes, and chronological evidence, explanation, state and recommended-action entries. The states are `suspected`, `confirmed` and `cleared`. Matching uses archive or payload hashes, including local copies with different filenames or import identities. It does not classify a changed, unknown binary as safe.
 
 Corrections append history and increase the advisory revision. Previously received findings cannot disappear or have their history rewritten. A later `cleared` entry removes that finding from active matches. Affected identities remain fixed; additional affected artifacts need a new advisory. These records stay separate from ordinary withdrawal, maintenance and compatibility metadata.
 

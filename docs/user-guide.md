@@ -36,11 +36,15 @@ Local builds must be supplied separately with their metadata and imported into t
 
 Settings provides **Stable** and **Preview** app-update channels. New prerelease installations default to Preview; stable installations default to Stable. Starframe checks after startup and periodically while open. You choose when to update, or choose Later. Updates verify the installer signature, wait for the game and file operations, preserve app data and reopen Starframe. Closing Starframe stops its background work; it does not install a service or a persistent updater.
 
-Mods refresh is separate from app updates. Discovery runs after sign-in and every five minutes while Starframe is open; manual refresh keeps your filters. A failed refresh identifies previous results. New downloads require a valid manager session and fresh signed approval/security metadata. Installed copies remain usable offline, subject to retained confirmed security blocks. A confirmed block stops new downloads and activation through Starframe while preserving files and settings. Removal cannot undo code that already ran.
+Mods refresh is separate from app updates. Discovery runs after sign-in and every five minutes while Starframe is open; manual refresh keeps your filters. A failed refresh identifies previous results. New downloads require a valid manager session and fresh signed approval/security metadata. Installed copies remain usable offline, subject to retained signed security blocks. A block stops new downloads and activation through Starframe while preserving files and settings. Removal cannot undo code that already ran.
 
 Run setup again to reinstall missing or damaged app files without deleting saved data. For full removal, use Windows Installed apps. Close Starframe and the game first. Uninstall removes Starframe's recorded game integration and then the app. A conflict or unavailable game location stops cleanup so you can correct it and retry.
 
 **Keep my library, collections and settings** starts unchecked. Leave it unchecked to delete Starframe-managed data; select it to retain that data for a later installation. Original local-import sources, game saves and unowned game configuration remain. Do not manually delete recovery records to get past a cleanup error.
+
+## Saved data in 0.7.0
+
+Current registry/local records and collections survive restart. Schema 19 records are retained after backup and removal of catalog-only rows. Earlier pre-release databases and collection exports are unsupported. An unsupported database produces an error and remains on disk; it is never silently replaced. Close Starframe and retain the entire old app-data directory before choosing a separate new data directory. Preserve original local sources and game recovery records. Do not delete game files to clear a storage error.
 
 ## Troubleshooting and reporting
 
