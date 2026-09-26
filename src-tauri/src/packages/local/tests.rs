@@ -6,99 +6,64 @@ fn collection_ref(reference: &crate::storage::ModReference) -> crate::references
 use serde_json::json;
 use std::time::Instant;
 
-#[tokio::test(flavor = "multi_thread")]
-async fn known_payload_findings_follow_renamed_local_copies_without_deleting_sources() {
-    use crate::catalog::{advisories::*, authentication::tests::verified};
+#[test]
+fn retained_registry_hash_blocks_local_activation_without_deleting_sources() {
     let root = tempfile::tempdir().unwrap();
     let source = root.path().join("source");
-    fixture(&source, "fixture.local", false);
-    let mut store = Storage::open(&root.path().join("data")).unwrap();
+    let data = root.path().join("data");
+    fixture(&source, "fixture.local", true);
+    let mut store = Storage::open(&data).unwrap();
     let mut queue = Packages::open(&mut store).unwrap();
     let reference = import(&mut queue, &mut store, &source);
-    let prepared = store.prepared_artifact(&reference.hash).unwrap().unwrap();
-    let mut advisories = Advisories {
-        schema_version: 1,
-        revision: "1".into(),
-        advisories: vec![Advisory {
-            id: "synthetic.payload".into(),
-            title: "Synthetic payload finding".into(),
-            affected: vec![AffectedArtifact {
-                release_id: "fixture.catalog.1".into(),
-                sha256: "a".repeat(64),
-                payload_sha256: vec![prepared.files[0].sha256.clone()],
-            }],
-            history: vec![Finding {
-                recorded_at: 1,
-                state: State::Suspected,
-                explanation: "Unconfirmed synthetic evidence".into(),
-                evidence: vec!["https://example.invalid/evidence".into()],
-                recommended_action: "Review the synthetic evidence".into(),
-            }],
-        }],
+    let enabled = |store: &mut Storage, enabled| {
+        let expected_revision = store.load().unwrap().revision.to_string();
+        mods::action(
+            store,
+            mods::Action::SetEnabled {
+                reference: collection_ref(&reference),
+                enabled,
+                expected_revision,
+            },
+        )
     };
-    store
-        .save_verified_catalog(&verified(1, &advisories).await, 100)
-        .unwrap();
-    let expected_revision = store.load().unwrap().revision.to_string();
-    mods::action(
-        &mut store,
-        mods::Action::SetEnabled {
-            reference: collection_ref(&reference),
-            enabled: true,
-            expected_revision,
-        },
+    enabled(&mut store, true).unwrap();
+    mods::requested(&store).unwrap();
+    // Seed a retained decision; signed ingestion and rollback have separate registry tests.
+    let db = rusqlite::Connection::open(data.join("sqlite/state.db")).unwrap();
+    let record = json!({"sha256":reference.hash,"revision":1,"status":"blocked","reason":"Synthetic retained registry block"});
+    db.execute(
+        "INSERT INTO registry_decisions (sha256,revision,record) VALUES (?,1,?)",
+        rusqlite::params![reference.hash, record.to_string()],
     )
     .unwrap();
-    mods::requested(&store).unwrap();
-    advisories.revision = "2".into();
-    let mut confirmed = advisories.advisories[0].current().clone();
-    confirmed.recorded_at = 2;
-    confirmed.state = State::Confirmed;
-    advisories.advisories[0].history.push(confirmed);
-    store
-        .save_verified_catalog(&verified(2, &advisories).await, 101)
-        .unwrap();
     assert!(
         mods::requested(&store)
             .unwrap_err()
-            .contains("synthetic.payload")
+            .contains("security decision")
     );
-    let renamed = root.path().join("renamed");
-    fixture(&renamed, "fixture.renamed", false);
-    fs::rename(renamed.join("Mod.dll"), renamed.join("Other.dll")).unwrap();
-    let mut manifest: serde_json::Value =
-        serde_json::from_slice(&fs::read(renamed.join(MANIFEST)).unwrap()).unwrap();
-    manifest["layout"]["entryAssembly"] = json!("Other.dll");
-    fs::write(
-        renamed.join(MANIFEST),
-        serde_json::to_vec(&manifest).unwrap(),
+    assert_eq!(
+        mods::view(&store).unwrap().blocked[&reference.hash],
+        "Synthetic retained registry block"
+    );
+    enabled(&mut store, false).unwrap();
+    assert!(enabled(&mut store, true).is_err());
+    drop(queue);
+    drop(store);
+    let mut store = Storage::open(&data).unwrap();
+    assert!(enabled(&mut store, true).is_err());
+    assert!(source.join("LJ/lua/local.lua").is_file());
+    let record = json!({"sha256":reference.hash,"revision":2,"status":"cleared","reason":"Synthetic explicit correction"});
+    db.execute(
+        "UPDATE registry_decisions SET revision=2, record=? WHERE sha256=?",
+        rusqlite::params![record.to_string(), reference.hash],
     )
     .unwrap();
-    let copy = import(&mut queue, &mut store, &renamed);
-    assert_ne!(copy.hash, reference.hash);
-    let expected_revision = store.load().unwrap().revision.to_string();
-    assert!(
-        mods::action(
-            &mut store,
-            mods::Action::SetEnabled {
-                reference: collection_ref(&copy),
-                enabled: true,
-                expected_revision
-            }
-        )
-        .err()
-        .unwrap()
-        .contains("synthetic.payload")
-    );
-    assert!(source.join("Mod.dll").exists());
-    assert!(renamed.join("Other.dll").exists());
-    assert_eq!(store.load().unwrap().library.len(), 2);
-    assert!(
-        store
-            .artifact_directory(&copy)
-            .unwrap()
-            .join("Other.dll")
-            .exists()
+    enabled(&mut store, true).unwrap();
+    mods::requested(&store).unwrap();
+    assert!(mods::view(&store).unwrap().blocked.is_empty());
+    assert_eq!(
+        fs::read(source.join("LJ/lua/local.lua")).unwrap(),
+        b"return 'fixture'"
     );
 }
 

@@ -1,85 +1,28 @@
 use crate::{
-    catalog::Catalog,
     deployment::Source,
     local_import::Layout,
     packages, runtime_contract,
-    storage::{ModReference, Origin, Records, Storage},
+    storage::{ModReference, Records, Storage},
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 type Result<T> = std::result::Result<T, String>;
 pub(crate) fn metadata(
-    catalog: Option<&Catalog>,
     locals: &[crate::local_import::LocalSource],
     reference: &ModReference,
 ) -> Result<crate::local_import::Manifest> {
-    if reference.origin == Origin::LocalImport {
-        return locals
-            .iter()
-            .find(|source| &source.reference == reference)
-            .map(|source| source.manifest.clone())
-            .ok_or_else(|| {
-                format!(
-                    "Local metadata for {} is unavailable. Import the exact build again.",
-                    reference.mod_id
-                )
-            });
-    }
-    let catalog =
-        catalog.ok_or("Catalog metadata is unavailable. Existing game files were retained.")?;
-    let release = release(catalog, reference)?;
-    let owner = catalog
-        .mods
+    crate::references::Reference::try_from(reference)?;
+    locals
         .iter()
-        .find(|m| m.id == reference.mod_id)
-        .ok_or("Mod metadata is missing.")?;
-    let requires = release
-        .requires
-        .iter()
-        .map(|id| {
-            let (owner, release) = catalog
-                .releases()
-                .find(|(_, r)| &r.id == id)
-                .ok_or("Required release metadata is missing.")?;
-            Ok(ModReference {
-                mod_id: owner.id.clone(),
-                hash: release.artifact.sha256.clone(),
-                origin: Origin::Catalog,
-                release_id: Some(release.id.clone()),
-            })
+        .find(|source| &source.reference == reference)
+        .map(|source| source.manifest.clone())
+        .ok_or_else(|| {
+            format!(
+                "Local metadata for {} is unavailable. Import the exact build again.",
+                reference.mod_id
+            )
         })
-        .collect::<Result<Vec<_>>>()?;
-    Ok(crate::local_import::Manifest {
-        schema_version: 1,
-        mod_id: owner.id.clone(),
-        name: owner.name.clone(),
-        author: owner.author.clone(),
-        version: release.version.clone(),
-        layout: release.artifact.layout.clone(),
-        requires,
-        load_before: release.load_before.clone(),
-        load_after: release.load_after.clone(),
-        prefer_before: release.prefer_before.clone(),
-        prefer_after: release.prefer_after.clone(),
-    })
-}
-
-fn release<'a>(
-    catalog: &'a Catalog,
-    reference: &ModReference,
-) -> Result<&'a crate::catalog::Release> {
-    let (owner, release) = catalog
-        .releases()
-        .find(|(_, r)| Some(&r.id) == reference.release_id.as_ref())
-        .ok_or("Release metadata is missing. Existing files were retained.")?;
-    if reference.origin != Origin::Catalog
-        || owner.id != reference.mod_id
-        || release.artifact.sha256 != reference.hash
-    {
-        return Err("Library identity differs from catalog approval.".into());
-    }
-    Ok(release)
 }
 
 pub(crate) fn requested_local(store: &Storage, entries: &[ModReference]) -> Result<Value> {
@@ -87,14 +30,13 @@ pub(crate) fn requested_local(store: &Storage, entries: &[ModReference]) -> Resu
         crate::references::Reference::try_from(reference)?;
     }
     let records = store.load().map_err(|e| e.to_string())?;
-    requested_entries(store, &records, entries, None)
+    requested_entries(store, &records, entries)
 }
 
 fn requested_entries(
     store: &Storage,
     records: &Records,
     entries: &[ModReference],
-    catalog: Option<Catalog>,
 ) -> Result<Value> {
     let (inventory, omitted) = inventory(records, entries);
     if entries.is_empty() {
@@ -106,7 +48,6 @@ fn requested_entries(
             "activation",
         );
     }
-    let security = store.catalog_security().map_err(|e| e.to_string())?;
     let locals = store.local_sources().map_err(|e| e.to_string())?;
     for reference in entries {
         if !records.library.iter().any(|e| &e.reference == reference) {
@@ -116,24 +57,18 @@ fn requested_entries(
             ));
         }
     }
-    let ordered =
-        crate::ordering::resolve_with_locals(catalog.as_ref(), &locals, entries)?.effective;
+    let ordered = crate::ordering::resolve_locals(&locals, entries)?.effective;
     let mut mods = Vec::new();
     let mut total_bytes = 0;
     for reference in &ordered {
         store
             .require_registry_unblocked_hash(&reference.hash)
             .map_err(|e| e.to_string())?;
-        let release = metadata(catalog.as_ref(), &locals, reference)?;
+        let release = metadata(&locals, reference)?;
         let prepared = store
             .prepared_artifact(&reference.hash)
             .map_err(|e| e.to_string())?
             .ok_or("Prepared package inventory is missing.")?;
-        if let Some(security) = &security {
-            security
-                .require_allowed(&prepared.hash, &prepared.files)
-                .map_err(|e| e.to_string())?;
-        }
         packages::layout(&prepared.files, &release.layout)?;
         total_bytes += prepared.files.iter().map(|f| f.size_bytes).sum::<u64>();
         if total_bytes > runtime_contract::MAX_ACTIVATION_BYTES {
@@ -166,12 +101,7 @@ fn requested_entries(
                 .map(|f| json!({"path":f.path,"sha256":f.sha256}))
                 .collect::<Vec<_>>()
         );
-        let source = match reference.origin {
-            Origin::Catalog => json!({"kind":"catalog", "releaseId":reference.release_id}),
-            Origin::LocalImport => {
-                json!({"kind":"local", "contentId":runtime_contract::content_id(&files)?})
-            }
-        };
+        let source = json!({"kind":"local", "contentId":runtime_contract::content_id(&files)?});
         mods.push(json!({"modId": reference.mod_id, "source": source, "root": root, "entryAssembly": entry_path, "entryType": entry_type, "requires":requires, "files":files }));
     }
     let value = json!({"schemaVersion":3, "runtimeContractVersion":1, "integrationId":"starframe.bepinex", "deploymentRevision":records.revision.to_string(), "installedMods":inventory,"omittedDisabledMods":omitted,"mods":mods});

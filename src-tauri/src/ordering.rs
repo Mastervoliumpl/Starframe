@@ -1,4 +1,4 @@
-use crate::{catalog::Catalog, storage::ModReference};
+use crate::storage::ModReference;
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap};
 
@@ -24,12 +24,7 @@ pub struct Adjustment {
     pub message: String,
 }
 
-pub fn resolve(catalog: &Catalog, requested: &[ModReference]) -> Result<Resolution, String> {
-    resolve_with_locals(Some(catalog), &[], requested)
-}
-
-pub fn resolve_with_locals(
-    catalog: Option<&Catalog>,
+pub fn resolve_locals(
     locals: &[crate::local_import::LocalSource],
     requested: &[ModReference],
 ) -> Result<Resolution, String> {
@@ -46,7 +41,7 @@ pub fn resolve_with_locals(
                 reference.mod_id
             ));
         }
-        let release = crate::mods::metadata(catalog, locals, reference).map_err(|e| {
+        let release = crate::mods::metadata(locals, reference).map_err(|e| {
             format!(
                 "Exact release metadata for {} is unavailable: {e}",
                 reference.mod_id

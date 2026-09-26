@@ -30,6 +30,14 @@ Local layout and ID validation now live under `local_import`, with the same path
 
 This increment passed frontend gates/19 Vitest, Rustfmt/Clippy/166 library tests (seven documented ignored), 11 executable tests and configuration/headless/runtime-contract suites. The embedded debug build and native exact-reference packages, signed registry, local import and source-watch fixtures cover the changed queue. Browser layout, updater, installer, C# and game acceptance from the prior increments are reused because their implementation is unchanged.
 
+## Local metadata and ordering
+
+Local activation and ordering now read exact local metadata directly. The catalog release-to-manifest adapter, ordering wrapper and payload-advisory gate are removed. The stable dependency/priority graph and registry/mixed ordering remain. Local setup checks retained registry decisions before accessing prepared content.
+
+A replacement isolated test retains a registry archive-hash block across restart, permits disable, rejects enable/setup, and accepts an explicit later clear without changing the source. Signed decision ingestion and rollback remain covered separately. The old catalog payload-hash advisory format is retired; this test does not claim detection across renamed or repacked payloads.
+
+Rustfmt, all-target Clippy, 165 library tests (seven documented ignored), 11 executable tests and configuration/headless/runtime-contract suites passed. The embedded debug build passed. The affected fake-game source-watch fixture covers changed local activation and ordering. Frontend, registry transport, installer and C# behavior are unchanged, so prior evidence is reused.
+
 ## Remaining implementation
 
-The unreferenced old client modules, cache/security storage, legacy metadata/ordering, source files and dependencies still need removal. They are separate from the completed remote publication cleanup. Registry fixtures use fresh isolated storage and no seeded old catalog; the native signed discovery/install/receipt path passes. App-update verification has separate signed fixtures and passed the native updater case in the preceding increment. #89 and final acceptance #90 remain open until the entire reader and its affected checks are complete.
+The unreferenced old client modules, cache/security storage, source files and dependencies still need removal. They are separate from the completed remote publication cleanup. Registry fixtures use fresh isolated storage and no seeded old catalog; the native signed discovery/install/receipt path passes. App-update verification has separate signed fixtures and passed the native updater case in the preceding increment. #89 and final acceptance #90 remain open until the entire reader and its affected checks are complete.
