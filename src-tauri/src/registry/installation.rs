@@ -117,6 +117,140 @@ impl Installation {
             }
         }
     }
+
+    pub fn validate_files(&self, files: &[crate::packages::PreparedFile]) -> Result<(), String> {
+        if !self.valid() {
+            return Err("The signed installation declaration is invalid or unsupported. Ask the author for a corrected release.".into());
+        }
+        if files.is_empty() || files.len() > 4096 {
+            return Err("Registry packages must contain 1–4,096 files.".into());
+        }
+        let mut paths = std::collections::BTreeSet::new();
+        let mut total = 0u64;
+        for file in files {
+            let normalized = crate::runtime_contract::relative_path(&file.path)?;
+            if !paths.insert(normalized) {
+                return Err("Registry package paths collide on Windows.".into());
+            }
+            total = total
+                .checked_add(file.size_bytes)
+                .ok_or("Registry package size overflow.")?;
+            if file.size_bytes > 512 * 1024 * 1024 || total > 2 * 1024 * 1024 * 1024 {
+                return Err(
+                    "Registry content exceeds the 512 MiB file or 2 GiB expanded limit.".into(),
+                );
+            }
+            let path = file.path.to_ascii_lowercase();
+            if (path.ends_with(".sanmap")
+                && !matches!(
+                    self,
+                    Self::Content {
+                        kind: Kind::Map,
+                        ..
+                    }
+                ))
+                || (path.starts_with("lj/lua/ai/")
+                    && !matches!(self, Self::Content { kind: Kind::Ai, .. }))
+            {
+                return Err("Code, Map and AI content require separate declared releases.".into());
+            }
+        }
+        for path in &paths {
+            let mut parent = path.rsplit_once('/');
+            while let Some((prefix, _)) = parent {
+                if paths.contains(prefix) {
+                    return Err("Registry package files overlap a directory.".into());
+                }
+                parent = prefix.rsplit_once('/');
+            }
+        }
+        let nonempty = |path: &str| {
+            files
+                .iter()
+                .any(|file| file.path == path && file.size_bytes > 0)
+        };
+        match self {
+            Self::Lua { entry_path, .. } => {
+                crate::packages::supported_files(files)?;
+                if !files
+                    .iter()
+                    .all(|file| crate::packages::lua_path(&file.path))
+                    || !nonempty(entry_path)
+                {
+                    return Err("The Lua archive must contain its declared nonempty entry and only Lua files under LJ/lua, outside AI.".into());
+                }
+            }
+            Self::Managed {
+                source_root,
+                entry_assembly,
+                ..
+            } => {
+                crate::packages::supported_files(files)?;
+                let prefix = if source_root.is_empty() {
+                    String::new()
+                } else {
+                    format!("{source_root}/")
+                };
+                if !files.iter().all(|file| file.path.starts_with(&prefix))
+                    || files
+                        .iter()
+                        .any(|file| file.path.to_ascii_lowercase().starts_with("lj/lua/"))
+                    || !nonempty(&format!("{prefix}{entry_assembly}"))
+                {
+                    return Err("The BepInEx archive must contain its declared nonempty DLL and keep all files inside the declared source folder, without Lua overlays.".into());
+                }
+            }
+            Self::Content {
+                source_root,
+                kind,
+                folder,
+                ..
+            } => {
+                let prefix = format!("{source_root}/");
+                if !files.iter().all(|file| file.path.starts_with(&prefix))
+                    || files
+                        .iter()
+                        .any(|file| file.path.to_ascii_lowercase().ends_with(".dll"))
+                {
+                    return Err("Map and AI archives must keep all files inside the declared source folder and cannot include DLLs.".into());
+                }
+                if (*kind == Kind::Map && !nonempty(&format!("{prefix}{folder}.sanmap")))
+                    || (*kind == Kind::Ai
+                        && !files.iter().any(|file| {
+                            file.path.to_ascii_lowercase().ends_with(".lua") && file.size_bytes > 0
+                        }))
+                {
+                    return Err("The declared Map needs its matching nonempty .sanmap file; an AI archive needs a nonempty Lua file.".into());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn content_path(&self, file: &str) -> Result<Option<String>, String> {
+        if !self.valid() || crate::runtime_contract::relative_path(file).is_err() {
+            return Err("Invalid declared installation path.".into());
+        }
+        let Self::Content {
+            source_root,
+            destination,
+            folder,
+            ..
+        } = self
+        else {
+            return Ok(None);
+        };
+        let relative = file
+            .strip_prefix(&format!("{source_root}/"))
+            .ok_or("The file is outside its declared source folder.")?;
+        let base = match destination {
+            Destination::SanctuaryMaps => "engine/Sanctuary_Data/Maps",
+            Destination::SanctuaryAiMods => "engine/LJ/lua/AI/mods",
+        };
+        let path = format!("{base}/{folder}/{relative}");
+        crate::runtime_contract::relative_path(&path)?;
+        Ok(Some(path))
+    }
 }
 
 #[cfg(test)]
@@ -158,5 +292,85 @@ mod tests {
                     .is_none_or(|plan| !plan.valid())
             );
         }
+    }
+
+    #[test]
+    fn website_inventory_cases_validate_without_guessing_paths() {
+        let fixtures: Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/registry-installation-v1.json"
+        ))
+        .unwrap();
+        let examples = fixtures["cases"]["valid"].as_array().unwrap();
+        let files = |example: &Value| {
+            example["inventory"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|file| crate::packages::PreparedFile {
+                    path: file["path"].as_str().unwrap().into(),
+                    size_bytes: file["bytes"].as_u64().unwrap(),
+                    sha256: file["sha256"].as_str().unwrap().into(),
+                })
+                .collect::<Vec<_>>()
+        };
+        for example in examples {
+            let plan: Installation = serde_json::from_value(example["plan"].clone()).unwrap();
+            plan.validate_files(&files(example)).unwrap();
+            if example["modType"] == "map" {
+                assert_eq!(
+                    plan.content_path("Maps/Example/Textures/height.png")
+                        .unwrap()
+                        .unwrap(),
+                    "engine/Sanctuary_Data/Maps/Example/Textures/height.png"
+                );
+            } else if example["modType"] == "ai" {
+                assert_eq!(
+                    plan.content_path("AI/Example/formers/rush.lua")
+                        .unwrap()
+                        .unwrap(),
+                    "engine/LJ/lua/AI/mods/Example/formers/rush.lua"
+                );
+            }
+        }
+        for invalid in fixtures["cases"]["invalid"].as_array().unwrap() {
+            let mut example = examples
+                .iter()
+                .find(|example| example["name"] == invalid["from"])
+                .unwrap()
+                .clone();
+            if let Some(change) = invalid["change"].as_object() {
+                for (key, value) in change {
+                    example["plan"][key] = value.clone();
+                }
+            }
+            if let Some(path) = invalid["removePath"].as_str() {
+                example["inventory"]
+                    .as_array_mut()
+                    .unwrap()
+                    .retain(|file| file["path"] != path);
+            }
+            if invalid.get("addFile").is_some() {
+                example["inventory"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(invalid["addFile"].clone());
+            }
+            if invalid.get("modType").is_some() {
+                continue;
+            }
+            assert!(
+                serde_json::from_value::<Installation>(example["plan"].clone())
+                    .ok()
+                    .is_none_or(|plan| plan.validate_files(&files(&example)).is_err()),
+                "{}",
+                invalid["name"]
+            );
+        }
+        let plan: Installation = serde_json::from_value(examples[2]["plan"].clone()).unwrap();
+        assert!(plan.content_path("Other/Example.sanmap").is_err());
+        assert!(plan.content_path("Maps/Example/../Other.sanmap").is_err());
+        let mut oversized = files(&examples[2]);
+        oversized[0].size_bytes = 512 * 1024 * 1024 + 1;
+        assert!(plan.validate_files(&oversized).is_err());
     }
 }

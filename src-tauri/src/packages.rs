@@ -22,8 +22,10 @@ use uuid::Uuid;
 
 mod archive;
 mod artifacts;
+mod declared;
 mod local;
 mod registry;
+pub use declared::prepare_registry_archive;
 #[cfg(test)]
 mod tests;
 mod transfer;

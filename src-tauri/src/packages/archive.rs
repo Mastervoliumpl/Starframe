@@ -75,9 +75,112 @@ pub(super) fn extract(
     artifact: &Artifact,
     cancel: &Cancel,
 ) -> Result<Prepared> {
+    extract_checked(
+        archive,
+        content,
+        &artifact.sha256,
+        artifact.size_bytes,
+        cancel,
+        |files| layout(files, &artifact.layout),
+    )
+}
+
+pub(super) fn extract_declared(
+    archive: &Path,
+    content: &Path,
+    identity: &crate::registry::trust::DownloadIdentity,
+    plan: &crate::registry::installation::Installation,
+    cancel: &Cancel,
+) -> Result<Prepared> {
+    let prepared = extract_checked(
+        archive,
+        content,
+        identity.reference().sha256.as_str(),
+        identity.bytes(),
+        cancel,
+        |files| plan.validate_files(files),
+    )?;
+    for file in &prepared.files {
+        cancel.check()?;
+        let mut input = read_file(&content.join(&file.path))?;
+        let mut prefix = Vec::new();
+        (&mut input)
+            .take(1024)
+            .read_to_end(&mut prefix)
+            .map_err(|error| error.to_string())?;
+        let extension = file
+            .path
+            .rsplit('.')
+            .next()
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        if [
+            "zip", "7z", "rar", "gz", "tar", "iso", "cab", "bz2", "xz", "zst", "pdf", "doc",
+            "docx", "xls", "xlsx", "ppt", "pptx",
+        ]
+        .contains(&extension.as_str())
+            || [
+                b"PK\x03\x04".as_slice(),
+                b"PK\x05\x06",
+                b"7z\xbc\xaf\x27\x1c",
+                b"Rar!",
+                b"\x1f\x8b",
+                b"MSCF",
+                b"BZh",
+                b"\xfd7zXZ",
+                b"\x28\xb5\x2f\xfd",
+            ]
+            .iter()
+            .any(|magic| prefix.starts_with(magic))
+            || prefix.get(257..262) == Some(b"ustar")
+        {
+            return Err("Nested archives and document packages cannot be installed from a registry release.".into());
+        }
+        if prefix.starts_with(b"MZ") || extension == "dll" {
+            if !matches!(
+                plan,
+                crate::registry::installation::Installation::Managed { .. }
+            ) {
+                return Err(
+                    "The declared Lua, Map or AI package contains executable content.".into(),
+                );
+            }
+            super::watch::assembly::check(&mut input)?;
+            let offset = u32::from_le_bytes(
+                prefix
+                    .get(60..64)
+                    .ok_or("Incomplete DLL header.")?
+                    .try_into()
+                    .unwrap(),
+            ) as u64;
+            input
+                .seek(SeekFrom::Start(offset + 22))
+                .map_err(|error| error.to_string())?;
+            let mut characteristics = [0u8; 2];
+            input
+                .read_exact(&mut characteristics)
+                .map_err(|error| error.to_string())?;
+            if u16::from_le_bytes(characteristics) & 0x2000 == 0 {
+                return Err(
+                    "Registry Code entries must be managed DLLs, not executable programs.".into(),
+                );
+            }
+        }
+    }
+    Ok(prepared)
+}
+
+fn extract_checked(
+    archive: &Path,
+    content: &Path,
+    expected_hash: &str,
+    expected_size: u64,
+    cancel: &Cancel,
+    validate: impl FnOnce(&[PreparedFile]) -> Result<()>,
+) -> Result<Prepared> {
     let mut input = read_file(archive)?;
-    let (size, hash) = digest(&mut input, artifact.size_bytes, cancel)?;
-    if size != artifact.size_bytes || hash != artifact.sha256 {
+    let (size, hash) = digest(&mut input, expected_size, cancel)?;
+    if size != expected_size || hash != expected_hash {
         return Err("Package bytes do not match the approved SHA-256 and size. Retry or contact the curator.".into());
     }
     input.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
@@ -199,9 +302,9 @@ pub(super) fn extract(
         });
     }
     files.sort_by(|a, b| a.path.cmp(&b.path));
-    layout(&files, &artifact.layout)?;
+    validate(&files)?;
     Ok(Prepared {
-        hash: artifact.sha256.clone(),
+        hash: expected_hash.into(),
         files,
     })
 }
