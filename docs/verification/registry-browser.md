@@ -30,6 +30,6 @@ The first native run exposed missing Tauri permissions for authentication and re
 
 For this increment, frontend formatting/lint/types, 17 Vitest tests, production build, Rustfmt/Clippy and the full Rust gate passed (171 library tests, 12 executable tests and the configuration/headless/runtime-contract suites). The embedded debug build and all eleven native cases passed across the initial suite and the focused remainder. The cleanup case initially read the previous installation’s ready text before the new fixture loader existed; it now waits for that second loader, and cleanup/updater passed on rerun. No maintenance behavior changed. Repository checks passed. Browser, C#, installer and real-game evidence are reused because those implementations did not change. Hosted checks for the new commit are required separately.
 
-## Remaining acceptance
+## Final acceptance
 
-Explicit dependency candidate/update choices are implemented and verified in [dependency verification](registry-dependencies.md#explicit-dependency-and-update-choices). Legacy catalog client/publication removal remains under #89. Production registry trust provisioning and real AI/map gameplay are separate limits. No public app release, website deployment, live credential or real-game mutation occurred.
+Explicit dependency candidate/update choices are implemented and verified in [dependency verification](registry-dependencies.md#explicit-dependency-and-update-choices). Legacy catalog client/publication removal is implemented under #89; the final hosted closeout is in [milestone acceptance](milestone-0.7.0.md). Production registry trust provisioning and real AI/map gameplay are separate limits. No public app release, website deployment, live credential or real-game mutation occurred.

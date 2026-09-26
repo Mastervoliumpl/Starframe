@@ -1,8 +1,8 @@
 # Starframe architecture
 
-Status: draft 0.4, revised on 6 September 2026. Accepted behavior is identified below; unimplemented structures remain proposals. Milestone 0.1.0 is complete. Milestone 0.1.1 is complete. Its binary uses bundled SQLite with retained-source conversion; see [implementation and recovery](docs/verification/sqlite.md). Its implemented state layer is described below; later modules remain subject to their milestone and prerequisites.
+Status: architecture revision 0.5, updated 26 September 2026. Accepted behavior is implemented through the 0.7.0 candidate; final hosted acceptance remains in [the milestone record](docs/verification/milestone-0.7.0.md). Historical storage/catalog evidence remains labelled and does not define an active compatibility path.
 
-Milestone 0.7.0 is active. Its approved scope replaces the catalog-specific design below with the website registry, exact ModID/ReleaseID/hash references, a Steam manager session, signed release and security metadata, authenticated archive delivery, and a native Mods browser. Obsolete pre-release catalog data and exports need no migration. The existing app-update signing boundary stays separate. Original release, trust and download fixtures pin website contract revision `fcd81be6667e2595166698178d5f55074c5ee92a`. Installation work pins website #101's merged revision `1d616d43d90227ee9967091be039e6c3e695091e`, installation schema 1 and full signed release schema 2. Shared Rust operations serve the Tauri worker and an internal headless command. The bounded registry client, exact-reference persistence, signed trust state, manager session and archive queue are implemented on draft PR #78. The declared archive worker prepares verified Code, Map and AI content through owned staging, and the shared queue commits installed native references atomically. Map/AI sources use the existing deployment journal, with fake-game placement/removal/recovery evidence. Native exact dependency matching and stable ordering are implemented. Explicit mixed local/registry selections now use schema 4 Code activation, bounded disabled inventory and the shared setup backend. Closed references preserve each origin and exact identity; the same ordering graph retains manual interleaving. SQLite schema 19 now stores the combined references for the ordinary collection owner. Membership, sharing, watcher updates and installed-mod UI controls use that type. Shared installed entries verify offline through the same package queue; missing shared entries now use fresh signed approval and the authenticated install queue; the native discovery/detail browser now uses generated wire types and an explicit signed install command; dependency/update candidate choices remain in progress. See [dependency verification](docs/verification/registry-dependencies.md). See [installation verification](docs/verification/registry-installation.md). Production downloads remain unavailable without an independent registry root; this does not block isolated local acceptance. The Mods page replaces the old Catalog page; #89 still removes the obsolete client and publication machinery. Later sections retain the 0.6.0 architecture until their affected 0.7.0 issues replace it; they do not authorize a catalog fallback.
+Milestone 0.7.0 implements the website registry, exact ModID/ReleaseID/hash references, backend Steam manager sessions, signed release/security metadata, authenticated archive delivery and a native Mods browser. Tauri and the internal headless command share Rust operations. Website installation/discovery pins `1d616d43d90227ee9967091be039e6c3e695091e`, installation schema 1 and full signed release schema 2; original transport/trust/download fixtures pin `fcd81be6667e2595166698178d5f55074c5ee92a`. Schema 20 persists exact native/local collections, trust, receipts and deployment state. Current local activation uses schema 3, registry/mixed activation schema 4. Catalog readers, publication, old data converters and fallback paths are removed. Production registry-root provisioning and current-game menu compatibility are release prerequisites, documented with gameplay limits in [milestone acceptance](docs/verification/milestone-0.7.0.md). App-update signatures remain independent.
 
 Read [DESIGN.md](DESIGN.md) for the accepted user experience and [CONTEXT.md](CONTEXT.md) for terminology. [DEVELOPMENT.md](DEVELOPMENT.md) defines continuous checks and versioning; [ROADMAP.md](ROADMAP.md) assigns the work to version milestones and issues. The [README](README.md) introduces the project, and [LICENSE](LICENSE) contains its licensing terms. Diagrams below are part of this proposal.
 
@@ -18,7 +18,7 @@ Diagnostics run bounded memory hashing outside the state lock in a blocking work
 
 Starframe has an installed desktop manager and a game-side runtime that we own. Svelte presents the user's setup; Rust owns saved manager state, downloads, and deployment. A C# runtime inside the game handles ordered mod activation and the in-game settings UI, with BepInEx providing the initial bootstrap. The game runs independently of the desktop manager.
 
-The user has selected Tauri, Svelte, TypeScript, and Rust for the desktop app; Windows first; curated individual releases; managed local imports; ordered collections; game launching; and GitHub distribution. Starframe must own its in-game loader/settings experience, support load order, automatically apply edits when the game is closed, and allow users to try mods after a game update with a warning. Collections contain mod references and order, without mod settings. The catalog updates independently of the app.
+The user has selected Tauri, Svelte, TypeScript, and Rust for the desktop app; Windows first; curated individual releases; managed local imports; ordered collections; game launching; and GitHub distribution. Starframe must own its in-game loader/settings experience, support load order, automatically apply edits when the game is closed, and allow users to try mods after a game update with a warning. Collections contain mod references and order, without mod settings. Registry discovery refreshes independently of the app; installed references change only through explicit user actions.
 
 The user reports that the game developers plan native mod loading/hosting. Design an explicit game-integration seam for that transition; do not assume an unpublished native interface exists. Bundled SQLite is selected for 0.1.1; see the [transition decision](docs/planning/sqlite-transition.md). Tauri's NSIS installer, uninstaller, and updater cover the desktop distribution requirements. These tooling recommendations still need implementation validation.
 
@@ -41,22 +41,21 @@ flowchart TB
         IPC[Tauri commands and state channel]
         Core[Rust application module]
         Library[Library and collections]
-        Catalog[Catalog and downloads]
+        Registry[Registry and authenticated downloads]
         Deploy[Deployment and game integration]
         Updates[App update checks]
         UI -->|User requests| IPC
         IPC --> Core
         Core --> Library
-        Core --> Catalog
+        Core --> Registry
         Core --> Deploy
         Core --> Updates
         Core -->|Confirmed state and progress| IPC
         IPC --> UI
     end
     Library --> DB[(Local SQLite records)]
-    Catalog --> Files[Local artifacts and staging]
-    Catalog --> Authors[Approved author downloads]
-    Catalog --> Index[Starframe catalog on GitHub]
+    Registry --> Files[Local artifacts and staging]
+    Registry --> Website[Website registry API and signed declarations]
     Updates --> Releases[Starframe GitHub Releases]
     Deploy --> DB
     Deploy --> Files
@@ -100,15 +99,15 @@ Starframe/
 │   │   ├── app.rs               Application state and operation coordination
 │   │   ├── model.rs             Domain values and interface data types
 │   │   ├── library.rs           Installed versions and collection edits
-│   │   ├── catalog.rs           Catalog validation and release resolution
+│   │   ├── backend.rs           Shared operations for desktop and headless callers
+│   │   ├── registry/            API, trust, sessions, grants, declared installs and receipts
 │   │   ├── packages.rs          Download, verification, extraction and import
 │   │   ├── deployment.rs        Plan, apply, ownership and recovery
 │   │   ├── ordering.rs          Dependency constraints and stable load order
 │   │   ├── game.rs              Discovery, build identity, launch and observation
 │   │   ├── integration.rs       Capability contract and current runtime adapter
-│   │   ├── storage.rs           Local SQL queries and schema migrations
+│   │   ├── storage/             Current SQLite records, validation, backups and cleanup
 │   │   └── updates.rs           In-app release checks and update handoff
-│   ├── migrations/             Ordered database migrations
 │   ├── capabilities/           Tauri permissions for the app window
 │   ├── tests/                  File-operation and recovery tests
 │   ├── Cargo.toml
@@ -132,7 +131,7 @@ Keep feature-specific Svelte components next to their feature. Move a control to
 | --- | --- | --- |
 | Application | Start operation, cancel operation, subscribe to state | Work scheduling, current state, progress and shutdown coordination. It delegates domain work. |
 | Library | Install into library, edit collection, remove stored version | Stable identities, collection references, requested setup and validation of edits. |
-| Catalog | Read approved catalog, resolve release | Source metadata, compatibility evidence, dependency references, catalog freshness and withdrawn releases. |
+| Registry | Discover, verify exact release, install approved declaration | Bounded website transport, protected manager sessions, signed metadata/security, grants/receipts and scoped availability. |
 | Packages | Prepare approved artifact, prepare local import | HTTP transfer, integrity checks, archive validation and immutable local content. |
 | Deployment | Plan setup, apply plan, recover interruption | Safe file changes, ownership, backups, conflicts and the confirmed deployed setup. |
 | Ordering | Resolve dependencies and requested priority | A deterministic effective load order, explanations for adjustments, and actionable dependency errors. |
@@ -150,7 +149,7 @@ The useful test seams are package preparation and deployment: callers supply an 
 App
 ├── Sidebar
 ├── Workspace
-│   ├── MyMods / Catalog / Collections / Downloads / Settings
+│   ├── MyMods / Mods / Collections / Downloads / Settings
 │   └── ModDetails when selected
 ├── LaunchBar
 ├── UpdateNotice
@@ -199,17 +198,15 @@ Use async I/O for transfers and bounded background workers for SQLite, extractio
 
 ## 5. Saved data and file ownership
 
-The 0.1.1 build uses bundled SQLite through pinned rusqlite 0.40.2 with default features disabled and bundled plus backup. One desktop worker owns the connection; synchronous SQL must not run on the UI thread. No database account, service, replication or cloud synchronization is required. See the [decision, dependency evidence and conversion plan](docs/planning/sqlite-transition.md).
-
-The historical 0.1.0 implementation from issue #9 used pinned Turso 0.7.2 with defaults disabled. Its required Windows checks passed. The SQLite decision is based on the accepted workload and dependency reduction, not a failed Turso gate. SQL and ordered migrations live in src-tauri/src/storage.rs. Schema 1 stores library entries, collections, ordered references and a database revision; schema 2 adds active selection; schema 3 adds the selected game installation. References retain exact content independently of local availability. Artifact paths derive from validated lowercase SHA-256 values; binaries remain outside SQL.
+Current storage uses bundled SQLite through pinned rusqlite with bundled/backup features. One background worker owns the connection and OS lock; synchronous SQL stays off the UI thread. Schema 20 creates current registry/local records directly. References preserve exact native approvals independently of content availability, with artifact paths derived from validated hashes. Binaries remain outside SQL. Schemas before 19 and legacy root databases are rejected with their files retained; the historical Turso converter and migration chain are removed.
 
 The storage module owns one connection and an OS file lock. Short immediate transactions validate expected revisions; failed edits roll back. The app opens storage after creating the shell and publishes ready/error status through the existing channel. Database revisions cross that channel as decimal strings. Issue #18 adds library membership and uninstall commands; issue #21 adds named collection creation, rename, deletion and selection without a schema change. Deleting the active collection clears active membership atomically; it does not uninstall library content or remove settings.
 
 SQLite uses WAL, foreign keys, synchronous=FULL, immediate transactions and a 250 ms busy timeout. Backups use SQLite's backup API, sync the completed database and write a completion marker. Schema changes and version updates commit together. Startup validates ownership, engine, version, integrity and logical records. Invalid data produces a visible error without resetting the library.
 
-The first 0.1.1 startup copies legacy state.db and its WAL into a unique staging directory under the locked app-data root. SQLite reads only that copy. The converter rebuilds schema 4 with engine='sqlite', preserving all logical records and revisions. After validation, close/reopen equality checks and file flushes, it marks the candidate complete and renames its directory to sqlite/. Original Turso files, legacy backups and artifact files remain in place. Startup uses an existing sqlite/ directory exclusively; incomplete or invalid contents cause an error rather than a fallback to stale legacy records. Interrupted staging directories are retained, and retry uses a new directory. See [recovery and verification](docs/verification/sqlite.md).
+Schema 19 cleanup creates a completed backup, removes obsolete catalog rows/tables/history in a transaction, validates current records and commits schema 20. Native collections, registry trust/blocks/receipts, local metadata/watch state, app updates and deployment journals remain. Failed cleanup rolls back and retains the backup. Empty-destination restore accepts current formats only. No original source, game file or old-ID conversion is part of storage cleanup. The former conversion evidence in [SQLite verification](docs/verification/sqlite.md) is historical.
 
-The workload through 0.7.0 needs ordinary local queries, constraints and short transactions. The game runtime reads prepared manifests without opening the database. Catalog refresh and collection sharing do not require database sync. The [transition decision](docs/planning/sqlite-transition.md) records the choice; original [Turso checks](docs/verification/storage.md) remain historical evidence.
+The workload through 0.7.0 needs ordinary local queries, constraints and short transactions. The game runtime reads prepared manifests without opening the database. Registry discovery and collection sharing do not require database sync. The [transition decision](docs/planning/sqlite-transition.md) records the choice; original [Turso checks](docs/verification/storage.md) remain historical evidence.
 
 Use the operating system's per-user app-data directory resolved through Tauri. The installation root selected by the user is separate. Do not hardcode the developer's Steam path or put user data beside the Starframe executable.
 
@@ -241,7 +238,7 @@ Confirm that `.starframe` is outside all relevant game/loader scans before adopt
 
 Local records identify exact content, so a shared collection can reuse the same artifact or fetch it when missing. A version label alone is insufficient because an author can replace a download or a developer can rebuild without changing that label. Hashes on local imports identify content and detect changes; they do not trigger online release checks.
 
-Keep database schema versions separate from catalog and collection-file format versions. Back up records before migrations, reject unsupported newer formats, and never silently replace a corrupt database with an empty library. Preserve user data and provide a repair path. Logs are diagnostic; the recovery record carries the information needed to repair an interrupted operation.
+Keep database schema versions separate from registry, activation and collection-file formats. Back up records before migrations, reject unsupported newer formats, and never silently replace a corrupt database with an empty library. Preserve user data and provide a repair path. Logs are diagnostic; the recovery record carries the information needed to repair an interrupted operation.
 
 The initial managed runtime and process-bound reports are implemented in #13. [Activation verification](docs/verification/runtime-activation.md) distinguishes verified managed fixtures from unsupported content and conventional plugin activation. The core targets .NET Standard 2.0 for complete Mono dependency packaging; the Unity bootstrap targets 2.1 against installed references.
 
@@ -306,7 +303,7 @@ Support automatic resolution and manual ordering. A collection stores the user's
 
 The ordering module builds a directed graph: required dependencies load before their dependents, and mandatory author/curator `before`/`after` rules become additional edges. Among valid next choices, prefer the user's order, then stable mod ID as a final tie-breaker. This produces the same effective order for the same inputs. Use an existing suitable graph routine where it fits; otherwise a small stable topological traversal with standard collections is sufficient. Do not build a general version solver.
 
-For example, if Terrain Tools requires Core Library, moving Terrain Tools above it keeps Core Library first and explains that dependency. A hard cycle lists the involved mod IDs in edge order and offers disabling an involved mod or selecting compatible releases. Optional suggestions remain warnings, so the user can choose another order when it is valid. Catalog schema 2 names these fields `loadBefore`, `loadAfter`, `preferBefore` and `preferAfter`; they target stable mod IDs while `requires` targets exact release IDs. Requested positions are unique, so no additional alphabetical tie-break is needed.
+For example, if Terrain Tools requires Core Library, moving Terrain Tools above it keeps Core Library first and explains that dependency. A hard cycle lists the involved mod IDs in edge order and offers disabling an involved mod or selecting compatible releases. Optional suggestions remain warnings, so the user can choose another order when it is valid. Local declarations retain their hard/soft order constraints. Registry declarations use immutable exact or half-open SemVer dependency constraints; selected releases are pinned to exact native references. Version labels alone are not SemVer. Requested positions are unique, so no additional alphabetical tie-break is needed.
 
 ```mermaid
 flowchart LR
@@ -375,7 +372,7 @@ Define a small lifecycle contract for mods we can load ourselves: stable identit
 
 Keep the runtime's responsibilities narrow: validate manifest/contract versions, activate in order, apply supported Lua/data overlays without rewriting shipped game assets, present settings, and write a bounded activation report. The overlay implementation depends on the actual game's content-loading interfaces and needs investigation. On a mod activation failure, mark that mod and its required dependents as failed/skipped, explain the failure in-game, and do not claim that the requested setup loaded successfully. Retrying or removing a loaded DLL is not equivalent to unloading its assembly or undoing its side effects.
 
-The runtime performs no catalog downloads or app-update checks and does not open the desktop database. It can run when the desktop app is closed because it is part of the running game. It exits with the game. This is distinct from a hidden desktop process or installed service.
+The runtime performs no registry downloads or app-update checks and does not open the desktop database. It can run when the desktop app is closed because it is part of the running game. It exits with the game. This is distinct from a hidden desktop process or installed service.
 
 Use a versioned JSON activation document as the initial desktop/runtime handoff. It records deployment revision, selected runtime contract, ordered mod IDs, content hashes, and validated relative paths. Include a metadata-only installed-mod inventory for the in-game list; only ordered activation entries authorize loading. Disabled mods need no deployed executable payload or assembly reflection to supply their names. Rust prepares the document with the deployment; C# reads it at startup. Runtime reports include that revision and a game-session ID, so the desktop never treats an old success report as evidence for a new launch. Keep wire-format fixtures under `contracts` and test them in both languages. No socket server is needed for this initial handoff.
 
@@ -395,7 +392,7 @@ A full desktop settings editor is not required for the first version. If added l
 
 ### Future native game support
 
-Keep the desktop library, collection format, ordering UI, and catalog independent of BepInEx paths and runtime-specific plugin IDs. The game-integration interface accepts an ordered setup and returns supported capabilities, activation preparation, readiness details, and observed results. The current adapter implements this with Starframe.Runtime. A future native adapter will use the game's published mod facilities.
+Keep the desktop library, collection format, ordering UI, and registry independent of BepInEx paths and runtime-specific plugin IDs. The game-integration interface accepts an ordered setup and returns supported capabilities, activation preparation, readiness details, and observed results. The current adapter implements this with Starframe.Runtime. A future native adapter will use the game's published mod facilities.
 
 ```mermaid
 flowchart TB
@@ -428,11 +425,11 @@ The version-1 format uses `format`, `schemaVersion`, `name` and `entries`. It re
 
 On import, first match each reference against verified content already in the library. Create the collection with its shared order and show any missing content as pending, then download only missing approved artifacts. The user accepts the import once; there is no need to click Install for every missing mod. Reuse files across collections instead of downloading separate copies. Show progress immediately, and apply the complete valid collection automatically when selected and the game is closed.
 
-If a release has disappeared, is withdrawn from approval, has changed hash, or cannot satisfy required dependencies, mark the reference unresolved and explain the reason. Do not silently substitute latest. Keep the incoming list/order available so the user can explicitly repair it. A local-only reference can match the recipient's imported bytes, but cannot be downloaded without an approved source. An optional source link in a share file is informational; it cannot bypass the curated catalog. Share the file through any existing channel; no Starframe account or collection-hosting service is required.
+If a release has disappeared, is withdrawn from approval, has changed hash, or cannot satisfy required dependencies, mark the reference unresolved and explain the reason. Do not silently substitute latest. Keep the incoming list/order available so the user can explicitly repair it. A local-only reference can match the recipient's imported bytes, but cannot be downloaded without an approved source. An optional source link in a share file is informational; it cannot bypass authenticated signed registry approval. Share the file through any existing channel; no Starframe account or collection-hosting service is required.
 
-Treat local imports like other library mods: enable, disable, order, add to collections, inspect, and uninstall. Their only source-specific omissions are catalog update/compatibility-version checks and automatic remote fetching. File hashes remain useful for change detection and collection matching; they are not version notifications. No separate developer-only manager is required.
+Treat local imports like other library mods: enable, disable, order, add to collections, inspect, and uninstall. Their only source-specific omissions are registry release-update checks and automatic remote fetching. File hashes remain useful for change detection and collection matching; they are not version notifications. No separate developer-only manager is required.
 
-Issue #24 implements one-time imports through the existing package queue. A folder's `starframe.local.json`, or a DLL's matching `.starframe.json` sidecar, supplies validated identity, layout and exact dependencies. Schema 11 stores the local source path and manifest separately from managed artifact files. Local content identity hashes the normalized manifest and sorted file inventory; source paths are excluded. Ordering and activation resolve each reference from local metadata or the catalog according to its origin. [Local import verification](docs/verification/local-imports.md) records the format and checks. Issue #25 adds the watcher described below; [watcher verification](docs/verification/local-watching.md) records the implementation and limits.
+Issue #24 implements one-time imports through the existing package queue. A folder's `starframe.local.json`, or a DLL's matching `.starframe.json` sidecar, supplies validated identity, layout and exact dependencies. Current storage retains the local source path and manifest separately from managed artifact files. Local content identity hashes the normalized manifest and sorted file inventory; source paths are excluded. Ordering and activation resolve exact local metadata or approved registry declarations according to the closed reference kind. [Local import verification](docs/verification/local-imports.md) records the format and checks. Issue #25 adds the watcher described below; [watcher verification](docs/verification/local-watching.md) records the implementation and limits.
 
 Schema 12 selects one watched source per mod ID: the latest explicit import. A dedicated worker uses Windows directory notifications and a 30-second fallback hash scan, with up to 256 imported sources. After a changed snapshot, it waits two seconds and verifies the same fingerprint again before saving a managed copy. Invalid metadata, locked output, truncated managed DLLs and changing file inventories retain the previous build. This checks file consistency and managed image structure; it cannot establish that arbitrary mod code works in the game.
 
@@ -452,7 +449,7 @@ Show version, release notes, and a quiet persistent notice. A dismissed release 
 
 The #28 implementation keeps release policy and scheduling in `updates.rs`, with Tauri download/install orchestration beside the existing storage worker. SQLite schema 14 retains update preferences/notices without changing collection revisions. The frontend sends typed actions and renders snapshots. The updater first rechecks GitHub eligibility, then uses the selected release's `latest.json` and the `windows-x86_64-nsis` target. [Update verification](docs/verification/app-updates.md) records tests, signing boundaries and key-recovery limits.
 
-Catalog publication remains separate. A catalog-only edit changes the independently fetched JSON and its revision; it does not rebuild the installer, update the desktop app, or replace installed mod releases.
+Registry publication remains separate from app distribution. New approved releases appear through website discovery; installed releases and collection references change only through explicit selection. The old GitHub publisher and daily renewal are retired.
 
 The desktop automatically prepares the required runtime after game selection, on first start and after app upgrades, through the existing deployment worker. Settings provides repair/reinstall for failures or an explicit user request. No separate runtime install is part of normal setup. Game-running and unknown states defer writes; successful preparation, not app installation alone, establishes readiness.
 
@@ -466,7 +463,7 @@ An explicitly requested installer may run to replace the app after its process e
 
 ## 10. Dependencies and security scope
 
-The repository now uses the desktop, runtime, HTTP, archive and SQLite dependencies recorded in its lockfiles. The following table also includes candidates for later work; it is not an instruction to install everything now. [Security scope](SECURITY.md) distinguishes implemented checks, lightweight 0.3.0 work and pre-distribution signing/advisory requirements. Internal development continues without artifact signing; public catalog and installer access require the corresponding verification checks first. Windows publisher certificates are separately deferred to #61.
+The repository now uses the desktop, runtime, HTTP, archive and SQLite dependencies recorded in its lockfiles. The following table also includes candidates for later work; it is not an instruction to install everything now. [Security scope](SECURITY.md) distinguishes implemented checks, lightweight 0.3.0 work and pre-distribution signing/advisory requirements. Internal review builds are unpublished. App-update signatures retain their independently verified authority; production registry access requires a separately approved root. Windows publisher certificates are separately deferred to #61.
 
 | Need | Proposed reuse |
 | --- | --- |
@@ -504,10 +501,10 @@ No runtime claims are verified by this document. Add tests alongside features an
 | Shared collection with unavailable release | Import review identifies the gap and never substitutes a release silently. |
 | Sleep, offline mode, repeated checks and close | One due check, useful cached state, server backoff, and no checker after exit. |
 | Database migration and interrupted update | Existing data survives or a clear recovery path is provided. |
-| SQLite transaction, process termination and legacy conversion | The pinned Windows build preserves committed records; recovery and backup/restore work with the features actually used. |
+| SQLite transaction, process termination and current startup/cleanup | The pinned Windows build preserves committed records; current recovery and backup/restore pass. Obsolete files are retained without conversion. |
 | Dependency order, manual priority and cycles | The result is deterministic; mandatory dependencies precede dependents; cycles identify the involved mods. The actual runtime follows the supported order. |
-| Older game compatibility declaration | The UI warns and still allows enable/launch; genuine structural failures remain separate. Local imports make no catalog version-check requests. |
-| Catalog changes while the app version stays fixed | A valid newer catalog appears live; invalid or failed responses leave the last valid catalog usable. Installed mods are not silently upgraded. |
+| Older game compatibility declaration | The UI warns and still allows enable/launch; genuine structural failures remain separate. Local imports make no registry release-update requests. |
+| Registry changes while the app version stays fixed | Discovery refreshes independently; new installation requires fresh signed approval. Failed requests retain local state. Installed releases are not silently upgraded. |
 | Shared collection with matching local content | Reuse verified bytes, download only missing approved releases, and preserve the ordered references without copying settings. |
 | In-game settings and desktop close | The runtime remains usable with the desktop closed, saves configuration once, and reports restart requirements without a merge workflow. |
 | Unsupported integration capability | The UI explains unavailable ordering/settings controls rather than presenting controls with no effect. |
@@ -515,7 +512,7 @@ No runtime claims are verified by this document. Add tests alongside features an
 
 Use Rust tests for package/deployment behavior, frontend tests for meaningful interaction logic, and C# tests plus in-game checks for activation and settings. Run shared contract fixtures through both Rust and C# readers. Use a small Windows desktop integration suite for the Tauri connection, installer, file permissions and game launch. Browser-only UI tests cannot establish native integration behavior. Accessibility, reduced motion, Windows scaling, keyboard focus, and full-path visibility follow DESIGN.md.
 
-Use GitHub Actions for frontend checks, Rust formatting/lint/tests, C# build/tests, cross-language contract fixtures, catalog validation, and Windows packaging as each source project arrives. Documentation checks start during planning. Pin dependency versions in lockfiles, keep action references immutable, and require relevant checks before merging. Publish an installer, matching source, and signed updater metadata through the official release workflow only after release authorization. The installer may include Starframe's own runtime; third-party mod binaries remain author-hosted downloads. Verify redistribution terms and integrity of bootstrap files and game reference assemblies before any packaging. Do not redistribute game assemblies merely because the runtime needs them to compile.
+Use GitHub Actions for frontend checks, Rust formatting/lint/tests, C# build/tests, cross-language/registry contract fixtures and Windows packaging as each source project arrives. Documentation checks start during planning. Pin dependency versions in lockfiles, keep action references immutable, and require relevant checks before merging. Publish an installer, matching source, and signed updater metadata through the official release workflow only after release authorization. The installer may include Starframe's own runtime; third-party mod binaries arrive only through authenticated registry grants. Verify redistribution terms and integrity of bootstrap files and game reference assemblies before any packaging. Do not redistribute game assemblies merely because the runtime needs them to compile.
 
 ROADMAP.md gives these slices their release targets. Work only within the active milestone and satisfy each issue's dependencies before starting it. Add modules when a slice needs them. Each completed slice gets a focused commit and relevant checks; version preparation and milestone exit verify the integrated result.
 
@@ -523,14 +520,14 @@ ROADMAP.md gives these slices their release targets. Work only within the active
 
 | Area | Current direction | Remaining work |
 | --- | --- | --- |
-| Local persistence | Bundled SQLite with retained-source legacy conversion is implemented. | Retain migration/recovery tests as record schemas grow. |
+| Local persistence | Bundled SQLite schema 20 stores current records. Historical converters are retired. | Current startup, schema-19 cleanup, interruption and backup/restore checks pass. |
 | Collections and application | Name plus ordered references; reuse exact content; automatically apply when the game is closed. User confirmed. | Validate import recovery, dependency adjustments and pending-state UI. |
 | Load order | Resolve dependencies automatically; allow manual priority within valid orders. | Review the UI; verify actual activation and define supported content-overlay precedence. |
-| Local builds | Normal mod controls without catalog version checks; watched managed copies. | Test incomplete builds, missed notifications and exit-time application. |
+| Local builds | Normal mod controls without registry release-update checks; watched managed copies. | Test incomplete builds, missed notifications and exit-time application. |
 | In-game scope | Starframe owns activation and settings UI; BepInEx provides bootstrap. User confirmed. | Verify the game integration, define the small mod contract, and review the in-game screen. Decide which existing BepInEx packages can be supported honestly. |
 | Mod settings | Per-mod configuration; runtime writes during play; excluded from collections. | Define supported setting types, defaults and restart behavior. Review SDK licensing before publishing a mod API. |
 | Future native support | Keep one replaceable integration interface. User requested. | Wait for the official API before designing its adapter and migration details. |
-| Catalog and compatibility | Independent five-minute refresh; older game-version declarations warn without blocking. User confirmed. | Validate metadata publication, caching, withdrawal and offline behavior. |
+| Registry and compatibility | Independent discovery refresh; exact approvals and retained security gates; older game-build declarations warn without an automatic ban. | Signature/freshness, scoped availability and offline behavior have fixture acceptance; production trust/gameplay limits remain. |
 | Windows distribution | Use Tauri NSIS, its uninstaller and signed updater. | Verify on supported Windows versions, including data retention and Starframe-owned game cleanup. |
 
 The remaining work concerns interface details and verification. The user-confirmed behavior above is not reopened as a product question. Desktop state and database recovery now have recorded implementation evidence. Game integration and installer behavior remain unverified proposals.

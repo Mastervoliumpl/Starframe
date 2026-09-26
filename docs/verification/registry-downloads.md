@@ -1,6 +1,6 @@
 # Registry downloads
 
-Issue #85 is in progress against the committed website delivery contract `fcd81be6667e2595166698178d5f55074c5ee92a`. The website checkout is read-only to this task; its current #101 edits are unfinished and were not used to define this transfer.
+Issue #85 is implemented against the committed website delivery contract `fcd81be6667e2595166698178d5f55074c5ee92a`. The website checkout is read-only. Later installation declarations pin the merged #101 revision recorded in [installation verification](registry-installation.md); the transfer protocol remains unchanged.
 
 The storage boundary derives a download identity only from saved, fresh signatures for the requested ModID and ReleaseID. It checks the retained hash decisions before returning the exact hash, size, approved metadata revision and security revision. The authenticated grant request sends those values. The response must repeat them, carry a relative content path for its DownloadID and have a short valid expiry. A 2 GiB archive cap matches the website upload limit.
 

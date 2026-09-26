@@ -1,14 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.7.0 local implementation - 2026-09-26
 
-- Begin 0.7.0 backend separation with shared Rust management calls and an internal headless command for local import, collections and game preparation (#66). The milestone remains in progress.
+Internal version remains `0.7.0-dev.1`. Exact hosted/merge closeout is recorded in PR #78 and #90; no installer or app release is published.
 
-## 0.7.0-dev.1 - 2026-09-24
-
-Internal development version for milestone 0.7.0. No installer or app release was published.
-
-- Replace the Catalog page with the native Mods browser, bounded website discovery filters/paging, release details and history, account-scoped refresh and explicit exact-release installs (#88). Verify signed-in discovery, exact chosen installs, receipts, tamper/expiry refusal and offline/revoked-session reopening through isolated native fixtures. Add bounded constrained dependency suggestions with exact unavailable-release status and explicit update selection (#87). Legacy client/publication removal remains open.
+- Share Rust management, collection, package and game operations between Tauri and an internal headless command (#66).
+- Add bounded website registry messages, native exact release identities, Steam manager sessions with protected backend credentials, independent signed trust/security decisions and authenticated resumable archive delivery with verified receipts (#82–#85).
+- Prepare author-declared Lua/BepInEx Code, Map and AI packages through existing guarded staging/deployment. Record actual destinations and gameplay/current-game menu limits (#86).
+- Preserve exact registry/local collection references, dependency ranges, manual order, offline reuse and explicit update/candidate selection (#87).
+- Replace Catalog with native Mods discovery, filters/paging, display choices, safe details/history and exact-release installation inside the existing shell (#88).
+- Remove the old catalog client/TUF/advisories/source/root, direct author downloader, publisher/renewal resources, obsolete converters and 22 catalog-only dependency packages. Schema 20 preserves current records and rejects unsupported old formats; activation readers accept current local/registry schemas 3/4 only (#89).
+- Consolidate local registry, offline/restart, native/headless and shared-contract acceptance. Keep production registry-root provisioning, hosted Steam and current-game compatibility separate from fixture evidence (#90).
 
 ## 0.6.0 completion - 2026-09-17
 

@@ -69,3 +69,7 @@ The integration supports Starframe managed entries, compatible BepInEx 5 Unity/M
 [BepInEx compatibility](bepinex-mods.md) excludes BepInEx 6, preloader patchers, plugins requiring earlier loading and reliance on a file-backed `Assembly.Location`. Registry Map and AI declarations have verified fake-game file placement. Map/AI loading and gameplay remain unverified; Starframe adds no AI selector. Initialization success does not prove later gameplay or multiplayer behavior. Do not install a duplicate plugin through another loader. DLL hot reload and automatic multiplayer mod synchronization are not available.
 
 Existing default-display and keyboard results are retained. Additional high-contrast, screen-reader and unusual scaling combinations are not part of 0.6.0 acceptance; report a concrete usability problem with its display settings so it can be investigated.
+
+## Current internal build limits
+
+The 0.7.0 internal review build has local registry acceptance, with production downloads paused until an independently approved registry trust root is provisioned. Current-game menu compatibility is also unverified: a fresh plugin build against the installed game references cannot find `MainMenuInterface`. The review input retains the unchanged, accepted earlier Bootstrap plugin and the current runtime reader. Map/AI placement is verified in fake games; gameplay and AI selection are not established. See [0.7.0 acceptance](verification/milestone-0.7.0.md) before treating this build as a distributable release.

@@ -1,6 +1,6 @@
 # Declared registry installation
 
-Issue #86 is in progress on draft PR #78. The contract pins website PR #113's merge `1d616d43d90227ee9967091be039e6c3e695091e`: `contracts/v1/installation.md`, `schema.json` and `install-fixtures.json`. Installation schema 1 is carried by full signed release schema 2. The original schema 1 release fixtures remain for explicit missing-plan rejection; no layout is inferred for them.
+Issue #86 is implemented on draft PR #78; final hosted closeout is tracked in [milestone acceptance](milestone-0.7.0.md). The contract pins website PR #113's merge `1d616d43d90227ee9967091be039e6c3e695091e`: `contracts/v1/installation.md`, `schema.json` and `install-fixtures.json`. Installation schema 1 is carried by full signed release schema 2. The original schema 1 release fixtures remain for explicit missing-plan rejection; no layout is inferred for them.
 
 The manager parses closed Lua, BepInEx 5, Map and AI declarations. It checks declared source folders, exact nonempty entries, safe Windows paths, case/file-directory collisions and file limits against the extracted inventory. Code uses the existing 1,024-file, 256 MiB expanded, 64 MiB file and 16 MiB DLL limits. Map/AI content uses the ZIP owner's 4,096-entry, 2 GiB expanded and 512 MiB file limits. Game-relative mapped paths must also fit the existing 240-character deployment limit.
 
@@ -24,4 +24,4 @@ Both runtime readers pass 19 new shared schema 4 cases: four accepted native/loc
 
 The combined selection backend now adds existing local imports to the same plan and preserves their runtime/settings IDs. Its bounded Code inventory includes disabled local and registry entries after active entries; Map/AI stay outside runtime reporting. Mixed order and offline fixture evidence is in [dependency verification](registry-dependencies.md). The explicitly invoked full setup test includes local import and disabled inventory as well as all four registry formats.
 
-Remaining #86 work: connect the complete plan to enabled native collection references under #87. #87 also needs mixed persistence, membership actions, library views, sharing and watcher membership updates. #88 supplies the native release entry point. #89 removes the temporary old catalog readers and caller. Production registry root provisioning remains a separate production prerequisite.
+Native collection references, mixed persistence, membership, sharing and watcher updates are implemented under #87. The native release entry point is implemented under #88 and the old catalog is removed under #89. Final candidate/merged-main gates and production/gameplay limits are consolidated in [milestone acceptance](milestone-0.7.0.md).

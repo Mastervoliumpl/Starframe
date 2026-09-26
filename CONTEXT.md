@@ -17,7 +17,7 @@ The exact ZIP bytes for a website release, identified by SHA-256 and byte size. 
 _Avoid_: Treating every download attached to a release as interchangeable.
 
 **Catalog**:
-The pre-0.7.0 GitHub list of approved releases. It is historical once the website registry replaces it.
+The pre-0.7.0 GitHub list of approved releases. It is retired in 0.7.0; current manager paths use the website registry.
 
 **Registry**:
 The website service's approved mod and release records. Its numeric ModID identifies a mod; a UUID ReleaseID identifies an exact published release. A collection reference also pins the archive SHA-256. Signed registry metadata and security decisions use a trust root separate from app-update signing.
@@ -28,7 +28,7 @@ A mod supplied from the user's computer rather than obtained through the registr
 _Avoid_: Unmanaged mod, approved release.
 
 **Local build**:
-A particular revision of a locally developed mod. Replacing it does not make it a new catalog release.
+A particular revision of a locally developed mod. Replacing it does not create a website release.
 
 **Library**:
 The mods and versions available locally through Starframe. Being in the library does not necessarily mean a mod is enabled or loaded by the game.
