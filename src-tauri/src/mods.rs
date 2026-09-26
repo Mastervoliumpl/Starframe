@@ -76,9 +76,6 @@ pub struct LibraryEntry {
 #[cfg_attr(test, derive(ts_rs::TS))]
 #[cfg_attr(test, ts(rename = "ModView"))]
 pub struct View {
-    pub catalog: Option<crate::catalog::Catalog>,
-    pub advisories: Option<crate::catalog::advisories::Advisories>,
-    pub findings: BTreeMap<String, Vec<String>>,
     pub blocked: BTreeMap<String, String>,
     pub revision: String,
     pub library: Vec<LibraryEntry>,
@@ -211,9 +208,6 @@ pub fn view(store: &Storage) -> Result<View> {
         .map(|decision| (decision.sha256.as_str().to_owned(), decision.reason))
         .collect();
     Ok(View {
-        catalog: None,
-        advisories: None,
-        findings: BTreeMap::new(),
         blocked,
         revision: records.revision.to_string(),
         library: library(store)?,

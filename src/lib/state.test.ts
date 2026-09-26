@@ -10,16 +10,6 @@ const snapshot = (revision: string, sessionId = 'session'): Snapshot => ({
   appVersion: '0.1.0-dev.1',
   operations: [],
   updates: emptyUpdates(),
-  catalog: {
-    revision: null,
-    releaseCount: 0,
-    checking: false,
-    lastChecked: null,
-    lastSuccess: null,
-    expires: null,
-    fresh: false,
-    error: null,
-  },
   game: {
     launch: {
       phase: 'setup_required',

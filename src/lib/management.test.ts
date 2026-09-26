@@ -23,14 +23,11 @@ const entry: LibraryEntry = {
   },
 };
 const data = (revision = '0'): ModView => ({
-  advisories: null,
-  findings: {},
   blocked: {},
   localSources: [],
   localWatches: [],
   revision,
   activeCollection: null,
-  catalog: null,
   library: [entry],
   enabled: [],
   order: { effective: [], adjustments: [] },
@@ -124,7 +121,7 @@ test('silent operation replies time out without claiming installation', async ()
     packages: vi.fn().mockImplementation(() => new Promise(() => {})),
     retryRegistryReceipts: vi.fn().mockResolvedValue(0),
   });
-  const install = manager.install('fixture.1');
+  const install = manager.importLocal('fixture.dll');
   await vi.advanceTimersByTimeAsync(5000);
   expect(await install).toBe(false);
   expect(get(manager).error).toContain('not confirmed');
@@ -132,17 +129,10 @@ test('silent operation replies time out without claiming installation', async ()
 });
 
 test('game build changes recalculate evidence without an activation ban', () => {
-  const release = {
-    testedGameBuilds: ['old'],
-    compatibilityProblems: [
-      {
-        gameBuild: 'broken',
-        note: 'Test finding',
-        sourceUrl: 'https://example.invalid/report',
-      },
-    ],
-  } as Parameters<typeof compatibility>[0];
-  expect(compatibility(release, 'old')).toBe('Tested with this version');
-  expect(compatibility(release, 'new')).toBe('Not tested with this version');
-  expect(compatibility(release, 'broken')).toBe('Known compatibility problem');
+  expect(compatibility('old', 'old')).toBe('Tested with this version');
+  expect(compatibility('old', 'new')).toBe('Not tested with this version');
+  expect(compatibility('old', undefined)).toBe(
+    'Choose a game to check compatibility',
+  );
+  expect(compatibility(null, 'new')).toBe('Compatibility metadata unavailable');
 });

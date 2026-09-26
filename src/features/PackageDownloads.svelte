@@ -22,8 +22,8 @@
     >
   </div>{/if}
 {#if !$manager.operations.length}<p class="result-count">
-    No downloads or imports yet. Install a release from Catalog or import a
-    local mod in My mods.
+    No downloads or imports yet. Install a release from Mods or import a local
+    mod in My mods.
   </p>{:else}
   <ul class="operations">
     {#each $manager.operations as op (op.id)}<li>
@@ -70,12 +70,7 @@
                 ? 'Cancel import'
                 : 'Cancel download'}</button
           >
-        {:else if (op.status === 'failed' || op.status === 'cancelled') && op.kind === 'package' && op.releaseId !== 'local-import' && op.releaseId !== 'local-verification'}<button
-            disabled={unavailable ||
-              $manager.pending.includes(`install:${op.releaseId}`)}
-            onclick={() => manager.install(op.releaseId)}
-            >Retry exact release</button
-          >{/if}
+        {/if}
         {#if (op.status === 'failed' || op.status === 'cancelled') && (op.kind === 'registry_verification' || op.releaseId === 'local-verification')}<p
           >
             Restore the exact managed files, then use Retry import in

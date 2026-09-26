@@ -1,11 +1,9 @@
 use crate::{
     app::Shared,
-    model::{CatalogStatus, CommandError, GameAction, SavedData},
+    model::{CommandError, GameAction, SavedData},
 };
 use starframe::{
-    backend,
-    catalog::refresh::Refresh,
-    deployment,
+    backend, deployment,
     game::{self, GameView, Running},
     launch::{self, LaunchView, Phase},
     packages::{self, Packages},

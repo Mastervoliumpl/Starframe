@@ -16,7 +16,6 @@ struct Worker {
     storage: Option<Storage>,
     packages: Result<Option<Packages>, String>,
     local_watcher: Option<packages::watch::Watcher>,
-    catalog: Option<Refresh>,
     view: GameView,
     selected: Option<(String, String)>,
     validated: Instant,
@@ -60,24 +59,6 @@ pub(super) fn run(
     }
     let packages = storage.as_mut().map(Packages::open).transpose();
     let local_watcher = storage.as_ref().map(packages::watch::Watcher::new);
-    let catalog = match storage.as_ref().map(Refresh::load).transpose() {
-        Ok(value) => value,
-        Err(error) => {
-            core.lock().expect("state lock").catalog(CatalogStatus {
-                error: Some(error),
-                ..Default::default()
-            });
-            None
-        }
-    };
-    if storage.is_none() {
-        core.lock().expect("state lock").catalog(CatalogStatus {
-            error: Some(
-                "Catalog refresh is unavailable because saved data could not be opened.".into(),
-            ),
-            ..Default::default()
-        });
-    }
     if let Some(storage) = &storage {
         match storage.selected_game() {
             Ok(value) => selected = value,
@@ -110,7 +91,6 @@ pub(super) fn run(
         storage,
         packages,
         local_watcher,
-        catalog,
         view,
         selected,
         validated: Instant::now(),
@@ -175,10 +155,6 @@ impl Worker {
             self.local_watcher = Some(packages::watch::Watcher::new(store));
         }
         if updates.waiting()
-            && self
-                .catalog
-                .as_ref()
-                .is_none_or(|catalog| !catalog.checking)
             && !self.busy.load(Ordering::SeqCst)
             && self
                 .packages
@@ -264,43 +240,6 @@ impl Worker {
                     .expect("state lock")
                     .saved_data(SavedData::Unavailable { message }),
             }
-        }
-        if let (Some(refresh), Some(store)) = (&mut self.catalog, &mut self.storage) {
-            let (ready, stopped) = {
-                let snapshot = self.core.lock().expect("state lock");
-                (snapshot.shell_ready(), snapshot.stopped)
-            };
-            refresh.tick(
-                store,
-                now.duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs(),
-                ready,
-                stopped,
-            );
-            self.core
-                .lock()
-                .expect("state lock")
-                .catalog(CatalogStatus {
-                    revision: refresh
-                        .cache
-                        .catalog
-                        .as_ref()
-                        .map(|c| c.catalog_revision.clone()),
-                    release_count: refresh.cache.catalog.as_ref().map_or(0, |c| {
-                        c.releases().filter(|(_, r)| !r.withdrawn).count() as u32
-                    }),
-                    checking: refresh.checking,
-                    last_checked: refresh.cache.last_checked.map(|t| t.to_string()),
-                    last_success: refresh.cache.last_success.map(|t| t.to_string()),
-                    expires: refresh.expires().map(|t| t.to_string()),
-                    fresh: refresh.fresh(
-                        now.duration_since(SystemTime::UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_secs(),
-                    ),
-                    error: refresh.cache.error.clone(),
-                });
         }
         if game::observation_expired(self.observed, now)
             || self.validated.elapsed() >= Duration::from_secs(30)

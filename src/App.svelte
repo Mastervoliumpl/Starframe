@@ -41,7 +41,6 @@
   let heading: HTMLHeadingElement;
   let fail = $state(false);
   const operations = $derived($desktop.snapshot?.operations ?? []);
-  const catalog = $derived($desktop.snapshot?.catalog);
   const affectedInstalled = $derived(
     $manager.data?.library.filter((entry) =>
       confirmedFinding($manager.data, entry.reference.reference.sha256),
@@ -170,9 +169,9 @@
       {#if affectedInstalled}<div class="error" role="alert">
           <p>
             {affectedInstalled} installed {affectedInstalled === 1
-              ? 'mod matches'
-              : 'mods match'} confirmed security findings. Affected selections block
-            launch through Starframe. Files and settings are retained.
+              ? 'mod has a'
+              : 'mods have'} retained registry security block. Affected selections
+            block launch through Starframe. Files and settings are retained.
           </p>
           <button onclick={() => navigate('mods')}>Review affected mods</button>
         </div>{/if}
@@ -199,8 +198,6 @@
             >
           </p>{/if}
         <ModList
-          mode="mods"
-          catalogFresh={catalog?.fresh ?? false}
           {manager}
           game={$desktop.snapshot?.game}
           unavailable={$desktop.connection !== 'connected'}

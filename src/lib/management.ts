@@ -4,20 +4,16 @@ import { confirmed, errorMessage } from './state';
 import type {
   CollectionReference as Reference,
   InstalledEntry as LibraryEntry,
-  Release,
   ModView,
   PackageOperation,
   ModAction,
   PackageAction,
   SharingAction,
   SharingReply,
-  Advisory,
 } from './generated/management';
 export type {
   CollectionReference as Reference,
   InstalledEntry as LibraryEntry,
-  Release,
-  CatalogMod,
   ModView,
   PackageOperation,
   ModAction,
@@ -66,36 +62,19 @@ export const localKey = (
   });
 export const transferring = (op: PackageOperation) =>
   op.status === 'preparing' || op.status === 'cancelling';
-export const findings = (
-  data: ModView | null,
-  hash: string | undefined,
-): Advisory[] => {
-  const ids = hash ? (data?.findings[hash] ?? []) : [];
-  return (
-    data?.advisories?.advisories.filter((advisory) =>
-      ids.includes(advisory.id),
-    ) ?? []
-  );
-};
 export const confirmedFinding = (
   data: ModView | null,
   hash: string | undefined,
-) =>
-  !!(hash && data?.blocked[hash]) ||
-  findings(data, hash).some(
-    (advisory) => advisory.history.at(-1)?.state === 'confirmed',
-  );
+) => !!(hash && data?.blocked[hash]);
 export const bytes = (value: number) =>
   `${(value / 1024 / 1024).toLocaleString(undefined, { maximumFractionDigits: 1 })} MiB`;
 export function compatibility(
-  release: Release | undefined,
-  build: string | undefined,
+  build: string | null,
+  selected: string | undefined,
 ) {
-  if (!release) return 'Compatibility metadata unavailable';
-  if (!build) return 'Choose a game to check compatibility';
-  if (release.compatibilityProblems.some((p) => p.gameBuild === build))
-    return 'Known compatibility problem';
-  return release.testedGameBuilds.includes(build)
+  if (!build) return 'Compatibility metadata unavailable';
+  if (!selected) return 'Choose a game to check compatibility';
+  return build === selected
     ? 'Tested with this version'
     : 'Not tested with this version';
 }
@@ -251,18 +230,6 @@ export function createManagement(transport: ManagementTransport | null) {
           }),
         );
         if (!stopped) update({ data });
-      });
-    },
-    install(releaseId: string) {
-      return run(`install:${releaseId}`, async () => {
-        const operations = await confirmed(
-          transport!.packages({
-            kind: 'prepare',
-            releaseId,
-            requestId: crypto.randomUUID(),
-          }),
-        );
-        if (!stopped) update({ operations });
       });
     },
     retryReceipts() {

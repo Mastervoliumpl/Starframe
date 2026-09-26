@@ -1,5 +1,5 @@
 import type {
-  CatalogMod,
+  LibraryEntry,
   ManagementTransport,
   ModView,
   PackageOperation,
@@ -12,9 +12,8 @@ export function fixtureManagement(
 ): ManagementTransport {
   const populated = new URLSearchParams(location.search).has('mods');
   const count = new URLSearchParams(location.search).has('large') ? 1200 : 4;
-  const mods: CatalogMod[] = populated
+  const mods: LibraryEntry[] = populated
     ? Array.from({ length: count }, (_, i) => ({
-        id: `fixture.mod${i}`,
         name:
           [
             'Terrain tools fixture',
@@ -23,69 +22,27 @@ export function fixtureManagement(
             'Failed transfer fixture',
           ][i] ?? `Mod fixture ${i}`,
         author: 'Test fixture',
-        sourceUrl: 'https://example.invalid/source',
-        description:
-          'Inert test data for the management screens. No author mod is downloaded or executed.',
-        unmaintained: i === 0,
-        releases: [
-          {
-            id: `11111111-1111-4111-8111-${(i + 1).toString(16).padStart(12, '0')}`,
-            version: '1.0',
-            withdrawn: i === 2,
-            withdrawalReason: i === 2 ? 'Author removed this release.' : null,
-            compatibilityProblems:
-              i === 1
-                ? [
-                    {
-                      gameBuild: 'Steam 123 · Unity fixture',
-                      note: 'Fixture conflict with this build.',
-                      sourceUrl: 'https://example.invalid/report',
-                    },
-                  ]
-                : [],
-            testedGameBuilds: ['Steam 100 · Unity fixture'],
-            requires: [],
-            artifact: {
-              url: 'https://example.invalid/package.zip',
-              sha256: i.toString(16).padStart(64, '0'),
-              sizeBytes: 10485760,
-              layout: {
-                kind: 'starframe_managed_zip',
-                root: 'package',
-                entryAssembly: 'Mod.dll',
-                entryType: 'Fixture.Mod',
-              },
-            },
+        version: '1.0',
+        kind: 'code',
+        testedGameBuild: 'Steam 100 · Unity fixture',
+        reference: {
+          kind: 'registry',
+          reference: {
+            modId: i + 1,
+            releaseId: `11111111-1111-4111-8111-${(i + 1).toString(16).padStart(12, '0')}`,
+            sha256: i.toString(16).padStart(64, '0'),
           },
-        ],
+        },
       }))
     : [];
-  const registryReference = (mod: CatalogMod): Reference => ({
-    kind: 'registry',
-    reference: {
-      modId: mods.indexOf(mod) + 1,
-      releaseId: mod.releases[0].id,
-      sha256: mod.releases[0].artifact.sha256,
-    },
-  });
   const data: ModView = {
-    advisories: { schemaVersion: 1, revision: '1', advisories: [] },
-    findings: {},
     blocked: {},
     localSources: [],
     localWatches: [],
     imports: [],
     revision: '0',
     activeCollection: null,
-    catalog: { schemaVersion: 1, catalogRevision: '1', mods },
-    library: mods.slice(0, 3).map((m) => ({
-      name: m.name,
-      author: m.author,
-      version: m.releases[0].version,
-      kind: 'code',
-      testedGameBuild: m.releases[0].testedGameBuilds[0],
-      reference: registryReference(m),
-    })),
+    library: mods.slice(0, 3),
     enabled: [],
     order: { effective: [], adjustments: [] },
     orderError: null,
@@ -135,36 +92,10 @@ export function fixtureManagement(
     );
   }
   const security = new URLSearchParams(location.search).get('security');
-  if (
-    populated &&
-    ['confirmed', 'suspected', 'cleared'].includes(security ?? '')
-  ) {
+  if (populated && ['blocked', 'cleared'].includes(security ?? '')) {
     const hash = data.library[0].reference.reference.sha256;
-    data.advisories!.advisories.push({
-      id: 'fixture.finding',
-      title: 'Synthetic security finding',
-      affected: [
-        { releaseId: mods[0].releases[0].id, sha256: hash, payloadSha256: [] },
-      ],
-      history: [
-        {
-          recordedAt: 1788819700,
-          state: security === 'suspected' ? 'suspected' : 'confirmed',
-          explanation: 'Inert fixture evidence for security controls.',
-          evidence: ['https://example.invalid/security-evidence'],
-          recommendedAction: 'Disable the affected fixture.',
-        },
-      ],
-    });
-    if (security === 'cleared')
-      data.advisories!.advisories[0].history.push({
-        recordedAt: 1788820000,
-        state: 'cleared',
-        explanation: 'The fixture finding was corrected after review.',
-        evidence: ['https://example.invalid/correction'],
-        recommendedAction: 'Use is permitted.',
-      });
-    data.findings[hash] = ['fixture.finding'];
+    if (security === 'blocked')
+      data.blocked[hash] = 'Confirmed fixture security block';
     data.enabled = [data.library[0].reference];
   }
   const commit = () => {
@@ -174,6 +105,54 @@ export function fixtureManagement(
     data.revision = String(BigInt(data.revision) + 1n);
     changed(data);
   };
+  function transfer(reference: Reference): PackageOperation {
+    const mod = mods.find((entry) => key(entry.reference) === key(reference));
+    if (
+      !mod ||
+      reference.kind !== 'registry' ||
+      reference.reference.modId === 3
+    )
+      throw new Error('Exact release unavailable.');
+    const op: PackageOperation = {
+      id: crypto.randomUUID(),
+      requestId: crypto.randomUUID(),
+      releaseId: reference.reference.releaseId,
+      hash: reference.reference.sha256,
+      kind: 'registry_install',
+      receiptId: null,
+      status: 'preparing',
+      message: 'Downloading fixture bytes…',
+      receivedBytes: 0,
+      totalBytes: 10485760,
+    };
+    operations.unshift(op);
+    const timer = setInterval(() => {
+      if (op.status !== 'preparing') {
+        clearInterval(timer);
+        return;
+      }
+      op.receivedBytes += 1048576;
+      if (
+        op.receivedBytes >= op.totalBytes / 2 &&
+        reference.reference.modId === 4
+      ) {
+        op.status = 'failed';
+        op.message = 'Download unavailable: HTTP 404.';
+        clearInterval(timer);
+      } else if (op.receivedBytes >= op.totalBytes) {
+        op.status = 'completed';
+        op.message = 'Package verified in the library.';
+        if (
+          !data.library.some((entry) => key(entry.reference) === key(reference))
+        ) {
+          data.library.push(mod);
+        }
+        commit();
+        clearInterval(timer);
+      }
+    }, 400);
+    return op;
+  }
   return {
     async retryRegistryReceipts() {
       return 0;
@@ -240,17 +219,16 @@ export function fixtureManagement(
             )
           )
             throw new Error('Invalid collection reference: unknown field.');
-          const release =
-            reference.kind === 'registry'
-              ? mods.find(
-                  (mod) => key(registryReference(mod)) === key(reference),
-                )?.releases[0]
-              : undefined;
+          const release = mods.find(
+            (mod) => key(mod.reference) === key(reference),
+          );
           const local = data.library.some(
             (e) => key(e.reference) === key(reference),
           );
           const available =
-            reference.kind === 'local' ? local : release && !release.withdrawn;
+            reference.kind === 'local'
+              ? local
+              : !!release && reference.reference.modId !== 3;
           return {
             reference,
             status: available ? 'pending' : 'unresolved',
@@ -292,19 +270,7 @@ export function fixtureManagement(
             commit();
           }, 600);
         } else {
-          await this.packages({
-            kind: 'prepare',
-            requestId: crypto.randomUUID(),
-            releaseId:
-              entry.reference.kind === 'registry'
-                ? entry.reference.reference.releaseId
-                : '',
-          });
-          const operation = operations.find(
-            (o) =>
-              entry.reference.kind === 'registry' &&
-              o.releaseId === entry.reference.reference.releaseId,
-          )!;
+          const operation = transfer(entry.reference);
           entry.operationId = operation.id;
           const timer = setInterval(() => {
             if (
@@ -492,69 +458,7 @@ export function fixtureManagement(
           commit();
         }
       }
-      if (action.kind === 'prepare') {
-        const mod = mods.find((m) =>
-          m.releases.some((r) => r.id === action.releaseId),
-        );
-        const release = mod?.releases[0];
-        if (!release || release.withdrawn)
-          throw new Error('Release withdrawn. New downloads are blocked.');
-        if (
-          operations.some(
-            (o) =>
-              o.releaseId === release.id &&
-              (o.status === 'preparing' || o.status === 'cancelling'),
-          )
-        )
-          throw new Error('This release is already being prepared.');
-        const op: PackageOperation = {
-          id: crypto.randomUUID(),
-          requestId: action.requestId,
-          releaseId: release.id,
-          hash: release.artifact.sha256,
-          kind: 'package',
-          receiptId: null,
-          status: 'preparing',
-          message: 'Downloading fixture bytes…',
-          receivedBytes: 0,
-          totalBytes: release.artifact.sizeBytes,
-        };
-        operations.unshift(op);
-        const timer = setInterval(() => {
-          if (op.status !== 'preparing') {
-            clearInterval(timer);
-            return;
-          }
-          op.receivedBytes += 1048576;
-          if (
-            op.receivedBytes >= op.totalBytes / 2 &&
-            release.id === mods[3]?.releases[0].id
-          ) {
-            op.status = 'failed';
-            op.message =
-              'Download unavailable: HTTP 404. Retry or check the author source.';
-            clearInterval(timer);
-          } else if (op.receivedBytes >= op.totalBytes) {
-            op.status = 'completed';
-            op.message = 'Package verified in the library.';
-            if (
-              !data.library.some(
-                (e) => e.reference.reference.sha256 === op.hash,
-              )
-            )
-              data.library.push({
-                name: mod!.name,
-                author: mod!.author,
-                version: release.version,
-                kind: 'code',
-                testedGameBuild: release.testedGameBuilds[0],
-                reference: registryReference(mod!),
-              });
-            commit();
-            clearInterval(timer);
-          }
-        }, 400);
-      } else if (action.kind === 'cancel') {
+      if (action.kind === 'cancel') {
         const op = operations.find((o) => o.id === action.operationId);
         if (op?.status === 'preparing') {
           op.status = 'cancelled';

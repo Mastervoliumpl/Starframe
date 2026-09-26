@@ -555,7 +555,7 @@ The remaining work concerns interface details and verification. The user-confirm
 
 ## 0.4.1 implementation boundaries
 
-The desktop game service keeps one storage owner in `game_service/worker.rs`. It polls catalog/package work, observes the game and serializes mutations. `game_service/requests.rs` handles queued requests. `game_service/session.rs` owns launch timing and consumes supplied observations and times; its tests cover uncertain process state, launch/report timeouts, exit and reset.
+The desktop game service keeps one storage owner in `game_service/worker.rs`. It polls package work, observes the game and serializes mutations. Legacy catalog refresh is removed in 0.7.0; native registry discovery refreshes independently through authenticated commands. `game_service/requests.rs` handles queued requests. `game_service/session.rs` owns launch timing and consumes supplied observations and times; its tests cover uncertain process state, launch/report timeouts, exit and reset.
 
 `packages.rs` owns the bounded queue and operations. `packages/archive.rs` validates supported layouts and extracts archives. `packages/artifacts.rs` verifies cached content, stages/promotes files and performs guarded cleanup. The shared `filesystem.rs` guards are used by package handling and deployment, so package validation no longer depends on deployment internals. Deployment keeps its ownership journal, rollback and recovery together; its larger tests are in `deployment/tests.rs`. Storage retains its transaction interface, with legacy conversion in `storage/conversion.rs` and tests in `storage/tests.rs`.
 

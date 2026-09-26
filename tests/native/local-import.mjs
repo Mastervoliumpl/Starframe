@@ -104,7 +104,7 @@ await withDesktop(
         action: { kind: 'list' },
       }),
     );
-    expect(view.catalog).toBeNull();
+    expect(view).not.toHaveProperty('catalog');
     expect(view.orderError).toBeNull();
     expect(view.localSources[0].path).toBe(source);
     reference = view.library[0].reference;

@@ -4,17 +4,7 @@ use ts_rs::TS;
 fn generated_management_contract_matches_rust() {
     let config = ts_rs::Config::default();
     let declarations = [
-        crate::catalog::Catalog::decl(&config),
-        crate::catalog::Mod::decl(&config),
-        crate::catalog::Release::decl(&config),
-        crate::catalog::CompatibilityProblem::decl(&config),
-        crate::catalog::Artifact::decl(&config),
         crate::catalog::Layout::decl(&config),
-        crate::catalog::advisories::Advisories::decl(&config),
-        crate::catalog::advisories::Advisory::decl(&config),
-        crate::catalog::advisories::AffectedArtifact::decl(&config),
-        crate::catalog::advisories::Finding::decl(&config),
-        crate::catalog::advisories::State::decl(&config),
         crate::storage::Origin::decl(&config),
         crate::storage::ModReference::decl(&config),
         crate::storage::LibraryEntry::decl(&config),

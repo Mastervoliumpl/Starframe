@@ -211,14 +211,6 @@ main {
   padding-top: 48px;
   max-width: 600px;
 }
-.catalog-status {
-  display: grid;
-  gap: 8px;
-  padding-block: 16px;
-}
-.catalog-status > button {
-  justify-self: start;
-}
 .mod-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
