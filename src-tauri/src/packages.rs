@@ -1,6 +1,6 @@
 use crate::{
-    catalog::{Artifact, Catalog, Layout},
     filesystem::{pin, read_file, regular_metadata},
+    local_import::Layout,
     storage::{LibraryEntry, ModReference, Origin, Storage},
 };
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ use std::{
     },
     time::Duration,
 };
-use tokio::{io::AsyncWriteExt, sync::watch as cancellation};
+use tokio::sync::watch as cancellation;
 use uuid::Uuid;
 
 mod archive;
@@ -30,7 +30,6 @@ pub use declared::prepare_registry_archive;
 pub(crate) use declared::tests::managed_image;
 #[cfg(test)]
 mod tests;
-mod transfer;
 pub mod watch;
 use archive::*;
 pub(crate) use archive::{layout, lua_path, supported_files};
@@ -76,11 +75,6 @@ pub enum Action {
     ImportLocal {
         request_id: String,
         path: String,
-    },
-    #[serde(rename_all = "camelCase")]
-    Prepare {
-        request_id: String,
-        release_id: String,
     },
     #[serde(rename_all = "camelCase")]
     Cancel {
@@ -241,7 +235,6 @@ struct PreparedImport {
 /// The existing storage worker owns this queue and calls `poll` to commit results.
 /// Dropping the queue cancels workers; startup records unfinished work as failed.
 pub struct Packages {
-    client: reqwest::Client,
     active: HashMap<String, Active>,
     registry_active: HashMap<String, RegistryActive>,
     registry_receipts: HashMap<Uuid, RegistryReceiptRetry>,
@@ -267,145 +260,10 @@ impl Packages {
         storage.recover_packages().map_err(|e| e.to_string())?;
         crate::sharing::recover(storage)?;
         Ok(Self {
-            client: transfer::client()?,
             active: HashMap::new(),
             registry_active: HashMap::new(),
             registry_receipts: HashMap::new(),
         })
-    }
-
-    pub fn start(
-        &mut self,
-        storage: &mut Storage,
-        request_id: &str,
-        release_id: &str,
-    ) -> Result<Operation> {
-        Uuid::parse_str(request_id).map_err(|_| "Invalid package request ID.")?;
-        if let Some(operation) = storage
-            .package_request(request_id)
-            .map_err(|e| e.to_string())?
-        {
-            if operation.release_id != release_id {
-                return Err("This request ID belongs to a different release.".into());
-            }
-            return Ok(operation);
-        }
-        let catalog = storage
-            .catalog_cache()
-            .map_err(|e| e.to_string())?
-            .and_then(|cache| cache.catalog)
-            .ok_or("No approved catalog is available. Wait for catalog refresh.")?;
-        let (entry, artifact) = resolve(&catalog, release_id)?;
-        storage
-            .require_registry_unblocked_hash(&artifact.sha256)
-            .map_err(|e| e.to_string())?;
-        if let Some(security) = storage.catalog_security().map_err(|e| e.to_string())? {
-            let prepared = storage
-                .prepared_artifact(&artifact.sha256)
-                .map_err(|e| e.to_string())?;
-            security
-                .require_allowed(
-                    &artifact.sha256,
-                    prepared.as_ref().map_or(&[], |p| p.files.as_slice()),
-                )
-                .map_err(|e| e.to_string())?;
-        }
-        if storage
-            .pending_removals()
-            .map_err(|e| e.to_string())?
-            .iter()
-            .any(|(hash, _)| hash == &artifact.sha256)
-        {
-            return Err("This artifact still has pending uninstall cleanup. Restart to retry cleanup before downloading it again.".into());
-        }
-        if let Some(active) = self
-            .active
-            .values()
-            .find(|a| a.operation.hash == artifact.sha256)
-        {
-            return Err(format!(
-                "This artifact is already being prepared by operation {}.",
-                active.operation.id
-            ));
-        }
-        if self.active.len() + self.registry_active.len() >= 3 {
-            return Err(
-                "Three packages are being prepared. Wait for one to finish or cancel it.".into(),
-            );
-        }
-        let operation = Operation {
-            id: Uuid::new_v4().to_string(),
-            request_id: request_id.into(),
-            release_id: release_id.into(),
-            hash: artifact.sha256.clone(),
-            kind: Kind::Package,
-            receipt_id: None,
-            status: Status::Preparing,
-            message: "Downloading and verifying the approved package.".into(),
-            received_bytes: 0,
-            total_bytes: artifact.size_bytes,
-        };
-        let root = storage.package_root().to_owned();
-        let previous = storage
-            .prepared_artifact(&artifact.sha256)
-            .map_err(|e| e.to_string())?;
-        if previous.is_none() {
-            storage
-                .require_catalog_download(
-                    &catalog,
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs(),
-                )
-                .map_err(|e| e.to_string())?;
-            let reserved: u64 = self
-                .active
-                .values()
-                .map(|a| a.operation.total_bytes + MAX_EXPANDED_BYTES)
-                .sum();
-            crate::space::require(&root, reserved + artifact.size_bytes + MAX_EXPANDED_BYTES)?;
-        }
-        storage
-            .save_package(&operation)
-            .map_err(|e| e.to_string())?;
-        let cancel = Cancel::default();
-        let progress = Arc::new(AtomicU64::new(0));
-        let (sender, result) = mpsc::sync_channel(1);
-        let worker_cancel = cancel.clone();
-        let worker_progress = progress.clone();
-        let id = operation.id.clone();
-        let client = self.client.clone();
-        tauri::async_runtime::spawn(async move {
-            let outcome = prepare(
-                root,
-                id,
-                artifact,
-                previous,
-                client,
-                worker_cancel,
-                worker_progress,
-            )
-            .await;
-            let _ = sender.send(outcome.map(|prepared| PreparedImport {
-                prepared,
-                local: None,
-            }));
-        });
-        self.active.insert(
-            operation.id.clone(),
-            Active {
-                operation: operation.clone(),
-                entry: Some(entry),
-                registry_reference: None,
-                source: None,
-                cancel,
-                progress,
-                result,
-                ready: None,
-            },
-        );
-        Ok(operation)
     }
 
     pub fn cancel(&mut self, storage: &mut Storage, operation_id: &str) -> Result<()> {
@@ -554,46 +412,21 @@ impl Packages {
                     .entry
                     .as_ref()
                     .ok_or("Package metadata is missing.")?;
-                if entry.reference.origin == Origin::LocalImport {
-                    if !storage
-                        .load()
-                        .map_err(|e| e.to_string())?
-                        .library
-                        .iter()
-                        .any(|e| e.reference == entry.reference)
-                    {
-                        return Err("The local reference changed during verification.".into());
-                    }
-                    return Ok(result);
+                if entry.reference.origin != Origin::LocalImport {
+                    return Err("Unsupported local verification reference.".into());
                 }
-                let catalog = storage
-                    .catalog_cache()
+                if !storage
+                    .load()
                     .map_err(|e| e.to_string())?
-                    .and_then(|cache| cache.catalog)
-                    .ok_or("Approved catalog is unavailable. Retry after refresh.")?;
-                if catalog.downloadable(&active.operation.release_id)?.sha256
-                    != result.prepared.hash
+                    .library
+                    .iter()
+                    .any(|e| e.reference == entry.reference)
                 {
-                    return Err("Release identity changed during package preparation.".into());
+                    return Err("The local reference changed during verification.".into());
                 }
                 storage
                     .require_registry_unblocked_hash(&result.prepared.hash)
                     .map_err(|e| e.to_string())?;
-                if storage
-                    .prepared_artifact(&result.prepared.hash)
-                    .map_err(|e| e.to_string())?
-                    .is_none()
-                {
-                    storage
-                        .require_catalog_download(
-                            &catalog,
-                            std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap_or_default()
-                                .as_secs(),
-                        )
-                        .map_err(|e| e.to_string())?;
-                }
                 Ok(result)
             });
             match outcome {
@@ -636,10 +469,8 @@ impl Packages {
                             &prepared,
                             result.local.as_ref(),
                         )
-                    } else if entry.reference.origin == Origin::LocalImport {
-                        storage.save_package(&active.operation)
                     } else {
-                        storage.complete_package(&active.operation, &entry, &prepared)
+                        storage.save_package(&active.operation)
                     } {
                         active.operation.status = Status::Failed;
                         active.operation.message = format!(
@@ -710,27 +541,4 @@ impl Drop for Packages {
             retry.cancel.cancel();
         }
     }
-}
-
-fn resolve(catalog: &Catalog, release_id: &str) -> Result<(LibraryEntry, Artifact)> {
-    catalog.validate()?;
-    let artifact = catalog.downloadable(release_id)?.clone();
-    let (owner, release) = catalog
-        .releases()
-        .find(|(_, r)| r.id == release_id)
-        .ok_or("Release is not approved.")?;
-    Ok((
-        LibraryEntry {
-            reference: ModReference {
-                mod_id: owner.id.clone(),
-                hash: artifact.sha256.clone(),
-                origin: Origin::Catalog,
-                release_id: Some(release.id.clone()),
-            },
-            name: owner.name.clone(),
-            author: owner.author.clone(),
-            version: release.version.clone(),
-        },
-        artifact,
-    ))
 }

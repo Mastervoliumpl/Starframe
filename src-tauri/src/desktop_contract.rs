@@ -4,7 +4,7 @@ use ts_rs::TS;
 fn generated_management_contract_matches_rust() {
     let config = ts_rs::Config::default();
     let declarations = [
-        crate::catalog::Layout::decl(&config),
+        crate::local_import::Layout::decl(&config),
         crate::storage::Origin::decl(&config),
         crate::storage::ModReference::decl(&config),
         crate::storage::LibraryEntry::decl(&config),

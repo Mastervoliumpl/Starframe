@@ -40,12 +40,6 @@ pub fn package_action(
         packages::Action::ImportLocal { request_id, path } => {
             queue.import_local(store, &request_id, &path)?;
         }
-        packages::Action::Prepare {
-            request_id,
-            release_id,
-        } => {
-            queue.start(store, &request_id, &release_id)?;
-        }
         packages::Action::Cancel { operation_id } => queue.cancel(store, &operation_id)?,
         packages::Action::List => (),
     }

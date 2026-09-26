@@ -1,6 +1,7 @@
 use crate::{
-    catalog::{Catalog, Layout},
+    catalog::Catalog,
     deployment::Source,
+    local_import::Layout,
     packages, runtime_contract,
     storage::{ModReference, Origin, Records, Storage},
 };

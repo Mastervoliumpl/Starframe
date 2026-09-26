@@ -502,3 +502,64 @@ fn local_junctions_and_locked_build_outputs_are_rejected_without_source_changes(
         b"return 'fixture'"
     );
 }
+
+#[test]
+fn three_local_workers_are_bounded_and_cancellation_wins_before_commit() {
+    let root = tempfile::tempdir().unwrap();
+    let mut store = Storage::open(&root.path().join("data")).unwrap();
+    let mut queue = Packages::open(&mut store).unwrap();
+    let sources: Vec<_> = (0..4)
+        .map(|i| {
+            let source = root.path().join(format!("source{i}"));
+            fixture(&source, &format!("fixture.local{i}"), true);
+            source
+        })
+        .collect();
+    let mut started = Vec::new();
+    for source in sources.iter().take(3) {
+        let request = Uuid::new_v4().to_string();
+        let op = queue
+            .import_local(&mut store, &request, source.to_str().unwrap())
+            .unwrap();
+        assert_eq!(
+            queue
+                .import_local(&mut store, &request, source.to_str().unwrap())
+                .unwrap()
+                .id,
+            op.id
+        );
+        started.push(op);
+    }
+    assert!(
+        queue
+            .import_local(
+                &mut store,
+                &Uuid::new_v4().to_string(),
+                sources[3].to_str().unwrap()
+            )
+            .unwrap_err()
+            .contains("three")
+    );
+    queue.cancel(&mut store, &started[0].id).unwrap();
+    assert_eq!(
+        wait(&mut queue, &mut store, &started[0].request_id).status,
+        Status::Cancelled
+    );
+    for op in &started[1..] {
+        assert_eq!(
+            wait(&mut queue, &mut store, &op.request_id).status,
+            Status::Completed
+        );
+    }
+    assert!(!queue.busy());
+    assert_eq!(store.load().unwrap().library.len(), 2);
+    let fourth = import(&mut queue, &mut store, &sources[3]);
+    assert_eq!(fourth.mod_id, "fixture.local3");
+    assert_eq!(store.load().unwrap().library.len(), 3);
+    for source in sources {
+        assert_eq!(
+            fs::read(source.join("LJ/lua/local.lua")).unwrap(),
+            b"return 'fixture'"
+        );
+    }
+}

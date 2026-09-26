@@ -1,3 +1,4 @@
+use crate::local_import::Layout;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -79,19 +80,6 @@ pub struct Artifact {
     #[cfg_attr(test, ts(type = "number"))]
     pub size_bytes: u64,
     pub layout: Layout,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub enum Layout {
-    StarframeLuaZip {},
-    #[serde(rename_all = "camelCase")]
-    StarframeManagedZip {
-        root: String,
-        entry_assembly: String,
-        entry_type: String,
-    },
 }
 
 fn ensure(condition: bool, message: &str) -> Result<()> {

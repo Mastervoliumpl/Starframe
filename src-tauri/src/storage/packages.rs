@@ -260,18 +260,6 @@ impl Storage {
         Ok(())
     }
 
-    pub(crate) fn complete_package(
-        &mut self,
-        operation: &Operation,
-        entry: &LibraryEntry,
-        prepared: &Prepared,
-    ) -> Result<()> {
-        if let Some(security) = self.catalog_security()? {
-            security.require_allowed(&prepared.hash, &prepared.files)?;
-        }
-        self.complete_import(operation, entry, prepared, None)
-    }
-
     pub(crate) fn complete_import(
         &mut self,
         operation: &Operation,

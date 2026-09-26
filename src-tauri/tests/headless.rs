@@ -53,12 +53,12 @@ fn headless_and_gui_share_local_operations_and_storage_ownership() {
     assert_eq!(import["data"]["status"], "completed");
     let (ok, missing_release) = command(&data, "prepare-package", &["missing-release"]);
     assert!(!ok);
-    assert_eq!(missing_release["error"]["code"], "package_failed");
+    assert_eq!(missing_release["error"]["code"], "invalid_command");
     assert!(
         missing_release["error"]["message"]
             .as_str()
             .unwrap()
-            .contains("No approved catalog")
+            .contains("Unknown headless command")
     );
     let (ok, created) = command(&data, "collection-create", &["Headless collection"]);
     assert!(ok, "{created}");

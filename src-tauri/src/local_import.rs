@@ -1,9 +1,10 @@
-use crate::{
-    catalog::Layout,
-    storage::{LibraryEntry, ModReference, Origin},
-};
+use crate::storage::{LibraryEntry, ModReference, Origin};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
+
+mod layout;
+pub use layout::Layout;
+pub(crate) use layout::{id as validate_id, validate_layout};
 
 pub const MANIFEST: &str = "starframe.local.json";
 pub const MAX_MANIFEST_BYTES: u64 = 64 * 1024;
@@ -54,7 +55,7 @@ impl Manifest {
         if self.schema_version != 1 {
             return Err("Unsupported local manifest schema. Use schemaVersion 1.".into());
         }
-        crate::catalog::id(&self.mod_id)?;
+        validate_id(&self.mod_id)?;
         for (value, limit) in [(&self.name, 200), (&self.author, 200), (&self.version, 128)] {
             if value.trim().is_empty() || value.len() > limit || value.chars().any(char::is_control)
             {
@@ -64,7 +65,7 @@ impl Manifest {
                 );
             }
         }
-        crate::catalog::validate_layout(&self.layout)?;
+        validate_layout(&self.layout)?;
         let mut ids = BTreeSet::new();
         if self.requires.len() > 64 {
             return Err("A local mod supports at most 64 dependencies.".into());
@@ -86,7 +87,7 @@ impl Manifest {
                 return Err("Too many local ordering constraints.".into());
             }
             for id in targets {
-                crate::catalog::id(id)?;
+                validate_id(id)?;
                 if id == &self.mod_id || !seen.insert(id) {
                     return Err("Ordering constraints must refer to distinct other mods.".into());
                 }

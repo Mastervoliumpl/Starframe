@@ -61,7 +61,7 @@ fn wait_for_package(
 
 fn run(args: &[String]) -> Result<Value, String> {
     if args.len() < 2 {
-        return Err("Usage: starframe_headless <absolute-data-dir> <status|import|prepare-package|collection-create|collection-select|select-game|readiness|setup|setup-selection|launch> [arguments].".into());
+        return Err("Usage: starframe_headless <absolute-data-dir> <status|import|collection-create|collection-select|select-game|readiness|setup|setup-selection|launch> [arguments].".into());
     }
     let root = Path::new(&args[0]);
     if !root.is_absolute() {
@@ -90,19 +90,6 @@ fn run(args: &[String]) -> Result<Value, String> {
                 packages::Action::ImportLocal {
                     request_id: request_id.clone(),
                     path: path.into(),
-                },
-            )?;
-            wait_for_package(&mut store, &mut queue, &request_id)
-        }
-        "prepare-package" => {
-            exact_args(args, 3)?;
-            let request_id = Uuid::new_v4().to_string();
-            backend::package_action(
-                &mut store,
-                &mut queue,
-                packages::Action::Prepare {
-                    request_id: request_id.clone(),
-                    release_id: argument(args, 2, "release ID")?.into(),
                 },
             )?;
             wait_for_package(&mut store, &mut queue, &request_id)
@@ -195,7 +182,7 @@ fn main() {
         Ok(data) => println!("{}", json!({"ok": true, "data": data})),
         Err(message) => {
             let code = match args.get(1).map(String::as_str) {
-                Some("import" | "prepare-package") => "package_failed",
+                Some("import") => "package_failed",
                 Some("collection-create" | "collection-select" | "status") => "mods_failed",
                 Some("select-game" | "readiness" | "setup" | "setup-selection" | "launch") => {
                     "game_failed"

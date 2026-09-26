@@ -41,7 +41,7 @@ impl Reference {
                     .map_err(str::to_owned)?;
             }
             Self::Local(local) => {
-                crate::catalog::id(&local.mod_id)?;
+                crate::local_import::validate_id(&local.mod_id)?;
                 if local.mod_id.len() > 128 {
                     return Err("Local mod IDs must fit the runtime's 128-byte limit.".into());
                 }

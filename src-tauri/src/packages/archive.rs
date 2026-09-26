@@ -69,22 +69,6 @@ pub(crate) fn lua_path(path: &str) -> bool {
         && crate::runtime_contract::relative_path(&path).is_ok()
 }
 
-pub(super) fn extract(
-    archive: &Path,
-    content: &Path,
-    artifact: &Artifact,
-    cancel: &Cancel,
-) -> Result<Prepared> {
-    extract_checked(
-        archive,
-        content,
-        &artifact.sha256,
-        artifact.size_bytes,
-        cancel,
-        |files| layout(files, &artifact.layout),
-    )
-}
-
 pub(super) fn extract_declared(
     archive: &Path,
     content: &Path,
@@ -170,7 +154,7 @@ pub(super) fn extract_declared(
     Ok(prepared)
 }
 
-fn extract_checked(
+pub(super) fn extract_checked(
     archive: &Path,
     content: &Path,
     expected_hash: &str,

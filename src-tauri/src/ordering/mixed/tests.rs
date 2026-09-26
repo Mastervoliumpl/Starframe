@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    catalog::Layout,
+    local_import::Layout,
     local_import::Manifest,
     references::LocalReference,
     registry::{Dependency, ExactReference, ModId, ReleaseId, Sha256},
