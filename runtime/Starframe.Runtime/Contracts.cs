@@ -24,7 +24,7 @@ public static class Contracts
             var root = document.RootElement;
             CheckDuplicates(root);
             string schema = root.GetProperty("schemaVersion").GetRawText();
-            Require(kind == "activation" ? schema is "2" or "3" or "4" : schema == "1", "schema version");
+            Require(kind == "activation" ? schema is "3" or "4" : schema == "1", "schema version");
             Require(root.GetProperty("runtimeContractVersion").GetRawText() == "1", "runtime contract version");
             Require(Text(root, "integrationId", 64) == "starframe.bepinex", "integration ID");
             switch (kind)
@@ -98,9 +98,6 @@ public static class Contracts
             var source = mod.GetProperty("source");
             switch (Text(source, "kind", 16))
             {
-                case "catalog":
-                    Require(root.GetProperty("schemaVersion").GetInt32() != 4, "obsolete catalog source");
-                    Fields(source, "kind", "releaseId"); Id(source, "releaseId"); break;
                 case "registry":
                     Require(root.GetProperty("schemaVersion").GetInt32() == 4, "registry activation schema");
                     Fields(source, "kind", "modId", "releaseId", "sha256");

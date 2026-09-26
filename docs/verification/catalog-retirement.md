@@ -50,6 +50,16 @@ Local checks passed: Rustfmt/all-target Clippy, 144 library tests (six documente
 
 Prior metadata head `9c1bad4` passed required checks 36270878411 and audits 36270878172. Transfer required run 36270411114 was cancelled by the metadata push; audits 36270410845 passed. Pending/cancelled runs are not passing final evidence.
 
-## Remaining implementation
+## Activation format retirement
 
-The cross-language activation contract still accepts old catalog sources, and its positive runtime fixtures need replacement with current local identities. That reader is the remaining #89 code cleanup. #89 and final acceptance #90 remain open until it and the affected candidate gates pass. Registry fixtures use fresh isolated storage without old catalog files or seeded catalog state. App-update verification retains its independent signed fixtures and native updater acceptance.
+Both Rust and C# activation readers now reject catalog sources. Activation schema 3 remains for current local preparation; schema 4 carries registry/mixed Code identities. Obsolete schemas 1/2 have no reader. The empty launch/setup document and runtime staging/preflight use schema 3 with explicit omitted-inventory count. Runtime fixture preparation uses canonical local content IDs; no catalog fallback remains in fixture tooling.
+
+Shared positive/negative safety fixtures now use local identities. Catalog sources in schemas 3/4 and obsolete schema 2 have explicit rejection cases. Bounds, path aliases, overlapping roots, exact dependencies, file hashes, source identity and process-bound reports retain shared Rust/C# coverage. Managed and Lua lifecycle tests run Starframe's inert fixtures, including changed bytes and dependency failure; no game is launched.
+
+The changed Rust gate passed its 144 library/11 executable/configuration/headless cases; after correcting the oversized boundary generator, all three runtime-contract integration cases passed. C# formatting/build and 113 tests passed using the prepared pinned SDK. A payload-failure fixture now recalculates its local content ID when changing the declared hash, preserving the intended on-disk hash rejection. All 35 Python script tests passed; fixture canonicalization matches the shared expected content ID. The rebuilt embedded debug executable passed affected fake-game activation and full cleanup/retry/retention cases. These fixture corrections do not weaken production validation.
+
+## Final acceptance
+
+Catalog client/publication/source/dependency removal is implemented. The affected activation and cleanup checks pass locally. Final #89/#90 acceptance still requires the reviewable current runtime/build and exact candidate hosted gate. Application-update signatures retain their independent verifier, fixture and native updater evidence. Production registry provisioning and gameplay limits remain separate from this local acceptance.
+
+Storage head `208d1f5` passed audits 36271841987. Required run 36271842325 passed repository/frontend/C#/Rust checks and ten native cases, then timed out in the updater startup assertion after five seconds while its view still held initial state. The startup assertions now use the same bounded 30-second wait as the other asynchronous updater checks; signature and network assertions are unchanged. The isolated updater case passes locally. The replacement head must pass the full hosted gate.

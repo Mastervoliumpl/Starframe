@@ -493,5 +493,15 @@
     "file": "activation-registry-source-missing.json",
     "kind": "activation",
     "valid": false
+  },
+  {
+    "file": "activation-obsolete-catalog-source.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-obsolete-v2.json",
+    "kind": "activation",
+    "valid": false
   }
 ]

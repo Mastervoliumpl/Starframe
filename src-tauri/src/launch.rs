@@ -58,9 +58,9 @@ pub fn requested(records: &Records) -> Result<Value, String> {
         return Err("This build cannot prepare a collection with mods yet. The existing deployment was retained.".into());
     }
     Ok(json!({
-        "schemaVersion": 2, "runtimeContractVersion": 1,
+        "schemaVersion": 3, "runtimeContractVersion": 1,
         "integrationId": "starframe.bepinex", "deploymentRevision": records.revision.to_string(),
-        "installedMods": [], "mods": []
+        "installedMods": [], "omittedDisabledMods": 0, "mods": []
     }))
 }
 

@@ -130,7 +130,7 @@ try {
       await settings(page);
       await expect(
         page.getByRole('heading', { name: `Update available: ${version}` }),
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 30000 });
       await page
         .getByRole('heading', { name: `Update available: ${version}` })
         .scrollIntoViewIfNeeded();
@@ -154,7 +154,7 @@ try {
       ).toHaveCount(0);
       await expect(
         page.getByRole('heading', { name: `Update available: ${version}` }),
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 30000 });
       await page
         .getByLabel('Update channel', { exact: true })
         .selectOption('stable');

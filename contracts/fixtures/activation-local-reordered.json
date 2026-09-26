@@ -1,5 +1,6 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
+  "omittedDisabledMods": 0,
   "runtimeContractVersion": 1,
   "integrationId": "starframe.bepinex",
   "deploymentRevision": "12",

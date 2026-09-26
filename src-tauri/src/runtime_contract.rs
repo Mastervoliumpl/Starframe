@@ -17,7 +17,7 @@ pub fn read(bytes: &[u8], kind: &str) -> Result<Value> {
     depth(&value, 0)?;
     require(
         if kind == "activation" {
-            matches!(value["schemaVersion"].as_u64(), Some(2..=4))
+            matches!(value["schemaVersion"].as_u64(), Some(3..=4))
         } else {
             value["schemaVersion"].as_u64() == Some(1)
         },
@@ -157,11 +157,6 @@ fn activation(root: &Value) -> Result<()> {
         )?;
         let source = &item["source"];
         match text(&source["kind"], 16, false)? {
-            "catalog" => {
-                require(root["schemaVersion"] != 4, "obsolete catalog source")?;
-                fields(source, &["kind", "releaseId"])?;
-                id(&source["releaseId"])?;
-            }
             "registry" => {
                 require(root["schemaVersion"] == 4, "registry activation schema")?;
                 fields(source, &["kind", "modId", "releaseId", "sha256"])?;

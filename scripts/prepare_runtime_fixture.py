@@ -6,6 +6,11 @@ from pathlib import Path
 import shutil
 
 
+def content_id(files):
+    lines = sorted(item['path'].lower() + '\0' + item['sha256'] + '\n' for item in files)
+    return 'sha256:' + hashlib.sha256(('starframe-inventory-v1\n' + ''.join(lines)).encode('utf-8')).hexdigest()
+
+
 def prepare(destination: Path, runtime: Path, fixture: Path, fail: bool) -> None:
     required = ['Starframe.Bootstrap.dll', 'Starframe.Runtime.dll', 'System.Text.Json.dll', 'System.Memory.dll', 'System.Buffers.dll', 'System.Threading.Tasks.Extensions.dll']
     if any(not (runtime / name).is_file() for name in required):
@@ -23,10 +28,11 @@ def prepare(destination: Path, runtime: Path, fixture: Path, fail: bool) -> None
         target = destination / 'Starframe' / root / fixture.name
         target.parent.mkdir(parents=True)
         shutil.copyfile(fixture, target)
-        active.append(dict(modId=mod_id, source=dict(kind='catalog', releaseId=mod_id), root=root, entryAssembly=fixture.name,
+        files = [dict(path=fixture.name, sha256=hashlib.sha256(target.read_bytes()).hexdigest())]
+        active.append(dict(modId=mod_id, source=dict(kind='local', contentId=content_id(files)), root=root, entryAssembly=fixture.name,
                            entryType='Starframe.FixtureMods.' + entry, requires=requires,
-                           files=[dict(path=fixture.name, sha256=hashlib.sha256(target.read_bytes()).hexdigest())]))
-    manifest = dict(schemaVersion=2, runtimeContractVersion=1, integrationId='starframe.bepinex', deploymentRevision='101' if fail else '100',
+                           files=files))
+    manifest = dict(schemaVersion=3, omittedDisabledMods=0, runtimeContractVersion=1, integrationId='starframe.bepinex', deploymentRevision='101' if fail else '100',
                     installedMods=[dict(modId=key, name=key, version='fixture') for key in ['fixture.first', 'fixture.second', 'fixture.disabled']], mods=active)
     (destination / 'Starframe/activation.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     inventory = [dict(path=p.relative_to(destination).as_posix(), sha256=hashlib.sha256(p.read_bytes()).hexdigest())

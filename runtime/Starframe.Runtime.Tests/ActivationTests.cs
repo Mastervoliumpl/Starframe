@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Starframe.Runtime.Tests;
@@ -105,7 +106,8 @@ public sealed class ActivationTests
             }
             var manifest = JsonSerializer.SerializeToUtf8Bytes(new
             {
-                schemaVersion = 2,
+                schemaVersion = 3,
+                omittedDisabledMods = 0,
                 runtimeContractVersion = 1,
                 integrationId = "starframe.bepinex",
                 deploymentRevision = "20",
@@ -113,7 +115,7 @@ public sealed class ActivationTests
                 mods = specs.Select(s => new
                 {
                     modId = s.Item1,
-                    source = new { kind = "catalog", releaseId = s.Item1 },
+                    source = new { kind = "local", contentId = Contracts.ContentId(JsonSerializer.SerializeToElement(new[] { new { path = "Starframe.FixtureMods.dll", sha256 = hash } })) },
                     root = s.Item1,
                     entryAssembly = "Starframe.FixtureMods.dll",
                     entryType = "Starframe.FixtureMods." + s.Item2,
@@ -176,7 +178,14 @@ public sealed class ActivationTests
             string manifest = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "fixtures/activation-content.json"));
             foreach (bool valid in new[] { false, true })
             {
-                string text = valid ? manifest.Replace(new string('0', 64), Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(file)))) : manifest;
+                var activation = JsonNode.Parse(manifest)!;
+                var mod = activation["mods"]![0]!;
+                if (valid)
+                {
+                    mod["files"]![0]!["sha256"] = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(file)));
+                    mod["source"]!["contentId"] = Contracts.ContentId(JsonSerializer.SerializeToElement(mod["files"]));
+                }
+                string text = activation.ToJsonString();
                 using var session = new ActivationSession(_ => { }, System.Array.Empty<string>());
                 using var report = Contracts.Read(session.Activate(root, System.Text.Encoding.UTF8.GetBytes(text)), "report");
                 Assert.AreEqual(valid ? "unsupported_content" : "invalid_payload", report.RootElement.GetProperty("mods")[0].GetProperty("errorCode").GetString());

@@ -2,11 +2,17 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from prepare_runtime_fixture import prepare
+from prepare_runtime_fixture import content_id, prepare
 from prepare_ordering_fixture import prepare_ordering
 
 
 class RuntimeFixturePreparation(unittest.TestCase):
+    def test_local_content_id_matches_shared_rust_and_csharp_fixture(self):
+        fixtures = Path(__file__).resolve().parents[1] / 'contracts/fixtures'
+        activation = json.loads((fixtures / 'activation-local.json').read_text(encoding='utf-8'))
+        expected = json.loads((fixtures / 'canonical-inventory.json').read_text(encoding='utf-8'))
+        self.assertEqual(content_id(activation['mods'][0]['files']), expected['contentId'])
+
     def test_package_inventory_and_failure_variant(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
