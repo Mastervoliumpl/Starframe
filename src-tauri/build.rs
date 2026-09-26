@@ -18,6 +18,14 @@ fn main() {
             "registry_release",
             "registry_history",
             "registry_install",
+            "registry_download",
+            "registry_retry_receipts",
+            "auth_restore",
+            "auth_inspect",
+            "auth_poll",
+            "auth_start",
+            "auth_cancel",
+            "auth_sign_out",
         ]),
     ))
     .expect("Tauri build configuration");

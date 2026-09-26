@@ -11,7 +11,7 @@ mod wire;
 
 pub use auth::{Auth, AuthError, ChallengeView, Poll, SignOut};
 #[cfg(windows)]
-pub use credential::CredentialStore;
+pub use credential::{CredentialStore, StoredToken};
 pub(crate) use dependencies::valid_dependencies;
 pub use discovery::{Options, ReleaseHistory};
 pub use transport::{Client, Config, Error, ErrorCode, FieldProblem, ResponseError};

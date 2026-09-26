@@ -19,6 +19,14 @@
     "allow-registry-detail",
     "allow-registry-release",
     "allow-registry-history",
-    "allow-registry-install"
+    "allow-registry-install",
+    "allow-registry-download",
+    "allow-registry-retry-receipts",
+    "allow-auth-restore",
+    "allow-auth-inspect",
+    "allow-auth-poll",
+    "allow-auth-start",
+    "allow-auth-cancel",
+    "allow-auth-sign-out"
   ]
 }

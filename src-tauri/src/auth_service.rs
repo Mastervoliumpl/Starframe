@@ -10,38 +10,28 @@ use tauri::State;
 use tauri_plugin_opener::OpenerExt;
 use tokio::sync::{Mutex as AsyncMutex, watch};
 
+#[cfg(debug_assertions)]
+mod fixture;
+
 pub struct AuthService {
     auth: AsyncMutex<Auth>,
     client: Client,
     cancel: Mutex<watch::Sender<bool>>,
+    root_public: Option<[u8; 32]>,
 }
 
 const PRODUCTION_REGISTRY_ROOT: Option<[u8; 32]> = None;
 
 impl AuthService {
     pub fn new() -> Result<Self, String> {
-        let config = Config::new(
-            "https://api.starframemanager.com/v1",
-            "https://starframemanager.com/",
-            false,
-        )
-        .map_err(|_| "The website connection is not configured correctly.")?;
+        let (config, root_public, store) = connection()?;
         let client = Client::new(config).map_err(|_| "The website client could not start.")?;
         let (cancel, _) = watch::channel(false);
-        let store = {
-            #[cfg(debug_assertions)]
-            if let Some(root) = std::env::var_os("STARFRAME_TEST_DATA_DIR") {
-                CredentialStore::isolated(std::path::Path::new(&root))
-            } else {
-                CredentialStore::production()
-            }
-            #[cfg(not(debug_assertions))]
-            CredentialStore::production()
-        };
         Ok(Self {
             auth: AsyncMutex::new(Auth::with_store(client.clone(), store)),
             client,
             cancel: Mutex::new(cancel),
+            root_public,
         })
     }
 
@@ -50,7 +40,7 @@ impl AuthService {
         mod_id: ModId,
         release_id: ReleaseId,
     ) -> Result<RegistryRequest, CommandError> {
-        let root_public = PRODUCTION_REGISTRY_ROOT.ok_or_else(|| {
+        let root_public = self.root_public.ok_or_else(|| {
             CommandError::new(
                 "registry_trust_unavailable",
                 "This Starframe build has no independently provisioned registry root. Registry downloads are unavailable; local mods remain usable.",
@@ -102,6 +92,35 @@ impl AuthService {
             .expect("auth cancellation state")
             .send_replace(true);
     }
+}
+
+fn connection() -> Result<(Config, Option<[u8; 32]>, CredentialStore), String> {
+    #[cfg(debug_assertions)]
+    if let Some(root) = std::env::var_os("STARFRAME_TEST_DATA_DIR") {
+        let root = std::path::Path::new(&root);
+        let store = CredentialStore::isolated(root);
+        if let Some(config) = fixture::read(root)? {
+            let connection = config.connection()?;
+            fixture::seed(root, &store)?;
+            return Ok((connection, Some(config.root_public), store));
+        }
+        return Ok((production_config()?, PRODUCTION_REGISTRY_ROOT, store));
+    }
+    Ok((
+        production_config()?,
+        PRODUCTION_REGISTRY_ROOT,
+        CredentialStore::production(),
+    ))
+}
+
+fn production_config() -> Result<Config, String> {
+    let config = Config::new(
+        "https://api.starframemanager.com/v1",
+        "https://starframemanager.com/",
+        false,
+    )
+    .map_err(|_| "The website connection is not configured correctly.")?;
+    Ok(config)
 }
 
 fn failure(error: AuthError) -> CommandError {

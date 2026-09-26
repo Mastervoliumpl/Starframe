@@ -8,7 +8,7 @@
 
 Internal development version for milestone 0.7.0. No installer or app release was published.
 
-- Replace the Catalog page with the native Mods browser, bounded website discovery filters/paging, release details and history, account-scoped refresh and explicit exact-release installs (#88). Combined signed-in native acceptance and legacy client/publication removal remain open.
+- Replace the Catalog page with the native Mods browser, bounded website discovery filters/paging, release details and history, account-scoped refresh and explicit exact-release installs (#88). Verify signed-in discovery, exact chosen installs, receipts, tamper/expiry refusal and offline/revoked-session reopening through isolated native fixtures. Legacy client/publication removal remains open.
 
 ## 0.6.0 completion - 2026-09-17
 
