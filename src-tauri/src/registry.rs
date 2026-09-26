@@ -1,6 +1,7 @@
 mod auth;
 #[cfg(windows)]
 mod credential;
+mod dependencies;
 pub mod installation;
 mod transport;
 pub mod trust;
@@ -9,6 +10,7 @@ mod wire;
 pub use auth::{Auth, AuthError, ChallengeView, Poll, SignOut};
 #[cfg(windows)]
 pub use credential::CredentialStore;
+pub(crate) use dependencies::valid_dependencies;
 pub use transport::{Client, Config, Error, ErrorCode, FieldProblem, ResponseError};
 pub(crate) use transport::{ReceiptClaim, VerifiedArchive};
 pub use wire::{

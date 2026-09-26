@@ -110,6 +110,7 @@ pub struct DownloadIdentity {
     pub(crate) metadata_revision: u64,
     pub(crate) security_revision: u64,
     pub(crate) installation: Option<super::installation::Installation>,
+    pub(crate) dependencies: Vec<super::Dependency>,
 }
 
 impl DownloadIdentity {
@@ -150,6 +151,7 @@ impl VerifiedRelease {
             metadata_revision: release.metadata.revision,
             security_revision: self.security_revision,
             installation: release.metadata.installation.clone(),
+            dependencies: release.metadata.dependencies.clone(),
         })
     }
 }
@@ -746,6 +748,22 @@ mod tests {
                 panic!("full fixture")
             };
             assert!(release.metadata.installation.unwrap().valid());
+
+            for dependencies in [
+                serde_json::json!([{"kind":"exact","modId":1,"releaseId":"22222222-2222-4222-8222-222222222222"}]),
+                serde_json::json!([{"kind":"range","modId":2,"minimum":null,"before":null,"includePrerelease":false}]),
+                serde_json::json!([{"kind":"range","modId":2,"minimum":"2.0.0","before":"1.0.0","includePrerelease":false}]),
+                serde_json::json!([{"kind":"range","modId":2,"minimum":"1.0.0","includePrerelease":false}]),
+                serde_json::json!([
+                    {"kind":"exact","modId":2,"releaseId":"22222222-2222-4222-8222-222222222222"},
+                    {"kind":"range","modId":2,"minimum":"1.0.0","before":null,"includePrerelease":false}
+                ]),
+            ] {
+                let mut changed = envelope.clone();
+                changed["signed"]["release"]["metadata"]["dependencies"] = dependencies;
+                sign(&mut changed);
+                assert!(check(&changed).is_err());
+            }
 
             let mut changed = envelope.clone();
             changed["signed"]["release"]["metadata"]["installation"]["schemaVersion"] = 2.into();

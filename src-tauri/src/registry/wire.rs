@@ -358,11 +358,17 @@ pub enum Dependency {
     Range {
         #[serde(rename = "modId")]
         mod_id: ModId,
+        #[serde(deserialize_with = "nullable_string")]
         minimum: Option<String>,
+        #[serde(deserialize_with = "nullable_string")]
         before: Option<String>,
         #[serde(rename = "includePrerelease")]
         include_prerelease: bool,
     },
+}
+
+fn nullable_string<'de, D: serde::Deserializer<'de>>(input: D) -> Result<Option<String>, D::Error> {
+    Option::<String>::deserialize(input)
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -408,8 +414,12 @@ impl ReleaseResult {
                     && release.published_at.ends_with('Z')
                     && (1..=100).contains(&release.metadata.tested_game_build.len())
                     && release.metadata.release_notes.len() <= 20_000
-                    && release.metadata.dependencies.len() <= 100
+                    && super::valid_dependencies(release.mod_id, &release.metadata.dependencies)
                     && release.metadata.dependency_problems.len() <= 100
+                    && release.metadata.dependency_problems.iter().all(|problem| {
+                        problem.dependency.valid(release.mod_id)
+                            && release.metadata.dependencies.contains(&problem.dependency)
+                    })
                     && release
                         .metadata
                         .installation

@@ -46,7 +46,7 @@ impl RegistryLibraryEntry {
             && (1..=100).contains(&self.tested_game_build.len())
             && (1..=crate::registry::MAX_SAFE_INTEGER).contains(&self.metadata_revision)
             && self.installation.valid()
-            && self.dependencies.len() <= 100
+            && crate::registry::valid_dependencies(self.reference.mod_id, &self.dependencies)
     }
 }
 
@@ -762,7 +762,31 @@ mod tests {
             1
         );
 
-        second["signed"]["revision"] = 2.into();
+        let mut changed_dependencies = second.clone();
+        changed_dependencies["signed"]["revision"] = 2.into();
+        changed_dependencies["signed"]["release"]["metadata"]["dependencies"] = serde_json::json!([
+            {"kind":"exact","modId":1,"releaseId":release_id.0.to_string()}
+        ]);
+        store
+            .accept_registry_release(
+                &sign(changed_dependencies),
+                &root,
+                second_mod,
+                second_release,
+                now,
+            )
+            .unwrap();
+        assert!(
+            store
+                .confirm_registry_download(&root, &second_identity, now)
+                .is_err()
+        );
+        assert_eq!(
+            store.installed_registry_releases().unwrap()[1].dependencies,
+            vec![]
+        );
+
+        second["signed"]["revision"] = 3.into();
         second["signed"]["release"]["metadata"]["installation"]["sourceRoot"] = "Maps/Other".into();
         store
             .accept_registry_release(&sign(second), &root, second_mod, second_release, now)

@@ -2,6 +2,9 @@ use crate::{catalog::Catalog, storage::ModReference};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap};
 
+mod registry;
+pub use registry::{RegistryAdjustment, RegistryResolution, resolve_registry};
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(test, derive(ts_rs::TS))]
@@ -99,27 +102,10 @@ pub fn resolve_with_locals(
             }
         }
     }
-    let mut incoming = vec![0; requested.len()];
-    for targets in &edges {
-        for &to in targets {
-            incoming[to] += 1;
-        }
-    }
-    let mut ready: BTreeSet<_> = incoming
-        .iter()
-        .enumerate()
-        .filter_map(|(i, &n)| (n == 0).then_some(i))
+    let effective: Vec<_> = topological(&edges)
+        .into_iter()
+        .map(|index| requested[index].clone())
         .collect();
-    let mut effective = Vec::new();
-    while let Some(index) = ready.pop_first() {
-        effective.push(requested[index].clone());
-        for &to in &edges[index] {
-            incoming[to] -= 1;
-            if incoming[to] == 0 {
-                ready.insert(to);
-            }
-        }
-    }
     let effective_positions: HashMap<_, _> = effective
         .iter()
         .enumerate()
@@ -160,6 +146,31 @@ pub fn resolve_with_locals(
         effective,
         adjustments,
     })
+}
+
+fn topological(edges: &[BTreeSet<usize>]) -> Vec<usize> {
+    let mut incoming = vec![0; edges.len()];
+    for targets in edges {
+        for &to in targets {
+            incoming[to] += 1;
+        }
+    }
+    let mut ready: BTreeSet<_> = incoming
+        .iter()
+        .enumerate()
+        .filter_map(|(index, &count)| (count == 0).then_some(index))
+        .collect();
+    let mut effective = Vec::new();
+    while let Some(index) = ready.pop_first() {
+        effective.push(index);
+        for &to in &edges[index] {
+            incoming[to] -= 1;
+            if incoming[to] == 0 {
+                ready.insert(to);
+            }
+        }
+    }
+    effective
 }
 
 fn cycle(edges: &[BTreeSet<usize>]) -> Option<Vec<usize>> {
