@@ -1,4 +1,6 @@
-# Catalog publication
+# Historical catalog publication, 0.6.0
+
+Retired on 26 September 2026 under #89. The following procedures record 0.6.0 and must not be used for the registry. The catalog-only publisher, key environment, enable variable and publication branch are removed or disabled. See [retirement verification](verification/catalog-retirement.md). Application-update signing uses its separate release environment.
 
 The publisher, embedded trust root and desktop signed refresh are implemented. The owner approved uploading the dedicated online key to the `catalog` GitHub environment on 9 September 2026. Its only allowed deployment branch is `main`, and `CATALOG_SIGNING_KEY` is configured. On 17 September the owner explicitly approved merging PR #60 and enabling signed catalog publication and daily renewal. `CATALOG_PUBLICATION_ENABLED` is `true`; production publication, renewal and normal client refresh passed. [Live verification](verification/catalog-authentication.md#first-production-publication-17-september-2026) records the source, workflow, publication and client identities.
 
@@ -10,7 +12,7 @@ Use a separate offline root key and online catalog key. The online key signs TUF
 
 The `catalog` GitHub environment holds only `CATALOG_SIGNING_KEY`, containing the online key's PKCS#8 PEM. Restrict that environment to `main`. Its renewal job must run without a manual approval on each daily renewal. Root changes and catalog/advisory edits still require maintainer review through the normal main-branch checks. Keep private keys out of the repository, issue comments, logs and uploaded build artifacts.
 
-The [workflow](../.github/workflows/catalog.yml) runs daily at 03:17 UTC and after successful Checks runs on main. It also permits manual dispatch. Before and after preparation it confirms that the checked source commit is still current main. It serializes publication jobs and pushes normally to `codex/catalog-published`; it never force-pushes. A rejected push retains the previous publication. Versioned metadata and hashed target filenames remain on that branch so clients can finish a refresh across publication boundaries. Root history must remain available for older clients to rotate their trust.
+The [workflow](https://github.com/Mastervoliumpl/Starframe/blob/53bbac7bf5f0c9ff318f50dfa14abe77b38de264/.github/workflows/catalog.yml) runs daily at 03:17 UTC and after successful Checks runs on main. It also permits manual dispatch. Before and after preparation it confirms that the checked source commit is still current main. It serializes publication jobs and pushes normally to `codex/catalog-published`; it never force-pushes. A rejected push retains the previous publication. Versioned metadata and hashed target filenames remain on that branch so clients can finish a refresh across publication boundaries. Root history must remain available for older clients to rotate their trust.
 
 Daily renewal advances TUF metadata versions and gives targets, snapshot and timestamp metadata thirty days of validity. It does not change catalog or advisory revisions when their content is unchanged. A failed renewal leaves the previous signed publication in place. The desktop pauses new catalog downloads after expiry while retaining installed offline use and known confirmed findings.
 

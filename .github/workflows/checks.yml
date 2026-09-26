@@ -113,10 +113,6 @@ jobs:
           cargo build --manifest-path src-tauri/Cargo.toml --locked --example verify_release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/verify_release_fixture.py --verifier src-tauri/target/debug/examples/verify_release.exe
-      - name: Validate catalog and retained release identities
-        env:
-          CATALOG_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
-        run: cargo run --manifest-path src-tauri/Cargo.toml --locked --bin check_catalog -- catalog/releases.json --git-base $env:CATALOG_BASE
       - name: Compile native installer controls
         run: ./scripts/prepare_windows_installer.ps1 -ThemeOnly
       - run: npm run tauri -- build --debug --no-bundle -- --locked
