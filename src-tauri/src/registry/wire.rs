@@ -33,6 +33,12 @@ where
 #[serde(try_from = "u8")]
 pub struct ApiVersion;
 
+impl Serialize for ApiVersion {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_u8(1)
+    }
+}
+
 impl TryFrom<u8> for ApiVersion {
     type Error = &'static str;
 
@@ -45,16 +51,18 @@ impl TryFrom<u8> for ApiVersion {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ApiResponse<T> {
     pub api_version: ApiVersion,
     pub data: T,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ModList {
+    #[cfg_attr(test, ts(type = "1"))]
     pub api_version: ApiVersion,
     pub items: Vec<ModSummary>,
     pub pagination: Pagination,
@@ -66,11 +74,21 @@ impl ModList {
             && [6, 10, 12, 20, 24, 48, 50].contains(&self.pagination.page_size)
             && self.pagination.as_of.ends_with('Z')
             && self.items.iter().all(ModSummary::valid)
+            && self
+                .items
+                .iter()
+                .map(|item| item.mod_id)
+                .collect::<std::collections::HashSet<_>>()
+                .len()
+                == self.items.len()
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ListQuery {
+    #[cfg_attr(test, ts(type = "number"))]
     pub page: u64,
     pub page_size: u8,
     pub query: String,
@@ -79,6 +97,7 @@ pub struct ListQuery {
     pub sort: Sort,
     pub period: Period,
     pub maintenance: Maintenance,
+    pub mod_type: ModTypeFilter,
     pub game_builds: Vec<String>,
 }
 
@@ -93,6 +112,7 @@ impl Default for ListQuery {
             sort: Sort::Updated,
             period: Period::All,
             maintenance: Maintenance::All,
+            mod_type: ModTypeFilter::All,
             game_builds: Vec::new(),
         }
     }
@@ -104,12 +124,12 @@ impl ListQuery {
             items.len() <= limit
                 && items
                     .iter()
-                    .all(|item| !item.is_empty() && item.len() <= length)
+                    .all(|item| !item.is_empty() && item.encode_utf16().count() <= length)
                 && items.iter().collect::<std::collections::HashSet<_>>().len() == items.len()
         };
         if !(1..=super::MAX_SAFE_INTEGER).contains(&self.page)
             || ![6, 10, 12, 20, 24, 48, 50].contains(&self.page_size)
-            || self.query.len() > 200
+            || self.query.encode_utf16().count() > 200
             || !unique(&self.include_tags, 20, 64)
             || !unique(&self.exclude_tags, 20, 64)
             || !unique(&self.game_builds, 20, 100)
@@ -124,7 +144,9 @@ impl ListQuery {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum Sort {
     Updated,
     Published,
@@ -142,14 +164,22 @@ impl Sort {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum Period {
     All,
+    #[serde(rename = "24h")]
     Day,
+    #[serde(rename = "7d")]
     Week,
+    #[serde(rename = "1m")]
     Month,
+    #[serde(rename = "3m")]
     ThreeMonths,
+    #[serde(rename = "6m")]
     SixMonths,
+    #[serde(rename = "1y")]
     Year,
 }
 impl Period {
@@ -166,11 +196,35 @@ impl Period {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum Maintenance {
     All,
     Maintained,
     Unmaintained,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub enum ModTypeFilter {
+    All,
+    Code,
+    Map,
+    Ai,
+    Unclassified,
+}
+impl ModTypeFilter {
+    pub(super) fn as_str(self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::Code => "code",
+            Self::Map => "map",
+            Self::Ai => "ai",
+            Self::Unclassified => "unclassified",
+        }
+    }
 }
 impl Maintenance {
     pub(super) fn as_str(self) -> &'static str {
@@ -182,22 +236,28 @@ impl Maintenance {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Pagination {
     #[serde(deserialize_with = "positive_u64")]
+    #[cfg_attr(test, ts(type = "number"))]
     pub page: u64,
     #[serde(deserialize_with = "positive_u64")]
+    #[cfg_attr(test, ts(type = "number"))]
     pub page_size: u64,
     #[serde(deserialize_with = "safe_u64")]
+    #[cfg_attr(test, ts(type = "number"))]
     pub total_items: u64,
     #[serde(deserialize_with = "safe_u64")]
+    #[cfg_attr(test, ts(type = "number"))]
     pub total_pages: u64,
     pub as_of: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Profile {
     pub display_name: String,
     pub avatar_url: Option<String>,
@@ -234,8 +294,9 @@ pub enum Capability {
     Report,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ModSummary {
     pub mod_id: ModId,
     #[serde(deserialize_with = "required_option")]
@@ -249,10 +310,13 @@ pub struct ModSummary {
     pub updated_at: String,
     pub latest_release_id: Option<ReleaseId>,
     #[serde(deserialize_with = "safe_u64")]
+    #[cfg_attr(test, ts(type = "number"))]
     pub downloads: u64,
     #[serde(deserialize_with = "safe_u64")]
+    #[cfg_attr(test, ts(type = "number"))]
     pub likes: u64,
     #[serde(deserialize_with = "required_option")]
+    #[cfg_attr(test, ts(type = "number | null"))]
     pub archive_bytes: Option<u64>,
     pub icon_id: Option<ReleaseId>,
     pub published_at: Option<String>,
@@ -282,24 +346,27 @@ impl ModSummary {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum ModType {
     Code,
     Map,
     Ai,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ModMedia {
     #[serde(deserialize_with = "required_option")]
     pub icon_id: Option<ReleaseId>,
     pub screenshot_ids: Vec<ReleaseId>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ModDetail {
     pub listing: ModSummary,
     pub description: String,
@@ -309,8 +376,9 @@ pub struct ModDetail {
     pub latest_release: ReleaseResult,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum ModResult {
     Mod(Box<ModDetail>),
     Tombstone(Tombstone),
@@ -362,8 +430,9 @@ impl ModResult {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum Availability {
     Available,
     Withdrawn,
@@ -372,21 +441,25 @@ pub enum Availability {
     Blocked,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Artifact {
     pub sha256: Sha256,
     #[serde(deserialize_with = "positive_u64")]
+    #[cfg_attr(test, ts(type = "number"))]
     pub bytes: u64,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Release {
     pub mod_id: ModId,
     pub release_id: ReleaseId,
     pub version_label: String,
     pub artifact: Artifact,
+    #[cfg_attr(test, ts(type = "'approved'"))]
     pub submission_state: Approved,
     pub publication_order: PublicationOrder,
     pub published_at: String,
@@ -400,6 +473,12 @@ pub struct Release {
 #[serde(try_from = "String")]
 pub struct Approved;
 
+impl Serialize for Approved {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str("approved")
+    }
+}
+
 impl TryFrom<String> for Approved {
     type Error = &'static str;
 
@@ -412,27 +491,52 @@ impl TryFrom<String> for Approved {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Security {
     pub status: SecurityStatus,
     #[serde(deserialize_with = "safe_u64")]
+    #[cfg_attr(test, ts(type = "number"))]
     pub revision: u64,
     pub reason: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+impl Security {
+    pub(super) fn valid_for(&self, availability: &Availability) -> bool {
+        self.reason
+            .as_ref()
+            .is_none_or(|reason| (1..=1000).contains(&reason.encode_utf16().count()))
+            && matches!(
+                (availability, &self.status),
+                (Availability::Blocked, SecurityStatus::Blocked)
+                    | (
+                        Availability::Available
+                            | Availability::Withdrawn
+                            | Availability::Hidden
+                            | Availability::Pruned,
+                        SecurityStatus::NotBlocked
+                    )
+            )
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum SecurityStatus {
     NotBlocked,
     Blocked,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Metadata {
     #[serde(deserialize_with = "positive_u64")]
+    #[cfg_attr(test, ts(type = "number"))]
     pub revision: u64,
+    #[cfg_attr(test, ts(type = "'approved'"))]
     pub state: Approved,
     pub tested_game_build: String,
     pub source_repository: Option<String>,
@@ -445,6 +549,7 @@ pub struct Metadata {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum Dependency {
     Exact {
         #[serde(rename = "modId")]
@@ -468,35 +573,40 @@ fn nullable_string<'de, D: serde::Deserializer<'de>>(input: D) -> Result<Option<
     Option::<String>::deserialize(input)
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct DependencyProblem {
     pub dependency: Dependency,
     pub code: DependencyProblemCode,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum DependencyProblemCode {
     NoMatchingRelease,
     ArchiveUnavailable,
     SecurityBlocked,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Tombstone {
     pub mod_id: ModId,
     pub release_id: ReleaseId,
     pub sha256: Sha256,
     pub availability: Availability,
     #[serde(deserialize_with = "safe_u64")]
+    #[cfg_attr(test, ts(type = "number"))]
     pub security_revision: u64,
     pub updated_at: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum ReleaseResult {
     Release(Box<Release>),
     Tombstone(Tombstone),
@@ -522,22 +632,7 @@ impl ReleaseResult {
                         .installation
                         .as_ref()
                         .is_none_or(|plan| plan.valid())
-                    && release
-                        .security
-                        .reason
-                        .as_ref()
-                        .is_none_or(|reason| (1..=1000).contains(&reason.len()))
-                    && matches!(
-                        (&release.availability, &release.security.status),
-                        (Availability::Blocked, SecurityStatus::Blocked)
-                            | (
-                                Availability::Available
-                                    | Availability::Withdrawn
-                                    | Availability::Hidden
-                                    | Availability::Pruned,
-                                SecurityStatus::NotBlocked
-                            )
-                    )
+                    && release.security.valid_for(&release.availability)
             }
             Self::Tombstone(tombstone) => {
                 !matches!(tombstone.availability, Availability::Available)

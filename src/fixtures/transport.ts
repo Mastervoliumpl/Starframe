@@ -1,12 +1,16 @@
 import type { Snapshot } from '../lib/generated/model';
 import type { Transport } from '../lib/state';
 import type { AuthSession, AuthTransport } from '../lib/auth';
+import type { RegistryTransport } from '../lib/registry';
 import { version } from '../../package.json';
 import { fixtureManagement } from './management';
+import { fixtureRegistry } from './registry';
 import { emptyUpdates } from './updates';
 
 // Browser tests opt into this fixture with ?fixture; production builds omit it.
-export function fixtureTransport(): Transport & AuthTransport {
+export function fixtureTransport(): Transport &
+  AuthTransport &
+  RegistryTransport {
   let snapshot: Snapshot = {
     sessionId: 'browser-fixture',
     revision: '0',
@@ -47,7 +51,19 @@ export function fixtureTransport(): Transport & AuthTransport {
   };
   const catalogCase = new URLSearchParams(location.search).get('catalog');
   const authCase = new URLSearchParams(location.search).get('auth');
-  let authSession: AuthSession | null = null;
+  let authSession: AuthSession | null = new URLSearchParams(
+    location.search,
+  ).has('registry')
+    ? {
+        accountId: '33333333-3333-4333-8333-333333333333',
+        profile: { displayName: 'Fixture user', avatarUrl: null },
+        context: 'manager',
+        authenticatedAt: '2026-09-24T00:00:00Z',
+        expiresAt: '2099-01-01T00:00:00Z',
+        capabilities: ['download_mod'],
+        isOwner: false,
+      }
+    : null;
   if (new URLSearchParams(location.search).has('update')) {
     snapshot.updates.release = {
       version: '0.6.1',
@@ -70,8 +86,9 @@ export function fixtureTransport(): Transport & AuthTransport {
   let work: ReturnType<typeof setInterval>;
   const publish = () => receiver?.(structuredClone(snapshot));
   return {
+    ...fixtureRegistry(),
     async authRestore() {
-      return null;
+      return authSession;
     },
     async authInspect() {
       return authSession;

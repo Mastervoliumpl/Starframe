@@ -2,6 +2,31 @@ use super::*;
 
 impl Worker {
     pub(super) fn handle(&mut self, request: Request) {
+        if let Request::RegistryInstall(request_id, reference, request, approval, reply) = request {
+            let result = (|| {
+                if self.core.lock().expect("state lock").stopped {
+                    return Err("Starframe is closing.".into());
+                }
+                let queue = self
+                    .packages
+                    .as_mut()
+                    .map_err(|error| error.clone())?
+                    .as_mut()
+                    .ok_or("Package storage is unavailable.")?;
+                let store = self.storage.as_mut().ok_or("Saved data is unavailable.")?;
+                backend::approved_registry_install(
+                    store,
+                    queue,
+                    &request_id,
+                    &reference,
+                    *request,
+                    *approval,
+                )?;
+                queue.operations(store)
+            })();
+            let _ = reply.send(result);
+            return;
+        }
         if let Request::SharedRegistry(action, reply) = request {
             let result = (|| {
                 if self.core.lock().expect("state lock").stopped {
@@ -215,6 +240,7 @@ impl Worker {
             | Request::SharedRegistry(..)
             | Request::Package(..) => unreachable!(),
             Request::RegistryPackage(..) => unreachable!(),
+            Request::RegistryInstall(..) => unreachable!(),
             Request::RegistryReceipts(..) => unreachable!(),
             Request::Update(..) => unreachable!(),
             Request::Discover => {

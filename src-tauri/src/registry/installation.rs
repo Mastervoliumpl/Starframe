@@ -4,6 +4,7 @@ pub const CONTRACT_REVISION: &str = "1d616d43d90227ee9967091be039e6c3e695091e";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum Kind {
     Code,
     Map,
@@ -12,6 +13,7 @@ pub enum Kind {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum Loader {
     Lua,
     Bepinex5,
@@ -19,6 +21,7 @@ pub enum Loader {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum Destination {
     SanctuaryMaps,
     SanctuaryAiMods,
@@ -26,6 +29,7 @@ pub enum Destination {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged, rename_all_fields = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum Installation {
     Lua {
         schema_version: u8,

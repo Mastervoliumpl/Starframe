@@ -75,20 +75,10 @@ impl AuthService {
             .inspect(cancel.clone())
             .await
             .map_err(failure)?
-            .ok_or_else(|| {
-                CommandError::new(
-                    "auth_required",
-                    "Sign in to continue this registry download.",
-                )
-            })?;
+            .ok_or_else(|| CommandError::new("auth_required", "Sign in for online mods."))?;
         let bearer = auth
             .token()
-            .ok_or_else(|| {
-                CommandError::new(
-                    "auth_required",
-                    "Sign in to continue this registry download.",
-                )
-            })?
+            .ok_or_else(|| CommandError::new("auth_required", "Sign in for online mods."))?
             .to_owned();
         Ok(ReceiptRequest {
             client: self.client.clone(),

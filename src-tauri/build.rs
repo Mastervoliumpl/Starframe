@@ -12,6 +12,12 @@ fn main() {
             "mod_action",
             "sharing_action",
             "save_collection_file",
+            "registry_list",
+            "registry_options",
+            "registry_detail",
+            "registry_release",
+            "registry_history",
+            "registry_install",
         ]),
     ))
     .expect("Tauri build configuration");

@@ -489,6 +489,7 @@ mod tests {
     #[cfg(windows)]
     #[tokio::test]
     async fn restored_session_and_failed_remote_signout_clear_only_local_token() {
+        let _vault = super::super::credential::FIXTURE_LOCK.lock().await;
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let origin = format!("http://{}", listener.local_addr().unwrap());
         let server = std::thread::spawn(move || {
@@ -553,6 +554,7 @@ mod tests {
     #[cfg(windows)]
     #[tokio::test]
     async fn revoked_saved_session_is_removed() {
+        let _vault = super::super::credential::FIXTURE_LOCK.lock().await;
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let origin = format!("http://{}", listener.local_addr().unwrap());
         let server = std::thread::spawn(move || {
@@ -596,6 +598,7 @@ mod tests {
     #[cfg(windows)]
     #[tokio::test]
     async fn switching_accounts_clears_the_old_credential_before_exchange() {
+        let _vault = super::super::credential::FIXTURE_LOCK.lock().await;
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let origin = format!("http://{}", listener.local_addr().unwrap());
         let website = origin.clone();

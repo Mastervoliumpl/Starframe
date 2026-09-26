@@ -2,11 +2,13 @@
 
 ## Unreleased
 
-- Begin 0.7.0 backend separation with shared Rust management calls and an internal headless command for local import, collections and game preparation (#66). The registry and native Mods browser remain in progress.
+- Begin 0.7.0 backend separation with shared Rust management calls and an internal headless command for local import, collections and game preparation (#66). The milestone remains in progress.
 
 ## 0.7.0-dev.1 - 2026-09-24
 
 Internal development version for milestone 0.7.0. No installer or app release was published.
+
+- Replace the Catalog page with the native Mods browser, bounded website discovery filters/paging, release details and history, account-scoped refresh and explicit exact-release installs (#88). Combined signed-in native acceptance and legacy client/publication removal remain open.
 
 ## 0.6.0 completion - 2026-09-17
 

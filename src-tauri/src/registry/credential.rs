@@ -13,6 +13,10 @@ use windows::{
 
 const TARGET: &str = "Starframe:api.starframemanager.com:manager:v1";
 
+#[cfg(test)]
+// These fixtures share the Windows user vault even though their targets differ.
+pub(super) static FIXTURE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StoredToken {
@@ -144,6 +148,7 @@ mod tests {
 
     #[test]
     fn isolated_windows_credential_round_trip_and_removal() {
+        let _vault = FIXTURE_LOCK.blocking_lock();
         let store = CredentialStore::fixture();
         struct Cleanup<'a>(&'a CredentialStore);
         impl Drop for Cleanup<'_> {

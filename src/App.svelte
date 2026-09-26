@@ -13,12 +13,14 @@
   import PackageDownloads from './features/PackageDownloads.svelte';
   import { createManagement, confirmedFinding } from './lib/management';
   import { createDesktop } from './lib/state';
+  import RegistryBrowser from './features/RegistryBrowser.svelte';
+  import { createRegistry } from './lib/registry';
   import { createAuth } from './lib/auth';
   import { getTransport } from './lib/native';
 
   const pages = [
     { id: 'mods', label: 'My mods' },
-    { id: 'catalog', label: 'Catalog' },
+    { id: 'browse', label: 'Mods' },
     { id: 'collections', label: 'Collections' },
     { id: 'downloads', label: 'Downloads' },
     { id: 'settings', label: 'Settings' },
@@ -29,6 +31,11 @@
   let desktop = $state(createDesktop(null));
   let auth = $state(createAuth(null));
   let manager = $state(createManagement(null));
+  let registry = $state(createRegistry(null));
+  $effect(() => {
+    if (registry.account($auth.session?.accountId ?? null))
+      void registry.browse();
+  });
   let drawer: HTMLDialogElement;
   let menu: HTMLButtonElement;
   let heading: HTMLHeadingElement;
@@ -85,6 +92,8 @@
       desktop = createDesktop(transport);
       auth = createAuth(transport);
       void auth.restore();
+      registry = createRegistry(transport);
+      registry.start();
       manager = createManagement(transport);
       stopManagement = manager.start();
       stop = desktop.startWatching();
@@ -99,6 +108,7 @@
     wide.addEventListener('change', closeDrawer);
     return () => {
       auth.stop();
+      registry.stop();
       disposed = true;
       stop?.();
       stopManagement?.();
@@ -197,64 +207,15 @@
           onsource={(id) => desktop.open(id)}
         />
       </section>
-      <section class="page" hidden={page !== 'catalog'} aria-label="Catalog">
-        <div class="catalog-status">
-          <h2>Approved release catalog</h2>
-          <p role="status" aria-live={page === 'catalog' ? 'polite' : 'off'}>
-            {#if catalog?.checking}
-              Checking for catalog changes…
-            {:else if catalog?.revision}
-              Catalog revision {catalog.revision}. {catalog.releaseCount} approved
-              releases.
-            {:else}
-              No catalog is cached yet.
-            {/if}
-          </p>
-          {#if catalog?.error}
-            <p class="error" role="alert">{catalog.error}</p>
-            {#if catalog.revision}<p>
-                Cached revision {catalog.revision} remains available.
-              </p>{/if}
-          {/if}
-          {#if catalog?.lastSuccess}
-            <p class="muted">
-              Last successful check: {new Date(
-                Number(catalog.lastSuccess) * 1000,
-              ).toLocaleString()}
-            </p>
-          {/if}
-          {#if catalog?.fresh && catalog.expires}<p>
-              Security information verified. Valid until {new Date(
-                Number(catalog.expires) * 1000,
-              ).toLocaleString()}.
-            </p>
-          {:else}<p class="error">
-              {catalog?.expires
-                ? 'Catalog security information has expired or the clock changed.'
-                : 'Catalog security information has not been verified.'} New downloads
-              are paused until a signed refresh succeeds. Verified library copies
-              remain available offline; confirmed findings still apply.
-            </p>{/if}
-          <p>
-            Downloads come from authors. Curation does not guarantee that a
-            binary is free of malware.
-          </p>
-          <button onclick={() => desktop.open('repository')}
-            >View Starframe on GitHub</button
-          >
-        </div>
-        {#if managementError}<p class="error" role="alert">
-            {managementError}<button onclick={() => manager.dismissError()}
-              >Dismiss</button
-            >
-          </p>{/if}
-        <ModList
-          mode="catalog"
-          catalogFresh={catalog?.fresh ?? false}
+      <section class="page" hidden={page !== 'browse'} aria-label="Mods">
+        <RegistryBrowser
+          {registry}
           {manager}
-          game={$desktop.snapshot?.game}
-          unavailable={$desktop.connection !== 'connected'}
-          onsource={(id) => desktop.open(id)}
+          active={page === 'browse'}
+          gameBuild={$desktop.snapshot?.game.selected?.build}
+          onsettings={() => navigate('settings')}
+          ondownloads={() => navigate('downloads')}
+          onsource={(id) => desktop.open(`registry:${id}`)}
         />
       </section>
       <section

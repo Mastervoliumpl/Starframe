@@ -53,6 +53,13 @@ enum Request {
         Box<packages::RegistryRequest>,
         tokio::sync::oneshot::Sender<Result<Vec<packages::Operation>, String>>,
     ),
+    RegistryInstall(
+        String,
+        starframe::registry::ExactReference,
+        Box<packages::RegistryRequest>,
+        Box<packages::RegistryApproval>,
+        tokio::sync::oneshot::Sender<Result<Vec<packages::Operation>, String>>,
+    ),
     RegistryReceipts(
         Box<packages::ReceiptRequest>,
         tokio::sync::oneshot::Sender<Result<usize, String>>,
@@ -71,6 +78,30 @@ pub struct GameService {
     writing: Arc<AtomicBool>,
 }
 impl GameService {
+    pub async fn registry_install(
+        &self,
+        request_id: String,
+        reference: starframe::registry::ExactReference,
+        request: packages::RegistryRequest,
+        approval: packages::RegistryApproval,
+    ) -> Result<Vec<packages::Operation>, CommandError> {
+        let (reply, result) = tokio::sync::oneshot::channel();
+        self.sender
+            .try_send(Request::RegistryInstall(
+                request_id,
+                reference,
+                Box::new(request),
+                Box::new(approval),
+                reply,
+            ))
+            .map_err(|_| {
+                CommandError::new("package_busy", "The storage worker is busy. Retry shortly.")
+            })?;
+        result
+            .await
+            .map_err(|_| CommandError::new("package_unavailable", "The package worker stopped."))?
+            .map_err(|message| CommandError::new("registry_install_failed", &message))
+    }
     pub async fn shared_registry(
         &self,
         action: starframe::sharing::OnlineAction,

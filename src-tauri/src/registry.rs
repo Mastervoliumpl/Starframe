@@ -3,6 +3,7 @@ mod auth;
 #[cfg(windows)]
 mod credential;
 mod dependencies;
+mod discovery;
 pub mod installation;
 mod transport;
 pub mod trust;
@@ -12,11 +13,12 @@ pub use auth::{Auth, AuthError, ChallengeView, Poll, SignOut};
 #[cfg(windows)]
 pub use credential::CredentialStore;
 pub(crate) use dependencies::valid_dependencies;
+pub use discovery::{Options, ReleaseHistory};
 pub use transport::{Client, Config, Error, ErrorCode, FieldProblem, ResponseError};
 pub(crate) use transport::{ReceiptClaim, VerifiedArchive};
 pub use wire::{
     ApiResponse, Artifact, Availability, Dependency, ListQuery, Maintenance, ModList, ModResult,
-    ModSummary, Period, Release, ReleaseResult, Session, SessionContext, Sort,
+    ModSummary, ModTypeFilter, Period, Release, ReleaseResult, Session, SessionContext, Sort,
 };
 
 use serde::{Deserialize, Serialize};
@@ -27,7 +29,8 @@ pub const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "u64", into = "u64")]
-pub struct ModId(u64);
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct ModId(#[cfg_attr(test, ts(type = "number"))] u64);
 
 impl TryFrom<u64> for ModId {
     type Error = &'static str;
@@ -49,7 +52,8 @@ impl From<ModId> for u64 {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "u64", into = "u64")]
-pub struct PublicationOrder(u64);
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct PublicationOrder(#[cfg_attr(test, ts(type = "number"))] u64);
 
 impl TryFrom<u64> for PublicationOrder {
     type Error = &'static str;
@@ -68,7 +72,8 @@ impl From<PublicationOrder> for u64 {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
-pub struct ReleaseId(pub Uuid);
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct ReleaseId(#[cfg_attr(test, ts(type = "string"))] pub Uuid);
 
 impl TryFrom<String> for ReleaseId {
     type Error = &'static str;
@@ -94,6 +99,7 @@ impl From<ReleaseId> for String {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Sha256(String);
 
 impl TryFrom<String> for Sha256 {

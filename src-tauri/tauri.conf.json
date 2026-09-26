@@ -21,8 +21,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-src 'none'",
-      "devCsp": "default-src 'self'; connect-src 'self' ws://127.0.0.1:1420; img-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-src 'none'",
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost https://api.starframemanager.com; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-src 'none'",
+      "devCsp": "default-src 'self'; connect-src 'self' ws://127.0.0.1:1420; img-src 'self' https://api.starframemanager.com; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-src 'none'",
       "capabilities": [
         "main"
       ]

@@ -2,8 +2,17 @@ import { Channel, invoke, isTauri } from '@tauri-apps/api/core';
 import type { Snapshot } from './generated/model';
 import type { Transport } from './state';
 import type { AuthTransport } from './auth';
+import type { RegistryTransport } from './registry';
 
-const native: Transport & AuthTransport = {
+const native: Transport & AuthTransport & RegistryTransport = {
+  registryList: (query) => invoke('registry_list', { query }),
+  registryOptions: () => invoke('registry_options'),
+  registryDetail: (modId) => invoke('registry_detail', { modId }),
+  registryHistory: (modId, page) =>
+    invoke('registry_history', { modId, page, pageSize: 12 }),
+  registryRelease: (releaseId) => invoke('registry_release', { releaseId }),
+  registryInstall: (requestId, reference) =>
+    invoke('registry_install', { requestId, reference }),
   authRestore: () => invoke('auth_restore'),
   authInspect: () => invoke('auth_inspect'),
   authStart: () => invoke('auth_start'),
@@ -37,7 +46,7 @@ const native: Transport & AuthTransport = {
 };
 
 export async function getTransport(): Promise<
-  (Transport & AuthTransport) | null
+  (Transport & AuthTransport & RegistryTransport) | null
 > {
   if (isTauri()) return native;
   if (

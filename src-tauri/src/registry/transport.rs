@@ -314,12 +314,16 @@ impl Client {
             pairs.append_pair("sort", query.sort.as_str());
             pairs.append_pair("period", query.period.as_str());
             pairs.append_pair("maintenance", query.maintenance.as_str());
+            pairs.append_pair("modType", query.mod_type.as_str());
             for build in &query.game_builds {
                 pairs.append_pair("gameBuilds", build);
             }
         }
         let result: ModList = self.exchange(url, Some(bearer), cancel).await?;
-        if !result.valid() {
+        if !result.valid()
+            || result.items.len() > usize::from(query.page_size)
+            || result.pagination.page_size != u64::from(query.page_size)
+        {
             return Err(Error::Protocol);
         }
         Ok(result)
@@ -673,9 +677,19 @@ impl Client {
         Ok(response.data)
     }
 
-    async fn get<T: DeserializeOwned>(
+    pub(super) async fn get<T: DeserializeOwned>(
         &self,
         path: &str,
+        bearer: Option<&str>,
+        cancel: watch::Receiver<bool>,
+    ) -> Result<T, Error> {
+        self.get_query(path, &[], bearer, cancel).await
+    }
+
+    pub(super) async fn get_query<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        query: &[(&str, String)],
         bearer: Option<&str>,
         cancel: watch::Receiver<bool>,
     ) -> Result<T, Error> {
@@ -688,6 +702,10 @@ impl Client {
         }
         let mut url = self.config.api.clone();
         url.set_path(&format!("/v1{path}"));
+        if !query.is_empty() {
+            url.query_pairs_mut()
+                .extend_pairs(query.iter().map(|(name, value)| (*name, value.as_str())));
+        }
         self.exchange(url, bearer, cancel).await
     }
 
@@ -1604,6 +1622,8 @@ mod tests {
         let query = ListQuery {
             query: "Lua & maps".into(),
             include_tags: vec!["lua".into(), "maps".into()],
+            mod_type: super::super::wire::ModTypeFilter::Map,
+            page_size: 12,
             ..ListQuery::default()
         };
         let (_sender, cancel) = watch::channel(false);
@@ -1616,6 +1636,7 @@ mod tests {
         assert!(request.starts_with("GET /v1/registry/mods?"));
         assert!(request.contains("query=Lua+%26+maps"));
         assert!(request.contains("includeTags=lua&includeTags=maps"));
+        assert!(request.contains("modType=map"));
 
         let invalid = ListQuery {
             page_size: 25,
@@ -1626,6 +1647,104 @@ mod tests {
             client.list_mods(&invalid, "fixture-token", cancel).await,
             Err(Error::InvalidQuery)
         ));
+    }
+
+    #[tokio::test]
+    async fn discovery_options_and_history_validate_bounds_identity_and_order() {
+        let good_options = serde_json::json!({"apiVersion":1,"data":{"tags":[{"id":"lua","label":"Lua","groupName":"Format"}],"gameBuilds":["Steam:123"]}});
+        for case in 0..5 {
+            let mut body = good_options.clone();
+            match case {
+                1 => {
+                    body["data"]["tags"] = serde_json::json!([
+                        body["data"]["tags"][0].clone(),
+                        body["data"]["tags"][0].clone()
+                    ])
+                }
+                2 => body["data"]["gameBuilds"] = serde_json::json!(["Steam:123", "Steam:123"]),
+                3 => body["data"]["tags"][0]["label"] = "x".repeat(101).into(),
+                4 => body["data"]["tags"][0]["groupName"] = "bad\nname".into(),
+                _ => (),
+            }
+            let (origin, thread) = serve("200 OK", &body.to_string(), "");
+            let client = Client::new(
+                Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap(),
+            )
+            .unwrap();
+            let (_sender, cancel) = watch::channel(false);
+            let result = client.discovery_options("fixture-token", cancel).await;
+            assert_eq!(result.is_ok(), case == 0, "options case {case}");
+            assert!(
+                thread
+                    .join()
+                    .unwrap()
+                    .starts_with("GET /v1/registry/options ")
+            );
+        }
+        let release: serde_json::Value = serde_json::from_str(&fixture("approved")).unwrap();
+        let mut summary = release["data"].clone();
+        summary.as_object_mut().unwrap().remove("metadata");
+        summary["metadataRevision"] = 1.into();
+        summary["testedGameBuild"] = "Steam:123".into();
+        let good_history = serde_json::json!({"apiVersion":1,"items":[summary],"pagination":{"page":1,"pageSize":12,"totalItems":1,"totalPages":1,"asOf":"2026-09-24T00:00:00Z"}});
+        serde_json::from_value::<super::super::discovery::ReleaseSummary>(summary.clone()).unwrap();
+        serde_json::from_value::<super::super::discovery::ReleaseHistory>(good_history.clone())
+            .unwrap();
+        let id = super::super::ModId::try_from(1).unwrap();
+        for case in 0..8 {
+            let mut body = good_history.clone();
+            match case {
+                1 => body["items"][0]["modId"] = 2.into(),
+                2 => body["items"] = serde_json::json!([summary.clone(), summary.clone()]),
+                3 => {
+                    let mut second = summary.clone();
+                    second["releaseId"] = "22222222-2222-4222-8222-222222222222".into();
+                    second["publicationOrder"] = 5.into();
+                    body["items"] = serde_json::json!([summary.clone(), second]);
+                }
+                4 => body["items"][0]["metadataRevision"] = 0.into(),
+                5 => body["items"][0]["availability"] = "blocked".into(),
+                6 => body["pagination"]["pageSize"] = 48.into(),
+                7 => {
+                    let unavailable: serde_json::Value =
+                        serde_json::from_str(&fixture("unavailable")).unwrap();
+                    body["items"] = serde_json::json!([unavailable["data"].clone()]);
+                }
+                _ => (),
+            }
+            let (origin, thread) = serve("200 OK", &body.to_string(), "");
+            let client = Client::new(
+                Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap(),
+            )
+            .unwrap();
+            let (_sender, cancel) = watch::channel(false);
+            let result = client
+                .release_history(id, 1, 12, "fixture-token", cancel)
+                .await;
+            assert_eq!(
+                result.is_ok(),
+                case == 0 || case == 7,
+                "history case {case}"
+            );
+            if case == 0 {
+                let wire = serde_json::to_value(result.unwrap()).unwrap();
+                assert_eq!(wire["apiVersion"], 1);
+                assert_eq!(wire["items"][0]["submissionState"], "approved");
+            }
+            assert!(
+                thread
+                    .join()
+                    .unwrap()
+                    .starts_with("GET /v1/registry/mods/1/releases?page=1&pageSize=12 ")
+            );
+            let (_sender, cancel) = watch::channel(false);
+            assert!(matches!(
+                client
+                    .release_history(id, 0, 12, "fixture-token", cancel)
+                    .await,
+                Err(Error::InvalidQuery)
+            ));
+        }
     }
 
     #[tokio::test]

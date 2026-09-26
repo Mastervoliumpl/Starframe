@@ -259,16 +259,14 @@
     {#if unavailable}<p class="muted">
         Management actions require a desktop connection.
       </p>{:else if busy}<p role="status">Saving collection changes…</p>{/if}
-    {#if $manager.loading}<p role="status">
-        Loading the saved library and catalog…
-      </p>
+    {#if $manager.loading}<p role="status">Loading the saved library…</p>
     {:else if !rows.length}<div class="empty-state">
         <h2>
           {mode === 'mods' ? 'No installed mods' : 'No approved releases yet'}
         </h2>
         <p>
           {mode === 'mods'
-            ? 'Import a local mod or install a release from Catalog, then enable it here.'
+            ? 'Import a local mod or install a release from Mods, then enable it here.'
             : 'Approved releases appear after the maintainer updates the catalog. Starframe checks automatically while open.'}
         </p>
       </div>
@@ -538,7 +536,7 @@
           </p>{/if}
         <h3>Required releases</h3>
         <p>{opened.release?.requires.join(', ') || 'None declared'}</p>
-        <p>Install required releases from Catalog before enabling this mod.</p>
+        <p>Install required releases from Mods before enabling this mod.</p>
       {/if}
       <h3>Installation</h3>
       <p>

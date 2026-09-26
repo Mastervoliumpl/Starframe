@@ -1,6 +1,6 @@
 # Starframe: design direction
 
-Status: revision 0.14, 24 September 2026. Product name: Starframe. Milestone 0.7.0 replaces the pre-release GitHub catalog with the website registry. The 0.6.0 verification policy, app-update channel defaults, installer identity, runtime lifecycle, uninstall data default and deferred Windows certificate signing remain in effect. Catalog-specific passages below describe the completed pre-release design until their 0.7.0 replacements land.
+Status: revision 0.15, 26 September 2026. Product name: Starframe. Milestone 0.7.0 replaces the pre-release GitHub catalog with the website registry. The 0.6.0 verification policy, app-update channel defaults, installer identity, runtime lifecycle, uninstall data default and deferred Windows certificate signing remain in effect. Catalog-specific passages below describe the completed pre-release design until their 0.7.0 replacements land.
 
 This is the accepted design handoff. The user authorized milestone 0.1.0 on 6 September 2026, including desktop navigation and live state in issue #8. Later feature screens remain planned. The user accepted the visual direction, including the fonts, added neutral shades, component treatments, and layout. Measurements and motion timings are starting targets to validate in representative visual screens. Open product decisions remain identified below.
 
@@ -190,21 +190,25 @@ Landing view: My mods. The visible active collection selector explains which set
 
 Use a list by default. A row contains a selection checkbox, mod name and author, version, origin, compatibility text, and an enabled switch. Selection chooses rows for bulk actions; the switch changes whether a mod is included in the active setup. These are separate controls with separate accessible labels.
 
-Show `Catalog release` or `Local import` as plain provenance text. Catalog compatibility uses labels such as `Compatible with [game version]`, `Not checked for this version`, or `Made for a previous game version`. Show the declared and installed game versions in details. An older-version warning must not disable Enable or launch or repeatedly demand confirmation. Missing required dependencies and a missing runtime are separate issues. Local imports skip catalog compatibility-version checks. Approval and compatibility are separate labels. Never display `Malware-free` or imply that curation guarantees safety.
+Show `Registry release` or `Local import` as plain provenance text. Catalog compatibility uses labels such as `Compatible with [game version]`, `Not checked for this version`, or `Made for a previous game version`. Show the declared and installed game versions in details. An older-version warning must not disable Enable or launch or repeatedly demand confirmation. Missing required dependencies and a missing runtime are separate issues. Local imports skip catalog compatibility-version checks. Approval and compatibility are separate labels. Never display `Malware-free` or imply that curation guarantees safety.
 
 Keep frequent actions visible when relevant. Put uninstall and infrequent actions in a named row menu. Clicking the mod name opens its detail view. Hover changes only the row fill; selection uses the selected surface, a checked selector, and readable text. Do not make information appear only on hover.
 
 A bulk action bar occupies a reserved area below the filters when rows are selected. Its labels name the outcome, such as `Enable selected` or `Remove from collection`. Distinguish removal from a collection from uninstalling a mod.
 
-### Catalog and mod details
+### Mods browser and details
 
-Use compact list entries with optional author-supplied artwork. A large thumbnail grid is an alternative to evaluate, not the default for a small curated catalog. Lead with name, purpose, approved release, and compatibility. Install is a neutral row action; it becomes the primary action in the detail view.
+The 0.7.0 Mods page replaces Catalog inside the existing desktop shell. My mods remains the default. Use the website's discovery behavior with Starframe's navy palette, typography, controls and launch area. Do not embed the website or introduce the separate desktop redesign.
 
-Details include description, author/source link, approved versions, dependencies, compatibility notes, and installation state. Put technical paths and diagnostics behind expandable sections. Download progress belongs beside the action it replaces and in Downloads. Keep labels stable in width as progress changes.
+Compact rows are the default. Offer the website's card and tile alternatives, with page sizes of 10/20/50 for rows, 6/12/24 for cards and 12/24/48 for tiles. Lead with name, purpose and author; show declared type, availability and author artwork where supplied. Keep pagination below results. Search matches name, description and author. Preserve sort, period, maintenance, type, include/exclude tags and tested-build choices while navigating. Include tags match all; excluded tags match any; selected game builds match any. Reset filters preserves search, sort and period.
 
-Fetch catalog changes on startup and every five minutes while the app is open. A valid new catalog updates the list in place, preserving filters, focus and scroll position. Reuse cached data while offline and show when it was last checked. New approval metadata must not install a mod or update an installed release by itself.
+Details include description, author/source action, screenshots, maintenance/replacement information, approved release history, notes, dependencies, tested build and installed versions. Render descriptions and notes as text. Use the existing 360-unit side panel at 1280 window width and above; use the full workspace detail below it. Back restores list focus and scroll. Screenshot previews use a keyboard-accessible dialog and return focus to their trigger.
 
-When signed catalog metadata expires, pause new catalog downloads until a valid signed refresh succeeds. Explain the unavailable download action and show that catalog information is stale. Installed mods and local collections remain usable offline, subject to cached confirmed security blocks. The owner approved daily renewal through GitHub Actions with thirty-day validity for #46 on 9 September 2026. Renewal does not require an app update or a new mod release.
+Install acts on the explicitly selected exact release. Show preparation immediately, then queue progress in Downloads; claim installation only after the backend confirms it. Installing another version never replaces a collection selection or enables the mod automatically. Show unavailable/blocked reasons and missing installation information. A different tested build is a warning, separate from approval. Registry type labels do not replace the signed installation declaration.
+
+Steam sign-in is required for online Mods. Keep installed mods, local imports, collections, settings and ordinary unblocked launch usable after sign-out, session expiry or a network failure. Credentials stay in the backend. A valid refresh updates results without resetting filters, focus or scroll. Discovery starts after sign-in and recurs every five minutes while the app is open, including on another page and while minimized. Scheduled checks must not overlap an active list read. Mark retained results as previous when a newer request is pending or fails; discard responses from stale filters or a retired account.
+
+The signed registry key/release/security gates authorize new downloads and installation. Pause those actions when trust is unavailable, stale or blocked. Installed/local persistence and retained confirmed blocks remain in force offline. The former signed GitHub catalog refresh/publication design is superseded under #89; no old-format fallback is approved.
 
 ### Collections
 
@@ -310,7 +314,7 @@ Respect the system reduced-motion preference. With reduced motion, remove transl
 
 | State | Required presentation |
 | --- | --- |
-| No installed mods | `No mods installed` with `Browse catalog` and `Import local mod` |
+| No installed mods | `No mods installed` with `Browse mods` and `Import local mod` |
 | Empty collection | Explain that it contains no mods; provide an add action |
 | Filter returns nothing | Keep the filters visible; offer `Clear filters` |
 | Catalog loading | Named loading status in the content region; keep navigation usable |

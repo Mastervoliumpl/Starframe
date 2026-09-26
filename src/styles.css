@@ -193,6 +193,7 @@ main {
 .page {
   padding: 0 24px 24px;
   overflow: auto;
+  scrollbar-gutter: stable;
   flex: 1;
 }
 .toolbar {

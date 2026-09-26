@@ -205,6 +205,142 @@ pub async fn registry_download(
     service.registry_package(request_id, request).await
 }
 
+fn registry_failure(error: starframe::registry::Error) -> CommandError {
+    use starframe::registry::Error;
+    let status = match &error {
+        Error::Server(status, _) | Error::Http(status) => Some(status.as_u16()),
+        _ => None,
+    };
+    let (code, message) = match status {
+        Some(401) => (
+            "auth_required",
+            "The manager session ended. Sign in again for online mods.",
+        ),
+        Some(403) => (
+            "registry_permission",
+            "This account cannot access this registry request. Installed and local mods remain available.",
+        ),
+        Some(404 | 410) => (
+            "registry_unavailable",
+            "This mod or release is no longer available.",
+        ),
+        Some(429) => (
+            "registry_wait",
+            "The website asked Starframe to wait. Retry later.",
+        ),
+        _ if matches!(error, Error::Cancelled) => (
+            "registry_cancelled",
+            "The registry request stopped because sign-in changed.",
+        ),
+        _ if matches!(error, Error::Protocol | Error::InvalidQuery) => (
+            "registry_response",
+            "The registry response or filters could not be used. Retry or reset filters.",
+        ),
+        _ => (
+            "registry_network",
+            "The registry could not be reached. Retry later; installed and local mods remain available.",
+        ),
+    };
+    CommandError::new(code, message)
+}
+
+#[tauri::command]
+pub async fn registry_list(
+    auth: State<'_, crate::auth_service::AuthService>,
+    query: starframe::registry::ListQuery,
+) -> Result<starframe::registry::ModList, CommandError> {
+    let connection = auth.receipt_request().await?;
+    connection
+        .client
+        .list_mods(&query, &connection.bearer, connection.auth_cancel)
+        .await
+        .map_err(registry_failure)
+}
+
+#[tauri::command]
+pub async fn registry_options(
+    auth: State<'_, crate::auth_service::AuthService>,
+) -> Result<starframe::registry::Options, CommandError> {
+    let connection = auth.receipt_request().await?;
+    connection
+        .client
+        .discovery_options(&connection.bearer, connection.auth_cancel)
+        .await
+        .map_err(registry_failure)
+}
+
+#[tauri::command]
+pub async fn registry_detail(
+    auth: State<'_, crate::auth_service::AuthService>,
+    mod_id: starframe::registry::ModId,
+) -> Result<starframe::registry::ModResult, CommandError> {
+    let connection = auth.receipt_request().await?;
+    connection
+        .client
+        .mod_detail(mod_id, &connection.bearer, connection.auth_cancel)
+        .await
+        .map(|response| response.data)
+        .map_err(registry_failure)
+}
+
+#[tauri::command]
+pub async fn registry_release(
+    auth: State<'_, crate::auth_service::AuthService>,
+    release_id: starframe::registry::ReleaseId,
+) -> Result<starframe::registry::ReleaseResult, CommandError> {
+    let connection = auth.receipt_request().await?;
+    connection
+        .client
+        .release(release_id, &connection.bearer, connection.auth_cancel)
+        .await
+        .map(|response| response.data)
+        .map_err(registry_failure)
+}
+
+#[tauri::command]
+pub async fn registry_history(
+    auth: State<'_, crate::auth_service::AuthService>,
+    mod_id: starframe::registry::ModId,
+    page: u64,
+    page_size: u8,
+) -> Result<starframe::registry::ReleaseHistory, CommandError> {
+    let connection = auth.receipt_request().await?;
+    connection
+        .client
+        .release_history(
+            mod_id,
+            page,
+            page_size,
+            &connection.bearer,
+            connection.auth_cancel,
+        )
+        .await
+        .map_err(registry_failure)
+}
+
+#[tauri::command]
+pub async fn registry_install(
+    service: State<'_, crate::game_service::GameService>,
+    auth: State<'_, crate::auth_service::AuthService>,
+    request_id: String,
+    reference: starframe::registry::ExactReference,
+) -> Result<Vec<starframe::packages::Operation>, CommandError> {
+    uuid::Uuid::parse_str(&request_id)
+        .map_err(|_| CommandError::new("registry_request", "Invalid install request ID."))?;
+    starframe::references::Reference::Registry(reference.clone())
+        .validate()
+        .map_err(|message| CommandError::new("registry_reference", &message))?;
+    let request = auth
+        .registry_request(reference.mod_id, reference.release_id)
+        .await?;
+    let approval = starframe::packages::RegistryApproval::fetch(&request)
+        .await
+        .map_err(|message| CommandError::new("registry_approval", &message))?;
+    service
+        .registry_install(request_id, reference, request, approval)
+        .await
+}
+
 #[tauri::command]
 pub async fn registry_retry_receipts(
     service: State<'_, crate::game_service::GameService>,
@@ -297,6 +433,7 @@ fn advisory_url(
 pub async fn open_external(
     app: tauri::AppHandle,
     service: State<'_, crate::game_service::GameService>,
+    auth: State<'_, crate::auth_service::AuthService>,
     page: String,
 ) -> Result<(), CommandError> {
     if let Some(identity) = page.strip_prefix("local:") {
@@ -333,7 +470,28 @@ pub async fn open_external(
                 )
             });
     }
-    let url = if let Some(identity) = page.strip_prefix("advisory:") {
+    let url = if let Some(identity) = page.strip_prefix("registry:") {
+        let mod_id = identity
+            .parse::<u64>()
+            .ok()
+            .and_then(|id| starframe::registry::ModId::try_from(id).ok())
+            .ok_or_else(|| CommandError::new("invalid_link", "Invalid registry mod reference."))?;
+        let connection = auth.receipt_request().await?;
+        let detail = connection
+            .client
+            .mod_detail(mod_id, &connection.bearer, connection.auth_cancel)
+            .await
+            .map_err(registry_failure)?;
+        let starframe::registry::ModResult::Mod(detail) = detail.data else {
+            return Err(CommandError::new(
+                "invalid_link",
+                "This mod is no longer available.",
+            ));
+        };
+        detail.source_repository.ok_or_else(|| {
+            CommandError::new("invalid_link", "This mod has no source repository.")
+        })?
+    } else if let Some(identity) = page.strip_prefix("advisory:") {
         let advisories = service
             .mods(starframe::mods::Action::List)
             .await?

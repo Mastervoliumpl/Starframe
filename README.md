@@ -1,7 +1,7 @@
 # Starframe
 Starframe is a mod manager for Sanctuary: Shattered Sun
 
-Milestone **0.7.0** is in progress at `0.7.0-dev.1`. It will move management operations behind a shared Rust boundary and replace the old GitHub catalog with the website registry and a native Mods browser. The website's installation-metadata contract is still being completed. No website deployment, public submission opening or app release is part of this work.
+Milestone **0.7.0** is in progress at `0.7.0-dev.1`. It will move management operations behind a shared Rust boundary and replace the old GitHub catalog with the website registry and a native Mods browser. The website's signed installation-metadata contract is merged. The native Mods page now provides discovery, release details and explicit exact-release installation; combined native network acceptance and legacy cleanup remain open. See [browser verification](docs/verification/registry-browser.md). No website deployment, public submission opening or app release is part of this work.
 
 Milestone **0.6.0** is complete. It added Windows packaging, signed app updates and catalog authentication. The owner accepted its `0.6.0-dev.2` hosted installer, and live catalog publication, renewal and client verification passed. No public installer release is available.
 

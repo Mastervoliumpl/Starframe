@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-registry-release"
+description = "Enables the registry_release command without any pre-configured scope."
+commands.allow = ["registry_release"]
+
+[[permission]]
+identifier = "deny-registry-release"
+description = "Denies the registry_release command without any pre-configured scope."
+commands.deny = ["registry_release"]
