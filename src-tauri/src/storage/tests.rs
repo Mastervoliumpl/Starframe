@@ -23,6 +23,80 @@ fn entry() -> LibraryEntry {
 }
 
 #[test]
+fn native_collection_schema_discards_obsolete_records_and_retains_local_files_and_backup() {
+    let root = tempfile::tempdir().unwrap();
+    let mut store = Storage::open(root.path()).unwrap();
+    store.put_library_entry(&entry(), 0).unwrap();
+    let source = root.path().join("source.lua");
+    let settings = root.path().join("settings.json");
+    fs::write(&source, b"author source").unwrap();
+    fs::write(&settings, b"saved settings").unwrap();
+    let id = Uuid::new_v4().to_string();
+    store.conn.execute_batch("DROP TABLE collection_entries; CREATE TABLE collection_entries(collection_id TEXT,position INTEGER,mod_id TEXT,hash TEXT,origin TEXT,release_id TEXT); PRAGMA user_version=18;").unwrap();
+    store
+        .conn
+        .execute(
+            "INSERT INTO collections VALUES (?, 'Obsolete collection', 1)",
+            [&id],
+        )
+        .unwrap();
+    store
+        .conn
+        .execute(
+            "UPDATE preferences SET active_collection=? WHERE id=1",
+            [&id],
+        )
+        .unwrap();
+    store
+        .conn
+        .execute(
+            "INSERT INTO collection_entries VALUES (?,0,'fixture',?,'local_import',NULL)",
+            rusqlite::params![id, entry().reference.hash],
+        )
+        .unwrap();
+    drop(store);
+    let store = Storage::open(root.path()).unwrap();
+    let records = store.load().unwrap();
+    assert!(records.collections.is_empty());
+    assert!(records.active_collection.is_none());
+    assert_eq!(records.library, vec![entry()]);
+    assert_eq!(fs::read(source).unwrap(), b"author source");
+    assert_eq!(fs::read(settings).unwrap(), b"saved settings");
+    let backup = fs::read_dir(root.path().join("backups"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    assert!(backup.join("complete").is_file());
+    let saved = Connection::open(backup.join("state.db")).unwrap();
+    assert_eq!(integer(&saved, "PRAGMA user_version").unwrap(), 18);
+    assert_eq!(
+        integer(&saved, "SELECT count(*) FROM collection_entries").unwrap(),
+        1
+    );
+}
+
+#[test]
+fn corrupt_native_reference_key_fails_load_backup_and_restart_without_reset() {
+    let root = tempfile::tempdir().unwrap();
+    let mut store = Storage::open(root.path()).unwrap();
+    let reference = crate::references::Reference::try_from(&local("fixture")).unwrap();
+    store
+        .save_collection(&Uuid::new_v4().to_string(), "Fixture", &[reference], 0)
+        .unwrap();
+    store
+        .conn
+        .execute("UPDATE collection_entries SET runtime_key='different'", [])
+        .unwrap();
+    assert!(store.load().is_err());
+    assert!(store.backup().is_err());
+    drop(store);
+    assert!(Storage::open(root.path()).is_err());
+    assert!(root.path().join("sqlite/state.db").is_file());
+}
+
+#[test]
 fn catalog_migration_and_failed_replacement_retain_records() {
     use crate::catalog::{Catalog, refresh::Cache};
     let root = tempfile::tempdir().unwrap();
@@ -95,18 +169,18 @@ fn records_survive_restart_with_order_origin_and_revisions() {
     assert_eq!(integer(&store.conn, "PRAGMA synchronous").unwrap(), 2);
     let id = Uuid::new_v4().to_string();
     assert_eq!(store.put_library_entry(&entry(), 0).unwrap(), 1);
-    let catalog = ModReference {
-        mod_id: "not-downloaded".into(),
-        hash: "cd".repeat(32),
-        origin: Origin::Catalog,
-        release_id: Some("release-1".into()),
-    };
+    let catalog = crate::references::Reference::Registry(crate::registry::ExactReference {
+        mod_id: crate::registry::ModId::try_from(7).unwrap(),
+        sha256: crate::registry::Sha256::try_from("cd".repeat(32)).unwrap(),
+        release_id: crate::registry::ReleaseId(Uuid::new_v4()),
+    });
+    let native_local = crate::references::Reference::try_from(&local("fixture")).unwrap();
     assert_eq!(
         store
             .save_collection(
                 &id,
                 "Fixture collection",
-                &[catalog.clone(), local("fixture")],
+                &[catalog.clone(), native_local.clone()],
                 0
             )
             .unwrap(),
@@ -133,7 +207,7 @@ fn records_survive_restart_with_order_origin_and_revisions() {
             .save_collection(
                 &id,
                 "Duplicate mod",
-                &[local("fixture"), local("fixture")],
+                &[native_local.clone(), native_local.clone()],
                 1
             )
             .is_err()
@@ -148,11 +222,11 @@ fn records_survive_restart_with_order_origin_and_revisions() {
             .is_err()
     );
     store
-        .save_collection(&id, "Reordered", &[local("fixture"), catalog], 1)
+        .save_collection(&id, "Reordered", &[native_local.clone(), catalog], 1)
         .unwrap();
     assert_eq!(
         store.load().unwrap().collections[0].entries[0],
-        local("fixture")
+        native_local
     );
     let mut invalid = entry();
     invalid.reference.hash = "../outside".into();

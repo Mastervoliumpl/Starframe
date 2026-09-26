@@ -19,7 +19,11 @@ impl Storage {
         finish(tx, result)
     }
 
-    pub fn set_mod_membership(&mut self, entries: &[ModReference], expected: i64) -> Result<i64> {
+    pub fn set_mod_membership(
+        &mut self,
+        entries: &[crate::references::Reference],
+        expected: i64,
+    ) -> Result<i64> {
         if entries.len() > crate::runtime_contract::MAX_MODS {
             return Err(Error::Invalid(
                 "This runtime supports at most 256 active mods.".into(),
@@ -27,8 +31,8 @@ impl Storage {
         }
         let mut ids = std::collections::HashSet::new();
         for entry in entries {
-            validate_reference(entry)?;
-            if !ids.insert(&entry.mod_id) {
+            entry.validate().map_err(Error::Invalid)?;
+            if !ids.insert(entry.runtime_id()) {
                 return Err(Error::Invalid(
                     "Only one version of a mod can be enabled.".into(),
                 ));
@@ -55,37 +59,47 @@ impl Storage {
                 [&id],
             )?;
             for (position, entry) in entries.iter().enumerate() {
-                tx.execute("INSERT INTO collection_entries (collection_id,position,mod_id,hash,origin,release_id) VALUES (?,?,?,?,?,?)", rusqlite::params![id, position as i64, entry.mod_id, entry.hash, entry.origin.as_str(), entry.release_id])?;
+                write_collection_entry(&tx, &id, position, entry)?;
             }
             bump(&tx)
         })();
         finish(tx, result)
     }
 
-    pub fn uninstall_mod(
+    pub fn uninstall_reference(
         &mut self,
-        reference: &ModReference,
+        reference: &crate::references::Reference,
         expected: i64,
         confirmed: bool,
     ) -> Result<i64> {
+        reference.validate().map_err(Error::Invalid)?;
         let records = self.load()?;
         if records.revision != expected {
+            return Err(Error::Stale {
+                current: records.revision,
+            });
+        }
+        let installed = match reference {
+            crate::references::Reference::Registry(reference) => self
+                .installed_registry_releases()?
+                .iter()
+                .any(|entry| &entry.reference == reference),
+            crate::references::Reference::Local(_) => records
+                .library
+                .iter()
+                .any(|entry| Some(entry.reference.clone()) == reference.local_reference()),
+        };
+        if !installed {
             return Err(Error::Invalid(
-                "The library changed. Retry with its current revision.".into(),
+                "This exact package is not in the library.".into(),
             ));
         }
-        let entry = records
-            .library
-            .iter()
-            .find(|e| &e.reference == reference)
-            .ok_or_else(|| Error::Invalid("This exact package is not in the library.".into()))?;
-        validate_reference(&entry.reference)?;
-        let affected: Vec<_> = records
+        let affected = records
             .collections
             .iter()
-            .filter(|c| c.entries.iter().any(|r| r == reference))
-            .map(|c| c.name.as_str())
-            .collect();
+            .filter(|collection| collection.entries.contains(reference))
+            .map(|collection| collection.name.as_str())
+            .collect::<Vec<_>>();
         if !affected.is_empty() && !confirmed {
             return Err(Error::Invalid(format!(
                 "Uninstall affects collections: {}. Confirm removal; other collections will retain an unresolved reference.",
@@ -100,56 +114,48 @@ impl Storage {
             if let Some(active) = records
                 .collections
                 .iter()
-                .find(|c| Some(&c.id) == records.active_collection.as_ref())
+                .find(|collection| Some(&collection.id) == records.active_collection.as_ref())
             {
-                let remaining: Vec<_> = active.entries.iter().filter(|r| *r != reference).collect();
+                let remaining = active
+                    .entries
+                    .iter()
+                    .filter(|entry| *entry != reference)
+                    .collect::<Vec<_>>();
                 tx.execute(
                     "DELETE FROM collection_entries WHERE collection_id=?",
                     [&active.id],
                 )?;
-                for (position, entry) in remaining.iter().enumerate() {
-                    tx.execute("INSERT INTO collection_entries (collection_id,position,mod_id,hash,origin,release_id) VALUES (?,?,?,?,?,?)", rusqlite::params![active.id, position as i64, entry.mod_id, entry.hash, entry.origin.as_str(), entry.release_id])?;
+                for (position, entry) in remaining.into_iter().enumerate() {
+                    write_collection_entry(&tx, &active.id, position, entry)?;
                 }
                 tx.execute(
                     "UPDATE collections SET revision=revision+1 WHERE id=?",
                     [&active.id],
                 )?;
             }
-            tx.execute(
-                "DELETE FROM library WHERE mod_id=? AND hash=? AND origin=? AND release_id IS ?",
-                rusqlite::params![
-                    reference.mod_id,
-                    reference.hash,
-                    reference.origin.as_str(),
-                    reference.release_id
-                ],
-            )?;
-            if tx.query_row(
-                "SELECT (SELECT count(*) FROM library WHERE hash=?1) + (SELECT count(*) FROM registry_library WHERE sha256=?1 AND installation_record IS NOT NULL)",
-                [&reference.hash],
-                |r| r.get::<_, i64>(0),
-            )? == 0
-            {
-                tx.execute(
-                    "INSERT OR IGNORE INTO pending_removals(hash) VALUES (?)",
-                    [&reference.hash],
-                )?;
+            match reference {
+                crate::references::Reference::Registry(reference) => {
+                    tx.execute("UPDATE registry_library SET installation_record=NULL WHERE mod_id=? AND release_id=? AND sha256=?",rusqlite::params![u64::from(reference.mod_id) as i64,reference.release_id.0.to_string(),reference.sha256.as_str()])?;
+                }
+                crate::references::Reference::Local(reference) => {
+                    tx.execute("DELETE FROM library WHERE mod_id=? AND hash=? AND origin='local_import' AND release_id IS NULL",rusqlite::params![reference.mod_id,reference.sha256.as_str()])?;
+                    tx.execute(
+                        "DELETE FROM local_watches WHERE mod_id=? AND hash=?",
+                        rusqlite::params![reference.mod_id, reference.sha256.as_str()],
+                    )?;
+                    tx.execute(
+                        "DELETE FROM local_sources WHERE mod_id=? AND hash=?",
+                        rusqlite::params![reference.mod_id, reference.sha256.as_str()],
+                    )?;
+                }
             }
-            if reference.origin == Origin::LocalImport {
-                tx.execute(
-                    "DELETE FROM local_watches WHERE mod_id=? AND hash=?",
-                    rusqlite::params![reference.mod_id, reference.hash],
-                )?;
-                tx.execute(
-                    "DELETE FROM local_sources WHERE mod_id=? AND hash=?",
-                    rusqlite::params![reference.mod_id, reference.hash],
-                )?;
+            if tx.query_row("SELECT (SELECT count(*) FROM library WHERE hash=?1) + (SELECT count(*) FROM registry_library WHERE sha256=?1 AND installation_record IS NOT NULL)",[reference.hash()],|row|row.get::<_,i64>(0))?==0 {
+                tx.execute("INSERT OR IGNORE INTO pending_removals(hash) VALUES (?)",[reference.hash()])?;
             }
             bump(&tx)
         })();
         finish(tx, result)
     }
-
     pub(crate) fn pending_removals(&self) -> Result<Vec<(String, String)>> {
         self.conn
             .prepare("SELECT hash,error FROM pending_removals ORDER BY hash")?

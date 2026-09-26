@@ -1,5 +1,8 @@
 use super::*;
 use crate::{mods, sharing};
+fn collection_ref(reference: &crate::storage::ModReference) -> crate::references::Reference {
+    crate::references::Reference::try_from(reference).unwrap()
+}
 use serde_json::json;
 
 #[test]
@@ -75,7 +78,7 @@ fn setup() -> (tempfile::TempDir, Storage, LocalSource) {
     mods::action(
         &mut store,
         mods::Action::SetEnabled {
-            reference: local.reference.clone(),
+            reference: collection_ref(&local.reference),
             enabled: true,
             expected_revision: revision,
         },
@@ -178,7 +181,7 @@ fn watching_keeps_invalid_output_and_accepts_only_the_settled_latest_build() {
     });
     assert_eq!(
         mods::view(&store).unwrap().enabled,
-        vec![original.reference.clone()]
+        vec![collection_ref(&original.reference)]
     );
     fs::write(&manifest, metadata).unwrap();
     fs::write(source.join("LJ/lua/local.lua"), b"return 'first'").unwrap();
@@ -190,7 +193,7 @@ fn watching_keeps_invalid_output_and_accepts_only_the_settled_latest_build() {
     let latest = store.local_watches().unwrap()[0].source.clone();
     assert_eq!(
         mods::view(&store).unwrap().enabled,
-        vec![latest.reference.clone()]
+        vec![collection_ref(&latest.reference)]
     );
     assert_eq!(
         fs::read(
@@ -266,7 +269,10 @@ fn rebuild_commit_preserves_shared_exact_references_and_inactive_collections() {
             .unwrap()
     );
     for collection in store.load().unwrap().collections {
-        assert_eq!(collection.entries, vec![original.reference.clone()]);
+        assert_eq!(
+            collection.entries,
+            vec![collection_ref(&original.reference)]
+        );
     }
     let exported = sharing::action(&mut store, sharing::Action::Export { id: imported.id })
         .unwrap()
@@ -274,7 +280,7 @@ fn rebuild_commit_preserves_shared_exact_references_and_inactive_collections() {
         .unwrap();
     assert_eq!(
         sharing::Portable::read(&exported).unwrap().entries,
-        vec![original.reference]
+        vec![collection_ref(&original.reference)]
     );
 }
 
@@ -296,7 +302,7 @@ fn missing_sources_recover_and_uninstall_rejects_a_late_prepared_build() {
     let next = build(&store, &original);
     let revision = store.load().unwrap().revision;
     store
-        .uninstall_mod(&original.reference, revision, true)
+        .uninstall_reference(&collection_ref(&original.reference), revision, true)
         .unwrap();
     assert!(
         !store
@@ -362,7 +368,7 @@ fn rebuild_transaction_failure_preserves_head_collection_and_previous_bytes() {
     assert_eq!(store.local_watches().unwrap()[0].source, original);
     assert_eq!(
         mods::view(&store).unwrap().enabled,
-        vec![original.reference.clone()]
+        vec![collection_ref(&original.reference)]
     );
     database
         .execute_batch("DROP TRIGGER reject_watch;")

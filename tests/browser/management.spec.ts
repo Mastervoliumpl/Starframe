@@ -21,6 +21,15 @@ test('registry archive status does not claim installation or offer catalog retry
     failed.getByRole('button', { name: 'Retry exact release' }),
   ).toHaveCount(0);
   await expect(failed.getByText(/Retry this release/)).toBeVisible();
+  const verification = downloads
+    .getByRole('listitem')
+    .filter({ hasText: '44444444-4444-4444-8444-444444444444' });
+  await expect(
+    verification.getByRole('button', { name: 'Retry exact release' }),
+  ).toHaveCount(0);
+  await expect(
+    verification.getByText(/Retry import in\s+Collections/),
+  ).toBeVisible();
   await expect(
     downloads.getByRole('button', { name: 'Retry pending receipts' }),
   ).toBeEnabled();
@@ -38,7 +47,7 @@ test('selection, warnings, enable and confirmed uninstall remain separate', asyn
   await expect(
     region.getByText('Not tested with this version').first(),
   ).toBeVisible();
-  await expect(region.getByText('Known compatibility problem')).toBeVisible();
+  await expect(region.getByText('Not tested with this version')).toHaveCount(3);
   await region
     .getByRole('checkbox', {
       name: 'Select Terrain tools fixture 1.0',

@@ -5,6 +5,7 @@ use std::collections::{BTreeSet, HashMap};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct MixedResolution {
     pub effective: Vec<Reference>,
     pub adjustments: Vec<MixedAdjustment>,
@@ -12,6 +13,7 @@ pub struct MixedResolution {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct MixedAdjustment {
     pub before: Reference,
     pub after: Reference,

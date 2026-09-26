@@ -37,7 +37,7 @@
   const catalog = $derived($desktop.snapshot?.catalog);
   const affectedInstalled = $derived(
     $manager.data?.library.filter((entry) =>
-      confirmedFinding($manager.data, entry.reference.hash),
+      confirmedFinding($manager.data, entry.reference.reference.sha256),
     ).length ?? 0,
   );
   const managementError = $derived(

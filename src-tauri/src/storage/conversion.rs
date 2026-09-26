@@ -58,6 +58,11 @@ pub(super) fn snapshot(conn: &Sqlite, schema: i64) -> Check<Snapshot> {
     TABLES
         .iter()
         .map(|&(since, table, columns, order)| {
+            let columns = if schema >= 19 && table == "collection_entries" {
+                "collection_id, position, runtime_key, record"
+            } else {
+                columns
+            };
             let rows = if schema >= since {
                 sqlite_rows(
                     conn,
@@ -88,10 +93,13 @@ pub(super) fn validate_records(conn: &Sqlite) -> Check<()> {
         sqlite_rows(conn, "PRAGMA foreign_key_check")?.is_empty(),
         "Broken foreign key",
     )?;
-    for row in sqlite_rows(
-        conn,
-        "SELECT mod_id, hash, origin, release_id FROM library UNION ALL SELECT mod_id, hash, origin, release_id FROM collection_entries",
-    )? {
+    let schema: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    let reference_sql = if schema >= 19 {
+        "SELECT mod_id, hash, origin, release_id FROM library"
+    } else {
+        "SELECT mod_id, hash, origin, release_id FROM library UNION ALL SELECT mod_id, hash, origin, release_id FROM collection_entries"
+    };
+    for row in sqlite_rows(conn, reference_sql)? {
         let reference = ModReference {
             mod_id: text(&row, 0)?.into(),
             hash: text(&row, 1)?.into(),
@@ -104,6 +112,38 @@ pub(super) fn validate_records(conn: &Sqlite) -> Check<()> {
         };
         validate_reference(&reference)?;
     }
+    if schema >= 19 {
+        for row in sqlite_rows(conn, "SELECT runtime_key, record FROM collection_entries")? {
+            let reference: crate::references::Reference = serde_json::from_value(
+                crate::runtime_contract::unique_json(text(&row, 1)?.as_bytes())?,
+            )?;
+            reference.validate()?;
+            require(
+                reference.runtime_id() == text(&row, 0)?,
+                "Collection identity does not match its reference",
+            )?;
+        }
+        for row in sqlite_rows(conn, "SELECT collection_id, record FROM collection_imports")? {
+            let import: crate::sharing::Import = serde_json::from_value(
+                crate::runtime_contract::unique_json(text(&row, 1)?.as_bytes())?,
+            )?;
+            require(
+                import.collection_id == text(&row, 0)?,
+                "Import identity does not match its collection",
+            )?;
+            let portable = crate::sharing::Portable {
+                format: "starframe-collection".into(),
+                schema_version: 2,
+                name: "Backup validation".into(),
+                entries: import
+                    .entries
+                    .into_iter()
+                    .map(|entry| entry.reference)
+                    .collect(),
+            };
+            portable.validate()?;
+        }
+    }
     for row in sqlite_rows(conn, "SELECT name, author, version FROM library")? {
         validate_text(text(&row, 0)?, "Mod name")?;
         require(text(&row, 1)?.chars().count() <= 200, "Author too long")?;
@@ -113,7 +153,12 @@ pub(super) fn validate_records(conn: &Sqlite) -> Check<()> {
         Uuid::parse_str(text(&row, 0)?)?;
         validate_text(text(&row, 1)?, "Collection name")?;
     }
-    require(sqlite_rows(conn, "SELECT collection_id FROM collection_entries GROUP BY collection_id HAVING min(position) != 0 OR max(position) != count(*) - 1 OR count(*) > 10000")?.is_empty(), "Invalid collection order")?;
+    let max_entries = if schema >= 19 {
+        crate::runtime_contract::MAX_MODS
+    } else {
+        10000
+    };
+    require(sqlite_rows(conn, &format!("SELECT collection_id FROM collection_entries GROUP BY collection_id HAVING min(position) != 0 OR max(position) != count(*) - 1 OR count(*) > {max_entries}"))?.is_empty(), "Invalid collection order")?;
     for row in sqlite_rows(conn, "SELECT installation_id, path FROM game_selection")? {
         validate_game_selection(text(&row, 0)?, text(&row, 1)?)?;
     }

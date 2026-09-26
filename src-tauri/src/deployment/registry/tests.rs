@@ -167,7 +167,11 @@ async fn mixed_selection_reuses_local_imports_and_registry_content_offline() {
     assert!(store.prepared_artifact(&disabled.hash).unwrap().is_some());
 }
 
-fn import_lua(store: &mut Storage, root: &Path, id: &str) -> crate::storage::ModReference {
+pub(crate) fn import_lua(
+    store: &mut Storage,
+    root: &Path,
+    id: &str,
+) -> crate::storage::ModReference {
     let source = root.join(id);
     fs::create_dir_all(source.join("LJ/lua")).unwrap();
     fs::write(source.join("LJ/lua/local.lua"), b"return 'local fixture'").unwrap();
@@ -351,7 +355,7 @@ async fn shared_backend_registry_setup_reopens_offline_and_removes_only_owned_fi
     }
 }
 
-fn install_case(
+pub(crate) fn install_case(
     store: &mut Storage,
     case: usize,
     id: u64,

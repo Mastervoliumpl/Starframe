@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { createHash } from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
+import { installedRegistry, runtimeId } from './fixture-registry.mjs';
 import { spawn } from 'node:child_process';
 import { mkdir, readFile, writeFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -51,137 +51,44 @@ await withDesktop(
 );
 
 const bytes = Buffer.from('inert managed mod fixture');
-const artifactHash = hash('archive identity for native mod fixture');
-const reference = {
-  modId: 'fixture.native',
-  hash: artifactHash,
-  origin: 'catalog',
-  releaseId: 'fixture.native.1',
-};
-const artifactRoot = join(data, 'artifacts', artifactHash);
-await mkdir(join(artifactRoot, 'package'), { recursive: true });
-await writeFile(join(artifactRoot, 'package/Fixture.dll'), bytes);
-const catalog = {
-  schemaVersion: 1,
-  catalogRevision: '1',
-  mods: [
-    {
-      id: reference.modId,
-      name: 'Native fixture',
-      author: 'Fixture',
-      sourceUrl: 'https://example.invalid/source',
-      releases: [
-        {
-          id: reference.releaseId,
-          version: '1',
-          withdrawn: true,
-          withdrawalReason: 'Author removed this fixture release.',
-          requires: [],
-          testedGameBuilds: [
-            'Steam 111 · Unity 0123456789abcdef0123456789abcdef',
-          ],
-          artifact: {
-            url: 'https://example.invalid/fixture.zip',
-            sha256: artifactHash,
-            sizeBytes: 100,
-            layout: {
-              kind: 'starframe_managed_zip',
-              root: 'package',
-              entryAssembly: 'Fixture.dll',
-              entryType: 'Fixture.Entry',
-            },
-          },
-        },
-      ],
-    },
-  ],
-};
-const db = new DatabaseSync(join(data, 'sqlite/state.db'));
-const luaBytes = Buffer.from('return "native order fixture"');
-const luaHash = hash(luaBytes);
-const luaId = 'fixture.lua';
-const luaPath = 'LJ/lua/starframe_fixture.lua';
-await mkdir(join(data, 'artifacts', luaHash, 'LJ/lua'), { recursive: true });
-await writeFile(join(data, 'artifacts', luaHash, luaPath), luaBytes);
-catalog.schemaVersion = 2;
-catalog.mods.push({
-  id: luaId,
-  name: 'Lua native fixture',
-  author: 'Fixture',
-  sourceUrl: 'https://example.invalid/source',
-  releases: [
-    {
-      id: 'fixture.lua.1',
-      version: '1',
-      withdrawn: false,
-      requires: [reference.releaseId],
-      testedGameBuilds: [],
-      artifact: {
-        url: 'https://example.invalid/lua.zip',
-        sha256: luaHash,
-        sizeBytes: luaBytes.length,
-        layout: { kind: 'starframe_lua_zip' },
-      },
-    },
-  ],
-});
-db.prepare(
-  'INSERT INTO library(mod_id,hash,origin,release_id,name,author,version) VALUES (?,?,?,?,?,?,?)',
-).run(
-  luaId,
-  luaHash,
-  'catalog',
-  'fixture.lua.1',
-  'Lua native fixture',
-  'Fixture',
-  '1',
-);
-db.prepare('INSERT INTO prepared_artifacts(hash,record) VALUES (?,?)').run(
-  luaHash,
-  JSON.stringify({
-    hash: luaHash,
-    files: [
-      { path: luaPath, sha256: hash(luaBytes), sizeBytes: luaBytes.length },
-    ],
-  }),
-);
-db.prepare(
-  'INSERT INTO library(mod_id,hash,origin,release_id,name,author,version) VALUES (?,?,?,?,?,?,?)',
-).run(
-  reference.modId,
-  artifactHash,
-  'catalog',
-  reference.releaseId,
+const reference = await installedRegistry(
+  data,
+  1,
   'Native fixture',
-  'Fixture',
-  '1',
+  { 'package/Fixture.dll': bytes },
+  {
+    schemaVersion: 1,
+    kind: 'code',
+    loader: 'bepinex5',
+    sourceRoot: 'package',
+    entryAssembly: 'Fixture.dll',
+    entryType: 'Fixture.Entry',
+  },
 );
-db.prepare('INSERT INTO prepared_artifacts(hash,record) VALUES (?,?)').run(
-  artifactHash,
-  JSON.stringify({
-    hash: artifactHash,
-    files: [
-      {
-        path: 'package/Fixture.dll',
-        sha256: hash(bytes),
-        sizeBytes: bytes.length,
-      },
-    ],
-  }),
+const artifactRoot = join(data, 'artifacts', reference.reference.sha256);
+const luaBytes = Buffer.from('return "native order fixture"');
+const luaPath = 'LJ/lua/starframe_fixture.lua';
+const luaReference = await installedRegistry(
+  data,
+  2,
+  'Lua native fixture',
+  { [luaPath]: luaBytes },
+  {
+    schemaVersion: 1,
+    kind: 'code',
+    loader: 'lua',
+    entryPath: luaPath,
+  },
+  [
+    {
+      kind: 'exact',
+      modId: reference.reference.modId,
+      releaseId: reference.reference.releaseId,
+    },
+  ],
 );
-db.prepare(
-  'INSERT INTO catalog_cache(id,record) VALUES (1,?) ON CONFLICT(id) DO UPDATE SET record=excluded.record',
-).run(
-  JSON.stringify({
-    catalog,
-    etag: null,
-    lastModified: null,
-    lastChecked: null,
-    lastSuccess: null,
-    error: null,
-  }),
-);
-db.close();
+const luaId = runtimeId(luaReference);
+const luaFile = join(data, 'artifacts', luaReference.reference.sha256, luaPath);
 let deployed;
 const activation = async () =>
   JSON.parse(await readFile(join(engine, 'Starframe/activation.json'), 'utf8'));
@@ -192,7 +99,7 @@ const waitForDeployment = (page, count) =>
         // The worker replies after file work; reading activation alone can see an unfinished deployment.
         const confirmed = await list(page);
         const current = await activation();
-        const mod = current.mods.find((m) => m.modId === reference.modId);
+        const mod = current.mods.find((m) => m.modId === runtimeId(reference));
         if (mod)
           deployed = join(engine, 'Starframe', mod.root, mod.entryAssembly);
         return {
@@ -324,12 +231,7 @@ try {
       expect(await readFile(deployed)).toEqual(bytes);
       await action(page, {
         kind: 'set_enabled',
-        reference: {
-          modId: luaId,
-          hash: luaHash,
-          origin: 'catalog',
-          releaseId: 'fixture.lua.1',
-        },
+        reference: luaReference,
         enabled: true,
         expectedRevision: (await list(page)).revision,
       });
@@ -337,15 +239,15 @@ try {
       const beforeOrder = await list(page);
       const reordered = await action(page, {
         kind: 'reorder',
-        modIds: [luaId, reference.modId],
+        modIds: [luaId, runtimeId(reference)],
         expectedRevision: beforeOrder.revision,
       });
-      expect(reordered.enabled.map((r) => r.modId)).toEqual([
+      expect(reordered.enabled.map(runtimeId)).toEqual([
         luaId,
-        reference.modId,
+        runtimeId(reference),
       ]);
-      expect(reordered.order.effective.map((r) => r.modId)).toEqual([
-        reference.modId,
+      expect(reordered.order.effective.map(runtimeId)).toEqual([
+        runtimeId(reference),
         luaId,
       ]);
       await expect
@@ -354,7 +256,7 @@ try {
         })
         .toBe(reordered.revision);
       expect((await activation()).mods.map((m) => m.modId)).toEqual([
-        reference.modId,
+        runtimeId(reference),
         luaId,
       ]);
       await page
@@ -382,6 +284,7 @@ try {
         kind: 'export',
         id: originalCollection,
       });
+      await writeFile(luaFile, 'changed retained fixture');
       const imported = await sharing({
         kind: 'accept',
         text: exported.text,
@@ -392,7 +295,7 @@ try {
         .poll(async () =>
           (await list(page)).imports
             .find((i) => i.collectionId === imported.collectionId)
-            ?.entries.every((e) => e.status === 'unresolved'),
+            ?.entries.some((e) => e.status === 'unresolved'),
         )
         .toBe(true);
       const beforeImport = await activation();
@@ -402,14 +305,15 @@ try {
       });
       await expect
         .poll(async () => (await list(page)).orderError)
-        .toContain('withdrawn');
+        .not.toBeNull();
       expect((await activation()).deploymentRevision).toBe(
         beforeImport.deploymentRevision,
       );
       expect((await activation()).mods.map((m) => m.modId)).toEqual([
-        reference.modId,
+        runtimeId(reference),
         luaId,
       ]);
+      await writeFile(luaFile, luaBytes);
       await collectionAction(page, {
         kind: 'select_collection',
         id: originalCollection,
@@ -420,12 +324,7 @@ try {
       });
       await action(page, {
         kind: 'set_enabled',
-        reference: {
-          modId: luaId,
-          hash: luaHash,
-          origin: 'catalog',
-          releaseId: 'fixture.lua.1',
-        },
+        reference: luaReference,
         enabled: false,
         expectedRevision: (await list(page)).revision,
       });

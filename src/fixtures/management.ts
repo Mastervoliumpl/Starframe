@@ -6,7 +6,7 @@ import type {
   Reference,
   SharingReply,
 } from '../lib/management';
-import { key } from '../lib/management';
+import { key, localKey, runtimeId } from '../lib/management';
 export function fixtureManagement(
   changed: (data: ModView) => void,
 ): ManagementTransport {
@@ -29,7 +29,7 @@ export function fixtureManagement(
         unmaintained: i === 0,
         releases: [
           {
-            id: `fixture.mod${i}.1`,
+            id: `11111111-1111-4111-8111-${(i + 1).toString(16).padStart(12, '0')}`,
             version: '1.0',
             withdrawn: i === 2,
             withdrawalReason: i === 2 ? 'Author removed this release.' : null,
@@ -60,9 +60,18 @@ export function fixtureManagement(
         ],
       }))
     : [];
+  const registryReference = (mod: CatalogMod): Reference => ({
+    kind: 'registry',
+    reference: {
+      modId: mods.indexOf(mod) + 1,
+      releaseId: mod.releases[0].id,
+      sha256: mod.releases[0].artifact.sha256,
+    },
+  });
   const data: ModView = {
     advisories: { schemaVersion: 1, revision: '1', advisories: [] },
     findings: {},
+    blocked: {},
     localSources: [],
     localWatches: [],
     imports: [],
@@ -73,12 +82,9 @@ export function fixtureManagement(
       name: m.name,
       author: m.author,
       version: m.releases[0].version,
-      reference: {
-        modId: m.id,
-        hash: m.releases[0].artifact.sha256,
-        origin: 'catalog',
-        releaseId: m.releases[0].id,
-      },
+      kind: 'code',
+      testedGameBuild: m.releases[0].testedGameBuilds[0],
+      reference: registryReference(m),
     })),
     enabled: [],
     order: { effective: [], adjustments: [] },
@@ -90,6 +96,18 @@ export function fixtureManagement(
   const operations: PackageOperation[] = [];
   if (new URLSearchParams(location.search).has('registryArchive')) {
     operations.push(
+      {
+        id: crypto.randomUUID(),
+        requestId: crypto.randomUUID(),
+        releaseId: '44444444-4444-4444-8444-444444444444',
+        hash: 'c'.repeat(64),
+        kind: 'registry_verification',
+        receiptId: null,
+        status: 'failed',
+        message: 'The exact managed content changed.',
+        receivedBytes: 0,
+        totalBytes: 10,
+      },
       {
         id: crypto.randomUUID(),
         requestId: crypto.randomUUID(),
@@ -121,7 +139,7 @@ export function fixtureManagement(
     populated &&
     ['confirmed', 'suspected', 'cleared'].includes(security ?? '')
   ) {
-    const hash = data.library[0].reference.hash;
+    const hash = data.library[0].reference.reference.sha256;
     data.advisories!.advisories.push({
       id: 'fixture.finding',
       title: 'Synthetic security finding',
@@ -187,14 +205,14 @@ export function fixtureManagement(
       } = collection
         ? {
             format: 'starframe-collection',
-            schemaVersion: 1,
+            schemaVersion: 2,
             name: collection.name,
             entries: collection.entries,
           }
         : JSON.parse('text' in action ? action.text : '{}');
       if (
         document.format !== 'starframe-collection' ||
-        document.schemaVersion !== 1
+        document.schemaVersion !== 2
       )
         throw new Error('Unsupported collection format or version.');
       if (
@@ -218,24 +236,21 @@ export function fixtureManagement(
         entries: document.entries.map((reference) => {
           if (
             Object.keys(reference).some(
-              (key) => !['modId', 'hash', 'origin', 'releaseId'].includes(key),
+              (field) => !['kind', 'reference'].includes(field),
             )
           )
             throw new Error('Invalid collection reference: unknown field.');
-          const release = mods
-            .find((m) => m.id === reference.modId)
-            ?.releases.find(
-              (r) =>
-                r.id === reference.releaseId &&
-                r.artifact.sha256 === reference.hash,
-            );
+          const release =
+            reference.kind === 'registry'
+              ? mods.find(
+                  (mod) => key(registryReference(mod)) === key(reference),
+                )?.releases[0]
+              : undefined;
           const local = data.library.some(
-            (e) => JSON.stringify(e.reference) === JSON.stringify(reference),
+            (e) => key(e.reference) === key(reference),
           );
           const available =
-            reference.origin === 'local_import'
-              ? local
-              : release && !release.withdrawn;
+            reference.kind === 'local' ? local : release && !release.withdrawn;
           return {
             reference,
             status: available ? 'pending' : 'unresolved',
@@ -269,11 +284,7 @@ export function fixtureManagement(
         if (entry.status !== 'pending') continue;
         entry.status = 'preparing';
         if (
-          data.library.some(
-            (e) =>
-              e.reference.modId === entry.reference.modId &&
-              e.reference.hash === entry.reference.hash,
-          )
+          data.library.some((e) => key(e.reference) === key(entry.reference))
         ) {
           setTimeout(() => {
             entry.status = 'ready';
@@ -284,10 +295,15 @@ export function fixtureManagement(
           await this.packages({
             kind: 'prepare',
             requestId: crypto.randomUUID(),
-            releaseId: entry.reference.releaseId!,
+            releaseId:
+              entry.reference.kind === 'registry'
+                ? entry.reference.reference.releaseId
+                : '',
           });
           const operation = operations.find(
-            (o) => o.releaseId === entry.reference.releaseId,
+            (o) =>
+              entry.reference.kind === 'registry' &&
+              o.releaseId === entry.reference.reference.releaseId,
           )!;
           entry.operationId = operation.id;
           const timer = setInterval(() => {
@@ -360,7 +376,7 @@ export function fixtureManagement(
         )
           throw new Error('Include each enabled mod once.');
         data.enabled = action.modIds.map((id) => {
-          const reference = data.enabled.find((r) => r.modId === id);
+          const reference = data.enabled.find((r) => runtimeId(r) === id);
           if (!reference) throw new Error('Unknown enabled mod.');
           return reference;
         });
@@ -377,7 +393,7 @@ export function fixtureManagement(
         if (!entry) throw new Error('Exact release is not installed.');
         data.enabled = data.enabled.filter((r) =>
           action.kind === 'set_enabled' && action.enabled
-            ? r.modId !== action.reference.modId
+            ? runtimeId(r) !== runtimeId(action.reference)
             : key(r) !== key(action.reference),
         );
         if (action.kind === 'set_enabled' && action.enabled)
@@ -385,10 +401,10 @@ export function fixtureManagement(
         if (action.kind === 'uninstall') {
           data.library = data.library.filter((e) => e !== entry);
           data.localSources = data.localSources.filter(
-            (s) => key(s.reference) !== key(action.reference),
+            (s) => localKey(s.reference) !== key(action.reference),
           );
           data.localWatches = data.localWatches.filter(
-            (w) => key(w.source.reference) !== key(action.reference),
+            (w) => localKey(w.source.reference) !== key(action.reference),
           );
         }
         if (!data.activeCollection) {
@@ -410,17 +426,25 @@ export function fixtureManagement(
           throw new Error(
             'The browser fixture accepts only fixture source paths.',
           );
-        const reference: Reference = {
+        const sourceReference = {
           modId: 'fixture.local',
           hash: 'b'.repeat(64),
-          origin: 'local_import',
+          origin: 'local_import' as const,
           releaseId: null,
         };
+        const reference: Reference = {
+          kind: 'local',
+          reference: {
+            modId: sourceReference.modId,
+            sha256: sourceReference.hash,
+          },
+        };
+
         operations.unshift({
           id: crypto.randomUUID(),
           requestId: action.requestId,
           releaseId: 'local-import',
-          hash: reference.hash,
+          hash: reference.reference.sha256,
           kind: 'package',
           receiptId: null,
           status: 'completed',
@@ -434,13 +458,15 @@ export function fixtureManagement(
             name: 'Local build fixture',
             author: 'Test fixture',
             version: 'dev.1',
+            kind: 'code',
+            testedGameBuild: null,
           });
           data.localSources.push({
-            reference,
+            reference: sourceReference,
             path: action.path,
             manifest: {
               schemaVersion: 1,
-              modId: reference.modId,
+              modId: reference.reference.modId,
               name: 'Local build fixture',
               author: 'Test fixture',
               version: 'dev.1',
@@ -502,7 +528,7 @@ export function fixtureManagement(
           op.receivedBytes += 1048576;
           if (
             op.receivedBytes >= op.totalBytes / 2 &&
-            release.id === 'fixture.mod3.1'
+            release.id === mods[3]?.releases[0].id
           ) {
             op.status = 'failed';
             op.message =
@@ -511,17 +537,18 @@ export function fixtureManagement(
           } else if (op.receivedBytes >= op.totalBytes) {
             op.status = 'completed';
             op.message = 'Package verified in the library.';
-            if (!data.library.some((e) => e.reference.hash === op.hash))
+            if (
+              !data.library.some(
+                (e) => e.reference.reference.sha256 === op.hash,
+              )
+            )
               data.library.push({
                 name: mod!.name,
                 author: mod!.author,
                 version: release.version,
-                reference: {
-                  modId: mod!.id,
-                  hash: op.hash,
-                  origin: 'catalog',
-                  releaseId: release.id,
-                },
+                kind: 'code',
+                testedGameBuild: release.testedGameBuilds[0],
+                reference: registryReference(mod!),
               });
             commit();
             clearInterval(timer);

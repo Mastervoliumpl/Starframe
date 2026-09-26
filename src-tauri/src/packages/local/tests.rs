@@ -1,5 +1,8 @@
 use super::*;
 use crate::{mods, sharing};
+fn collection_ref(reference: &crate::storage::ModReference) -> crate::references::Reference {
+    crate::references::Reference::try_from(reference).unwrap()
+}
 use serde_json::json;
 use std::time::Instant;
 
@@ -40,7 +43,7 @@ async fn known_payload_findings_follow_renamed_local_copies_without_deleting_sou
     mods::action(
         &mut store,
         mods::Action::SetEnabled {
-            reference: reference.clone(),
+            reference: collection_ref(&reference),
             enabled: true,
             expected_revision,
         },
@@ -78,7 +81,7 @@ async fn known_payload_findings_follow_renamed_local_copies_without_deleting_sou
         mods::action(
             &mut store,
             mods::Action::SetEnabled {
-                reference: copy.clone(),
+                reference: collection_ref(&copy),
                 enabled: true,
                 expected_revision
             }
@@ -171,13 +174,13 @@ fn offline_dll_and_folder_imports_use_managed_copies_and_retain_sources_after_re
         let view = mods::action(
             &mut store,
             mods::Action::SetEnabled {
-                reference: reference.clone(),
+                reference: collection_ref(&reference),
                 enabled: true,
                 expected_revision: revision,
             },
         )
         .unwrap();
-        assert_eq!(view.enabled, vec![reference.clone()]);
+        assert_eq!(view.enabled, vec![collection_ref(&reference)]);
         assert!(view.order_error.is_none());
         let activation = mods::requested(&store).unwrap();
         assert_eq!(activation["mods"][0]["source"]["kind"], "local");
@@ -203,7 +206,7 @@ fn offline_dll_and_folder_imports_use_managed_copies_and_retain_sources_after_re
         mods::action(
             &mut store,
             mods::Action::Uninstall {
-                reference: reference.clone(),
+                reference: collection_ref(&reference),
                 expected_revision: revision,
                 confirm_references: true,
             },
@@ -254,9 +257,9 @@ fn content_matches_across_source_locations_and_collections_keep_unmatched_requir
     assert_eq!(store.load().unwrap().library.len(), 1);
     let text = serde_json::to_string(&sharing::Portable {
         format: "starframe-collection".into(),
-        schema_version: 1,
+        schema_version: 2,
         name: "Local sharing fixture".into(),
-        entries: vec![reference.clone()],
+        entries: vec![collection_ref(&reference)],
     })
     .unwrap();
     let review =
@@ -323,13 +326,16 @@ fn local_dependencies_are_enabled_exactly_and_constrain_manual_order() {
     let view = mods::action(
         &mut store,
         mods::Action::SetEnabled {
-            reference: dependent_ref.clone(),
+            reference: collection_ref(&dependent_ref),
             enabled: true,
             expected_revision,
         },
     )
     .unwrap();
-    assert_eq!(view.enabled, vec![core_ref.clone(), dependent_ref.clone()]);
+    assert_eq!(
+        view.enabled,
+        vec![collection_ref(&core_ref), collection_ref(&dependent_ref)]
+    );
     let view = mods::action(
         &mut store,
         mods::Action::Reorder {
@@ -340,12 +346,12 @@ fn local_dependencies_are_enabled_exactly_and_constrain_manual_order() {
     .unwrap();
     assert_eq!(
         view.order.unwrap().effective,
-        vec![core_ref.clone(), dependent_ref]
+        vec![collection_ref(&core_ref), collection_ref(&dependent_ref)]
     );
     let view = mods::action(
         &mut store,
         mods::Action::SetEnabled {
-            reference: core_ref,
+            reference: collection_ref(&core_ref),
             enabled: false,
             expected_revision: view.revision,
         },

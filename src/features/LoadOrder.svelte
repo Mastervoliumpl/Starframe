@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import type { Management } from '../lib/management';
+  import { runtimeId, type Management } from '../lib/management';
   let {
     manager,
     name,
@@ -15,10 +15,11 @@
     unavailable || $manager.pending.includes('membership') || !order,
   );
   const label = (id: string) =>
-    $manager.data?.library.find((e) => e.reference.modId === id)?.name ?? id;
+    $manager.data?.library.find((e) => runtimeId(e.reference) === id)?.name ??
+    id;
   async function move(id: string, target: number) {
     if (busy || target < 0 || target >= entries.length) return;
-    const ids = entries.map((e) => e.modId);
+    const ids = entries.map(runtimeId);
     const from = ids.indexOf(id);
     if (from < 0 || from === target) return;
     picked = null;
@@ -68,8 +69,9 @@
 </p>
 <p class="muted">
   Changes apply automatically when the game is closed. Lua overlays use the
-  later mod's file when paths collide. Conventional BepInEx plugins and maps are
-  unsupported.
+  later mod's file when paths collide. Map and AI files use their approved
+  placement. Their order does not control game selection or gameplay.
+  Conventional BepInEx plugins are unsupported.
 </p>
 {#if $manager.error}<p class="error" role="alert">
     {$manager.error}<button onclick={() => manager.dismissError()}
@@ -103,25 +105,25 @@
     aria-describedby="order-help"
     aria-busy={$manager.pending.includes('membership')}
   >
-    {#each entries as entry, index (entry.modId)}
-      <li class:picked={picked === entry.modId}>
+    {#each entries as entry, index (runtimeId(entry))}
+      <li class:picked={picked === runtimeId(entry)}>
         <div class="order-row">
           <button
             class="drag-handle"
             draggable={!busy}
             aria-disabled={busy}
-            aria-label={`Reorder ${label(entry.modId)}`}
+            aria-label={`Reorder ${label(runtimeId(entry))}`}
             aria-describedby="order-keyboard"
-            aria-pressed={picked === entry.modId}
+            aria-pressed={picked === runtimeId(entry)}
             title="Drag to reorder; arrow keys move; select to pick up or place"
             ondragstart={(event) => {
               if (busy) {
                 event.preventDefault();
                 return;
               }
-              dragged = entry.modId;
+              dragged = runtimeId(entry);
               picked = null;
-              event.dataTransfer?.setData('text/plain', entry.modId);
+              event.dataTransfer?.setData('text/plain', runtimeId(entry));
             }}
             ondragend={() => (dragged = null)}
             ondragover={(event) => {
@@ -132,7 +134,7 @@
               if (dragged) void move(dragged, index);
               dragged = null;
             }}
-            onclick={() => pick(entry.modId, index)}
+            onclick={() => pick(runtimeId(entry), index)}
             onkeydown={(event) => {
               if (event.key === 'Escape') {
                 picked = null;
@@ -147,18 +149,18 @@
                     : event.key === 'End'
                       ? entries.length - 1
                       : index + (event.key === 'ArrowUp' ? -1 : 1);
-                void move(entry.modId, target);
+                void move(runtimeId(entry), target);
               }
             }}><span aria-hidden="true">⠿</span></button
           >
           <div class="order-description">
-            <strong>{label(entry.modId)}</strong>
+            <strong>{label(runtimeId(entry))}</strong>
             <p class="muted">
               Requested position {($manager.data?.enabled.findIndex(
-                (e) => e.modId === entry.modId,
+                (e) => runtimeId(e) === runtimeId(entry),
               ) ?? index) + 1}
             </p>
-            {#each order?.adjustments.filter((note) => note.before === entry.modId || note.after === entry.modId) ?? [] as note (note.message)}<p
+            {#each order?.adjustments.filter((note) => runtimeId(note.before) === runtimeId(entry) || runtimeId(note.after) === runtimeId(entry)) ?? [] as note (note.message)}<p
               >
                 {note.message}
               </p>{/each}

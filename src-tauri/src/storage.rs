@@ -18,9 +18,9 @@ pub use registry::{RegistryDisplay, RegistryLibraryEntry};
 mod sharing;
 mod updates;
 
-const SCHEMA: i64 = 18;
+const SCHEMA: i64 = 19;
 const APPLICATION_ID: i64 = 0x53544652;
-const MIGRATIONS: [&str; 18] = [
+const MIGRATIONS: [&str; 19] = [
     "CREATE TABLE metadata (id INTEGER PRIMARY KEY CHECK(id = 1), engine TEXT NOT NULL CHECK(engine = 'sqlite'), revision INTEGER NOT NULL CHECK(revision >= 0));
      INSERT INTO metadata VALUES (1, 'sqlite', 0);
      CREATE TABLE library (mod_id TEXT NOT NULL CHECK(length(mod_id) BETWEEN 1 AND 200), hash TEXT NOT NULL CHECK(length(hash) = 64 AND hash NOT GLOB '*[^0-9a-f]*'), name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 200), author TEXT NOT NULL CHECK(length(author) <= 200), version TEXT NOT NULL CHECK(length(version) BETWEEN 1 AND 200), origin TEXT NOT NULL CHECK(origin IN ('catalog', 'local_import')), release_id TEXT, PRIMARY KEY(mod_id, hash), CHECK((origin = 'catalog' AND release_id IS NOT NULL AND length(release_id) BETWEEN 1 AND 200) OR (origin = 'local_import' AND release_id IS NULL)));
@@ -43,6 +43,7 @@ const MIGRATIONS: [&str; 18] = [
     "CREATE TABLE registry_trust_streams (name TEXT PRIMARY KEY NOT NULL CHECK(name IN ('keys','security') OR name GLOB 'release:*'), revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991), canonical TEXT NOT NULL CHECK(length(canonical)<=2097152), envelope BLOB NOT NULL CHECK(length(envelope)<=4194304)); CREATE TABLE registry_decisions (sha256 TEXT PRIMARY KEY NOT NULL CHECK(length(sha256)=64 AND sha256 NOT GLOB '*[^0-9a-f]*'), revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991), record TEXT NOT NULL CHECK(length(record)<=8192 AND json_valid(record)));",
     "CREATE TABLE registry_receipt_attempts (download_id TEXT PRIMARY KEY NOT NULL CHECK(length(download_id)=36), account_id TEXT NOT NULL CHECK(length(account_id)=36), record TEXT NOT NULL CHECK(length(record)<=4096 AND json_valid(record))); CREATE INDEX registry_receipt_account ON registry_receipt_attempts(account_id);",
     "ALTER TABLE registry_library ADD COLUMN installation_record TEXT CHECK(installation_record IS NULL OR (length(installation_record)<=131072 AND json_valid(installation_record)));",
+    "DROP TABLE collection_imports; DROP TABLE collection_entries; UPDATE preferences SET active_collection=NULL; DELETE FROM collections; CREATE TABLE collection_entries (collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE, position INTEGER NOT NULL CHECK(position>=0), runtime_key TEXT NOT NULL CHECK(length(runtime_key) BETWEEN 1 AND 128), record TEXT NOT NULL CHECK(length(record)<=4096 AND json_valid(record)), PRIMARY KEY(collection_id,position), UNIQUE(collection_id,runtime_key)); CREATE TABLE collection_imports (collection_id TEXT PRIMARY KEY NOT NULL REFERENCES collections(id) ON DELETE CASCADE, record TEXT NOT NULL CHECK(length(record)<=1048576 AND json_valid(record)));",
 ];
 
 #[derive(Debug)]
@@ -127,7 +128,7 @@ pub struct Collection {
     pub name: String,
     #[cfg_attr(test, ts(type = "number"))]
     pub revision: i64,
-    pub entries: Vec<ModReference>,
+    pub entries: Vec<crate::references::Reference>,
 }
 #[derive(Debug, PartialEq)]
 pub struct Records {
@@ -493,16 +494,23 @@ impl Storage {
         }
         drop(rows);
         for collection in &mut collections {
-            let mut statement = self.conn.prepare("SELECT mod_id, hash, origin, release_id, position FROM collection_entries WHERE collection_id = ? ORDER BY position")?;
+            let mut statement = self.conn.prepare("SELECT record, position, runtime_key FROM collection_entries WHERE collection_id = ? ORDER BY position")?;
             let mut entries = statement.query([collection.id.as_str()])?;
             while let Some(row) = entries.next()? {
-                if row.get::<_, i64>(4)? != collection.entries.len() as i64 {
+                if row.get::<_, i64>(1)? != collection.entries.len() as i64 {
                     return Err(Error::Invalid(
                         "A saved collection has an incomplete order. Restore a verified backup."
                             .into(),
                     ));
                 }
-                collection.entries.push(reference(row)?);
+                let entry: crate::references::Reference =
+                    serde_json::from_str(&row.get::<_, String>(0)?)
+                        .map_err(|error| Error::Invalid(error.to_string()))?;
+                entry.validate().map_err(Error::Invalid)?;
+                if row.get::<_, String>(2)? != entry.runtime_id() {
+                    return Err(Error::Invalid("A saved collection identity does not match its reference. Restore a verified backup.".into()));
+                }
+                collection.entries.push(entry);
             }
         }
         let mut statement = self
@@ -543,18 +551,18 @@ impl Storage {
         &mut self,
         id: &str,
         name: &str,
-        entries: &[ModReference],
+        entries: &[crate::references::Reference],
         expected: i64,
     ) -> Result<i64> {
         Uuid::parse_str(id).map_err(|_| Error::Invalid("The collection ID is invalid.".into()))?;
         validate_text(name, "Collection name")?;
-        if entries.len() > 10_000 {
+        if entries.len() > crate::runtime_contract::MAX_MODS {
             return Err(Error::Invalid(
-                "A collection cannot contain more than 10,000 entries.".into(),
+                "A collection cannot contain more than 256 entries.".into(),
             ));
         }
         for entry in entries {
-            validate_reference(entry)?;
+            entry.validate().map_err(Error::Invalid)?;
         }
         let tx = self
             .conn
@@ -579,7 +587,7 @@ impl Storage {
                 [id],
             )?;
             for (position, entry) in entries.iter().enumerate() {
-                tx.execute("INSERT INTO collection_entries (collection_id, position, mod_id, hash, origin, release_id) VALUES (?, ?, ?, ?, ?, ?)", rusqlite::params![id, position as i64, entry.mod_id.clone(), entry.hash.clone(), entry.origin.as_str(), entry.release_id.clone()])?;
+                write_collection_entry(&tx, id, position, entry)?;
             }
             bump(&tx)?;
             Ok(revision)
@@ -762,3 +770,16 @@ mod conversion;
 mod sqlite_proof;
 #[cfg(test)]
 mod tests;
+
+fn write_collection_entry(
+    conn: &Connection,
+    collection: &str,
+    position: usize,
+    reference: &crate::references::Reference,
+) -> Result<()> {
+    reference.validate().map_err(Error::Invalid)?;
+    let record =
+        serde_json::to_string(reference).map_err(|error| Error::Invalid(error.to_string()))?;
+    conn.execute("INSERT INTO collection_entries(collection_id,position,runtime_key,record) VALUES (?,?,?,?)", rusqlite::params![collection, position as i64, reference.runtime_id(), record])?;
+    Ok(())
+}

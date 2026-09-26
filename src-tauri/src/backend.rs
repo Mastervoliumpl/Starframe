@@ -14,7 +14,7 @@ pub fn mod_action(
     action: mods::Action,
 ) -> Result<mods::View, String> {
     if let mods::Action::Uninstall { reference, .. } = &action
-        && queue.is_some_and(|queue| queue.busy_hash(&reference.hash))
+        && queue.is_some_and(|queue| queue.busy_hash(reference.hash()))
     {
         return Err(
             "This package is being prepared. Finish or cancel its download before uninstalling."

@@ -101,6 +101,7 @@ impl Packages {
             Active {
                 operation: operation.clone(),
                 entry: None,
+                registry_reference: None,
                 source: Some(path.into()),
                 cancel,
                 progress,

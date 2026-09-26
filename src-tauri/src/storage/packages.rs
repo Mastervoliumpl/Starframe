@@ -340,7 +340,11 @@ impl Storage {
             tx.execute("INSERT INTO local_watches(mod_id,hash) VALUES (?,?) ON CONFLICT(mod_id) DO UPDATE SET hash=excluded.hash,state='watching',message='Verified build saved. Active local collections apply when the game is closed.'", rusqlite::params![entry.reference.mod_id, prepared.hash])?;
         }
         if let Some((collection, previous)) = advance {
-            if tx.execute("UPDATE collection_entries SET hash=? WHERE collection_id=? AND mod_id=? AND hash=? AND origin='local_import' AND release_id IS NULL", rusqlite::params![prepared.hash, collection, previous.mod_id, previous.hash])? != 1 {
+            let previous_reference =
+                crate::references::Reference::try_from(previous).map_err(Error::Invalid)?;
+            let next_reference =
+                crate::references::Reference::try_from(&entry.reference).map_err(Error::Invalid)?;
+            if tx.execute("UPDATE collection_entries SET record=? WHERE collection_id=? AND runtime_key=? AND record=?", rusqlite::params![serde_json::to_string(&next_reference).map_err(|error| Error::Invalid(error.to_string()))?, collection, previous_reference.runtime_id(),serde_json::to_string(&previous_reference).map_err(|error| Error::Invalid(error.to_string()))?])? != 1 {
                 return Err(Error::Invalid("The active local build changed before it could be saved.".into()));
             }
             tx.execute(

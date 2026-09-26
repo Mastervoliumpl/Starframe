@@ -64,6 +64,7 @@ pub enum Kind {
     Package,
     RegistryArchive,
     RegistryInstall,
+    RegistryVerification,
 }
 
 #[derive(Deserialize)]
@@ -159,6 +160,7 @@ impl Cancel {
 struct Active {
     operation: Operation,
     entry: Option<LibraryEntry>,
+    registry_reference: Option<crate::registry::ExactReference>,
     source: Option<String>,
     cancel: Cancel,
     progress: Arc<AtomicU64>,
@@ -386,6 +388,7 @@ impl Packages {
             Active {
                 operation: operation.clone(),
                 entry: Some(entry),
+                registry_reference: None,
                 source: None,
                 cancel,
                 progress,
@@ -486,6 +489,7 @@ impl Packages {
             Active {
                 operation: operation.clone(),
                 entry: Some(entry),
+                registry_reference: None,
                 source: None,
                 cancel,
                 progress: Arc::new(AtomicU64::new(0)),
@@ -514,6 +518,27 @@ impl Packages {
             let outcome = active.ready.as_ref().unwrap().clone().and_then(|result| {
                 active.cancel.check()?;
                 if result.local.is_some() {
+                    return Ok(result);
+                }
+                if let Some(reference) = &active.registry_reference {
+                    storage
+                        .require_registry_unblocked_hash(reference.sha256.as_str())
+                        .map_err(|error| error.to_string())?;
+                    let entry = storage
+                        .installed_registry_releases()
+                        .map_err(|error| error.to_string())?
+                        .into_iter()
+                        .find(|entry| &entry.reference == reference)
+                        .ok_or("The exact registry reference changed during verification.")?;
+                    entry.installation.validate_files(&result.prepared.files)?;
+                    if storage
+                        .prepared_artifact(reference.sha256.as_str())
+                        .map_err(|error| error.to_string())?
+                        .as_ref()
+                        != Some(&result.prepared)
+                    {
+                        return Err("The exact file inventory changed during verification.".into());
+                    }
                     return Ok(result);
                 }
                 let entry = active
@@ -564,6 +589,18 @@ impl Packages {
             });
             match outcome {
                 Ok(result) => {
+                    if active.registry_reference.is_some() {
+                        active.operation.status = Status::Completed;
+                        active.operation.received_bytes = active.operation.total_bytes;
+                        active.operation.message =
+                            "Existing exact registry package verified offline.".into();
+                        storage
+                            .save_package(&active.operation)
+                            .map_err(|error| error.to_string())?;
+                        self.active.remove(&id);
+                        changed = true;
+                        continue;
+                    }
                     let prepared = result.prepared;
                     if result.local.is_some() {
                         active.operation.total_bytes = prepared

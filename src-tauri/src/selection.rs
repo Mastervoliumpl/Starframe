@@ -141,3 +141,24 @@ pub(crate) fn payload(
     sources.extend(crate::deployment::registry_sources(store, &registry)?);
     Ok(sources)
 }
+
+pub(crate) fn verify(store: &Storage, references: &[Reference]) -> Result<(), String> {
+    let installed = store
+        .installed_registry_releases()
+        .map_err(|error| error.to_string())?;
+    for reference in references {
+        match reference {
+            Reference::Registry(reference) => {
+                let entry = installed
+                    .iter()
+                    .find(|entry| &entry.reference == reference)
+                    .ok_or("The exact registry release is not installed.")?;
+                crate::packages::verify_registry_artifact(store, entry)?;
+            }
+            Reference::Local(_) => {
+                crate::packages::verify_artifact(store, &reference.local_reference().unwrap())?;
+            }
+        }
+    }
+    Ok(())
+}

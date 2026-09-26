@@ -56,3 +56,5 @@ pub(crate) fn payload(
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+pub(crate) use tests::{import_lua, install_case};

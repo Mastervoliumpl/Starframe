@@ -6,8 +6,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct LocalReference {
     pub mod_id: String,
+    #[cfg_attr(test, ts(type = "string"))]
     pub sha256: Sha256,
 }
 
@@ -18,8 +20,16 @@ pub struct LocalReference {
     rename_all = "snake_case",
     deny_unknown_fields
 )]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "CollectionReference"))]
 pub enum Reference {
-    Registry(ExactReference),
+    Registry(
+        #[cfg_attr(
+            test,
+            ts(type = "{ modId: number; releaseId: string; sha256: string }")
+        )]
+        ExactReference,
+    ),
     Local(LocalReference),
 }
 

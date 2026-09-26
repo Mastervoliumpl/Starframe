@@ -35,7 +35,10 @@
             >{op.status === 'completed'
               ? op.kind === 'registry_archive'
                 ? 'Archive saved'
-                : 'Installed in library'
+                : op.kind === 'registry_verification' ||
+                    op.releaseId === 'local-verification'
+                  ? 'Existing package verified'
+                  : 'Installed in library'
               : op.status}</span
           >
         </div>
@@ -67,13 +70,18 @@
                 ? 'Cancel import'
                 : 'Cancel download'}</button
           >
-        {:else if (op.status === 'failed' || op.status === 'cancelled') && op.kind !== 'registry_archive' && op.kind !== 'registry_install' && op.releaseId !== 'local-import' && op.releaseId !== 'local-verification'}<button
+        {:else if (op.status === 'failed' || op.status === 'cancelled') && op.kind === 'package' && op.releaseId !== 'local-import' && op.releaseId !== 'local-verification'}<button
             disabled={unavailable ||
               $manager.pending.includes(`install:${op.releaseId}`)}
             onclick={() => manager.install(op.releaseId)}
             >Retry exact release</button
           >{/if}
-        {#if (op.status === 'failed' || op.status === 'cancelled') && op.releaseId === 'local-import'}<p
+        {#if (op.status === 'failed' || op.status === 'cancelled') && (op.kind === 'registry_verification' || op.releaseId === 'local-verification')}<p
+          >
+            Restore the exact managed files, then use Retry import in
+            Collections to verify them again.
+          </p>
+        {:else if (op.status === 'failed' || op.status === 'cancelled') && op.releaseId === 'local-import'}<p
           >
             Fix the source, then use Import local mod in My mods to retry.
           </p>

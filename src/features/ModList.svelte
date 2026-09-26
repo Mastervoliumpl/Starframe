@@ -7,6 +7,8 @@
     findings,
     confirmedFinding,
     key,
+    localKey,
+    referenceRelease,
     transferring,
     type Management,
     type LibraryEntry,
@@ -62,32 +64,15 @@
           version: release.version,
           mod,
           release,
-          installed: data.library.find(
-            (e) =>
-              e.reference.modId === mod.id &&
-              e.reference.hash === release.artifact.sha256 &&
-              e.reference.origin === 'catalog' &&
-              e.reference.releaseId === release.id,
-          ),
         })),
       );
-    return data.library.map((installed) => {
-      const mod =
-        installed.reference.origin === 'catalog'
-          ? data.catalog?.mods.find((m) => m.id === installed.reference.modId)
-          : undefined;
-      return {
-        id: key(installed.reference),
-        name: installed.name,
-        author: installed.author,
-        version: installed.version,
-        installed,
-        mod,
-        release: mod?.releases.find(
-          (r) => r.id === installed.reference.releaseId,
-        ),
-      };
-    });
+    return data.library.map((installed) => ({
+      id: key(installed.reference),
+      name: installed.name,
+      author: installed.author,
+      version: installed.version,
+      installed,
+    }));
   });
   const filtered = $derived(
     rows.filter((r) =>
@@ -111,7 +96,7 @@
     $manager.data?.localSources.find(
       (source) =>
         opened?.installed &&
-        key(source.reference) === key(opened.installed.reference),
+        localKey(source.reference) === key(opened.installed.reference),
     ),
   );
   let copyStatus = $state('');
@@ -119,13 +104,14 @@
     $manager.data?.localWatches.find(
       (w) =>
         row.installed &&
-        key(w.source.reference) === key(row.installed.reference),
+        localKey(w.source.reference) === key(row.installed.reference),
     );
   const busy = $derived(unavailable || $manager.pending.includes('membership'));
   const hash = (row: Row) =>
-    row.installed?.reference.hash ?? row.release?.artifact.sha256;
+    row.installed?.reference.reference.sha256 ?? row.release?.artifact.sha256;
   const security = (row: Row) => findings($manager.data, hash(row));
   const blocked = (row: Row) => confirmedFinding($manager.data, hash(row));
+  const blockReason = (row: Row) => $manager.data?.blocked[hash(row) ?? ''];
   const suspected = (row: Row) =>
     security(row).some(
       (advisory) => advisory.history.at(-1)?.state === 'suspected',
@@ -152,7 +138,7 @@
     if (
       !catalogFresh &&
       !$manager.data?.library.some(
-        (entry) => entry.reference.hash === hash(row),
+        (entry) => entry.reference.reference.sha256 === hash(row),
       )
     )
       return 'Catalog refresh required before downloading.';
@@ -309,13 +295,15 @@
               >
               <p>
                 {row.author} · {row.version} · {row.installed?.reference
-                  .origin === 'local_import'
+                  .kind === 'local'
                   ? 'Local import'
-                  : 'Catalog release'}
+                  : 'Registry release'}
               </p>
-              {#if row.installed?.reference.origin === 'local_import'}
+              {#if row.installed?.reference.kind === 'local'}
                 <p class="technical">
-                  Build {row.installed.reference.hash.slice(0, 8)} · {watch(row)
+                  Build {row.installed.reference.reference.sha256.slice(0, 8)} · {watch(
+                    row,
+                  )
                     ? 'Following source'
                     : 'Saved build'}
                 </p>
@@ -326,21 +314,28 @@
                     {watch(row)?.message}
                   </p>{/if}
               {/if}
-              {#if row.installed?.reference.origin !== 'local_import'}<p
+              {#if row.installed?.reference.kind !== 'local'}<p
                   class="compatibility"
                 >
-                  {compatibility(row.release, game?.selected?.build)}
+                  {row.installed?.testedGameBuild
+                    ? !game?.selected?.build
+                      ? 'Choose a game to check compatibility'
+                      : row.installed.testedGameBuild === game.selected.build
+                        ? 'Tested with this version'
+                        : 'Not tested with this version'
+                    : compatibility(row.release, game?.selected?.build)}
                 </p>{/if}
               {#if row.mod?.unmaintained}<p>Unmaintained</p>{/if}
-              {#if security(row).length}<p
+              {#if security(row).length || blockReason(row)}<p
                   class:error={blocked(row)}
                   id={`${mode}-security-${encodeURIComponent(row.id)}`}
                 >
-                  {blocked(row)
-                    ? 'Confirmed security finding · activation blocked'
-                    : suspected(row)
-                      ? 'Unconfirmed security finding · review details'
-                      : 'Previous security finding cleared'}
+                  {blockReason(row) ??
+                    (blocked(row)
+                      ? 'Confirmed security finding · activation blocked'
+                      : suspected(row)
+                        ? 'Unconfirmed security finding · review details'
+                        : 'Previous security finding cleared')}
                 </p>{/if}
               {#if row.release?.withdrawn}<p>
                   Withdrawn · {row.release.withdrawalReason ??
@@ -364,7 +359,7 @@
                     type="checkbox"
                     role="switch"
                     aria-label={`Enable ${row.name} ${row.version}`}
-                    aria-describedby={security(row).length
+                    aria-describedby={security(row).length || blockReason(row)
                       ? `${mode}-security-${encodeURIComponent(row.id)}`
                       : undefined}
                     checked={enabled(row)}
@@ -423,6 +418,10 @@
       <button onclick={back}>Back to list</button>
       <h2 bind:this={detailHeading} tabindex="-1">{opened.name}</h2>
       <p>{opened.author} · {opened.version}</p>
+      {#if blockReason(opened)}
+        <h3>Registry security decision</h3>
+        <p class="error">{blockReason(opened)}. Activation is blocked.</p>
+      {/if}
       {#if security(opened).length}
         <h3>Security findings</h3>
         {#each security(opened) as advisory (advisory.id)}
@@ -459,7 +458,7 @@
           </details>
         {/each}
       {/if}
-      {#if opened.installed?.reference.origin === 'local_import'}
+      {#if opened.installed?.reference.kind === 'local'}
         <h3>Local source</h3>
         <p class="technical">
           {local?.path ??
@@ -556,7 +555,7 @@
           >{opened.installed ? 'Installed' : 'Install release'}</button
         >
         <p>{reason(opened)}</p>{/if}
-      {#if opened.installed?.reference.origin !== 'local_import'}<p>
+      {#if opened.installed?.reference.kind !== 'local'}<p>
           Approval applies to the reviewed archive bytes. It does not guarantee
           that a mod is free of malware.
         </p>{/if}
@@ -564,9 +563,10 @@
         <summary>Package details</summary>
         <p class="technical">
           Release: {opened.release?.id ??
-            opened.installed?.reference.releaseId ??
+            (opened.installed &&
+              referenceRelease(opened.installed.reference)) ??
             'Local import'}<br />SHA-256: {opened.release?.artifact.sha256 ??
-            opened.installed?.reference.hash}
+            opened.installed?.reference.reference.sha256}
         </p>
         {#if opened.release}<p>
             Download: {bytes(opened.release?.artifact.sizeBytes ?? 0)}. Space
@@ -586,7 +586,7 @@
     Remove version {removing?.version} from your library. Settings are kept. Game
     files change only after the game closes.
   </p>
-  {#if removing?.reference.origin === 'local_import'}<p>
+  {#if removing?.reference.kind === 'local'}<p>
       Your source DLL, source folder and local metadata are kept.
     </p>{/if}
   <p>

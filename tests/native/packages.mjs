@@ -1,165 +1,87 @@
 import { expect } from '@playwright/test';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { withDesktop } from './session.mjs';
+import { installedRegistry } from './fixture-registry.mjs';
 
-const root = await mkdtemp(join(tmpdir(), 'starframe-packages-'));
+const data = await mkdtemp(join(tmpdir(), 'starframe-packages-'));
 const offline = {
   HTTPS_PROXY: 'http://127.0.0.1:1',
   HTTP_PROXY: 'http://127.0.0.1:1',
   NO_PROXY: '',
 };
-const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
-const bytes = Buffer.from('inert native fixture');
-const archiveHash = hash('native archive identity fixture');
-const request = randomUUID();
+const invoke = (page, command, action) =>
+  page.evaluate(
+    ({ command, action }) =>
+      window.__TAURI_INTERNALS__.invoke(command, { action }),
+    { command, action },
+  );
+const view = (page) => invoke(page, 'mod_action', { kind: 'list' });
+const sharing = (page, action) => invoke(page, 'sharing_action', action);
 await withDesktop(
-  root,
+  data,
   async (page) => {
-    await page.getByRole('button', { name: 'Catalog', exact: true }).waitFor();
-    await expect
-      .poll(() =>
-        page.evaluate(() =>
-          window.__TAURI_INTERNALS__.invoke('package_action', {
-            action: { kind: 'list' },
-          }),
-        ),
-      )
-      .toEqual([]);
+    await expect.poll(async () => (await view(page)).library.length).toBe(0);
   },
   offline,
 );
-const directory = join(root, 'artifacts', archiveHash, 'package');
-await mkdir(directory, { recursive: true });
-await writeFile(join(directory, 'Core.dll'), bytes);
-const catalog = {
-  schemaVersion: 1,
-  catalogRevision: '41',
-  mods: [
-    {
-      id: 'fixture.core',
-      name: 'Native fixture',
-      author: 'Test fixture',
-      sourceUrl: 'https://example.invalid/source',
-      releases: [
-        {
-          id: 'fixture.core.1',
-          version: '1',
-          withdrawn: false,
-          requires: [],
-          testedGameBuilds: [],
-          artifact: {
-            url: 'https://example.invalid/core.zip',
-            sha256: archiveHash,
-            sizeBytes: 123,
-            layout: {
-              kind: 'starframe_managed_zip',
-              root: 'package',
-              entryAssembly: 'Core.dll',
-              entryType: 'Fixture.Core',
-            },
-          },
-        },
-      ],
-    },
-  ],
+const bytes = Buffer.from('return "inert offline native fixture"');
+const path = 'LJ/lua/fixture.lua';
+const reference = await installedRegistry(
+  data,
+  1,
+  'Native fixture',
+  { [path]: bytes },
+  {
+    schemaVersion: 1,
+    kind: 'code',
+    loader: 'lua',
+    entryPath: path,
+  },
+);
+const file = join(data, 'artifacts', reference.reference.sha256, path);
+const document = {
+  format: 'starframe-collection',
+  schemaVersion: 2,
+  name: 'Native shared collection',
+  entries: [reference],
 };
-const db = new DatabaseSync(join(root, 'sqlite', 'state.db'));
-db.prepare(
-  'INSERT INTO catalog_cache (id, record) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET record=excluded.record',
-).run(
-  JSON.stringify({
-    catalog,
-    etag: null,
-    lastModified: null,
-    lastChecked: null,
-    lastSuccess: null,
-    error: null,
-  }),
-);
-db.prepare('INSERT INTO prepared_artifacts (hash, record) VALUES (?, ?)').run(
-  archiveHash,
-  JSON.stringify({
-    hash: archiveHash,
-    files: [
-      {
-        path: 'package/Core.dll',
-        sha256: hash(bytes),
-        sizeBytes: bytes.length,
-      },
-    ],
-  }),
-);
-db.close();
-const action = (page, action) =>
-  page.evaluate(
-    (action) => window.__TAURI_INTERNALS__.invoke('package_action', { action }),
-    action,
-  );
-let failedRequest;
+let collection;
 await withDesktop(
-  root,
+  data,
   async (page) => {
-    await page.getByRole('button', { name: 'Catalog', exact: true }).waitFor();
-    await expect.poll(() => action(page, { kind: 'list' })).toEqual([]);
-    const invalid = await page.evaluate(async (requestId) => {
-      return window.__TAURI_INTERNALS__
-        .invoke('package_action', {
-          action: { kind: 'prepare', requestId, releaseId: '../unapproved' },
-        })
-        .catch((error) => error);
-    }, randomUUID());
-    expect(invalid.code).toBe('package_failed');
-    await action(page, {
-      kind: 'prepare',
-      requestId: request,
-      releaseId: 'fixture.core.1',
+    await expect.poll(async () => (await view(page)).library.length).toBe(1);
+    const review = await sharing(page, {
+      kind: 'review',
+      text: JSON.stringify(document),
     });
+    expect(review.entries[0].status).toBe('pending');
+    const requestId = randomUUID();
+    const action = {
+      kind: 'accept',
+      text: JSON.stringify(document),
+      requestId,
+      expectedRevision: (await view(page)).revision,
+    };
+    const accepted = await sharing(page, action);
+    expect((await sharing(page, action)).collectionId).toBe(
+      accepted.collectionId,
+    );
+    collection = accepted.collectionId;
     await expect
-      .poll(
-        async () =>
-          (await action(page, { kind: 'list' })).find(
-            (op) => op.requestId === request,
-          )?.status,
-      )
-      .toBe('completed');
-    const duplicate = await action(page, {
-      kind: 'prepare',
-      requestId: request,
-      releaseId: 'fixture.core.1',
-    });
-    expect(duplicate.filter((op) => op.requestId === request)).toHaveLength(1);
+      .poll(async () => (await view(page)).imports[0].entries[0].status)
+      .toBe('ready');
+    const operations = await invoke(page, 'package_action', { kind: 'list' });
+    expect(operations).toHaveLength(1);
+    expect(operations[0].kind).toBe('registry_verification');
+    expect(operations[0].status).toBe('completed');
+    expect(operations[0].receiptId).toBeNull();
     await page
       .getByRole('button', { name: 'Collections', exact: true })
       .click();
-    await page
-      .getByRole('button', { name: 'Import collection', exact: true })
-      .click();
-    const shared = {
-      format: 'starframe-collection',
-      schemaVersion: 1,
-      name: 'Native shared collection',
-      entries: [
-        {
-          modId: 'fixture.core',
-          hash: archiveHash,
-          origin: 'catalog',
-          releaseId: 'fixture.core.1',
-        },
-      ],
-    };
-    const dialog = page.getByRole('dialog');
-    await dialog
-      .getByRole('textbox', { name: 'Or paste collection JSON' })
-      .fill(JSON.stringify(shared));
-    await dialog.getByRole('button', { name: 'Review import' }).click();
-    await expect(dialog).toContainText(
-      'Already downloaded; verify local files before reuse.',
-    );
-    await dialog.getByRole('button', { name: 'Accept import' }).click();
     await expect(page.getByText('1 of 1 exact packages ready')).toBeVisible();
     await page
       .getByRole('button', {
@@ -168,183 +90,86 @@ await withDesktop(
       .click();
     expect(
       JSON.parse(
-        await dialog
+        await page
           .getByRole('textbox', { name: 'Collection JSON', exact: true })
           .inputValue(),
       ),
-    ).toEqual(shared);
-    await page.screenshot({
-      path: 'test-results/native/collection-export-live.png',
-    });
-    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-    const invalidShare = await page.evaluate(async () =>
-      window.__TAURI_INTERNALS__
-        .invoke('sharing_action', {
-          action: { kind: 'review', text: '{"format":"untrusted"}' },
-        })
-        .catch((error) => error),
-    );
-    expect(invalidShare.code).toBe('sharing_failed');
-    await page.getByRole('button', { name: 'Catalog', exact: true }).click();
-    await expect(page.getByText('Catalog revision 41')).toBeVisible();
-    await writeFile(
-      join(directory, 'Core.dll'),
-      Buffer.from('changed native bytes'),
-    );
-    failedRequest = randomUUID();
-    await action(page, {
-      kind: 'prepare',
-      requestId: failedRequest,
-      releaseId: 'fixture.core.1',
-    });
+    ).toEqual(document);
+    await page.keyboard.press('Escape');
+    await writeFile(file, 'changed retained fixture');
+    await sharing(page, { kind: 'retry', id: collection });
     await expect
-      .poll(
-        async () =>
-          (await action(page, { kind: 'list' })).find(
-            (op) => op.requestId === failedRequest,
-          )?.status,
-      )
-      .toBe('failed');
-    await page
-      .getByRole('button', { name: 'Collections', exact: true })
-      .click();
-    await expect(
-      page.getByRole('heading', {
-        name: 'Native shared collection',
-        exact: true,
-      }),
-    ).toBeVisible();
+      .poll(async () => (await view(page)).imports[0].entries[0].status)
+      .toBe('unresolved');
+    expect((await view(page)).collections[0].entries).toEqual([reference]);
   },
   offline,
 );
 await withDesktop(
-  root,
+  data,
   async (page) => {
-    await page.getByRole('button', { name: 'Catalog', exact: true }).waitFor();
+    expect((await view(page)).imports[0].entries[0].status).toBe('unresolved');
+    await writeFile(file, bytes);
+    await sharing(page, { kind: 'retry', id: collection });
     await expect
-      .poll(
-        async () =>
-          (await action(page, { kind: 'list' })).find(
-            (op) => op.requestId === failedRequest,
-          )?.status,
-      )
-      .toBe('failed');
+      .poll(async () => (await view(page)).imports[0].entries[0].status)
+      .toBe('ready');
+    const before = await view(page);
+    await invoke(page, 'mod_action', {
+      kind: 'select_collection',
+      id: collection,
+      expectedRevision: before.revision,
+    });
+    expect((await view(page)).orderError).toBeNull();
   },
   offline,
 );
-expect(await readFile(join(directory, 'Core.dll'), 'utf8')).toBe(
-  'changed native bytes',
-);
-const reopened = new DatabaseSync(join(root, 'sqlite', 'state.db'));
-expect(
-  reopened.prepare('SELECT count(*) AS count FROM library').get().count,
-).toBe(1);
-reopened.close();
-// Seed retained state only; real signatures and corrected-history acceptance are covered by Rust TUF fixtures.
-const history = [];
-for (const state of ['suspected', 'confirmed', 'cleared']) {
-  const db = new DatabaseSync(join(root, 'sqlite', 'state.db'));
-  const cached = JSON.parse(
-    db.prepare('SELECT record FROM catalog_cache WHERE id=1').get().record,
-  );
-  history.push({
-    recordedAt: 1788819700 + history.length,
-    state,
-    explanation: `Synthetic ${state} evidence`,
-    evidence: ['https://example.invalid/evidence'],
-    recommendedAction:
-      state === 'confirmed' ? 'Disable this fixture.' : 'Use is permitted.',
-  });
-  const now = Math.floor(Date.now() / 1000);
+// Retained state only. Signature and revision acceptance use synthetic signed Rust fixtures.
+for (const [index, status] of ['blocked', 'cleared'].entries()) {
+  const db = new DatabaseSync(join(data, 'sqlite/state.db'));
   db.prepare(
-    'INSERT INTO catalog_security (id, record) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET record=excluded.record',
+    'INSERT INTO registry_decisions(sha256,revision,record) VALUES (?,?,?) ON CONFLICT(sha256) DO UPDATE SET revision=excluded.revision,record=excluded.record',
   ).run(
+    reference.reference.sha256,
+    index + 1,
     JSON.stringify({
-      catalogSha256: hash(JSON.stringify(cached.catalog)),
-      receivedAt: now - 100,
-      expires: now - 1,
-      advisories: {
-        schemaVersion: 1,
-        revision: String(history.length),
-        advisories: [
-          {
-            id: 'fixture.finding',
-            title: 'Synthetic native finding',
-            affected: [
-              {
-                releaseId: 'fixture.core.1',
-                sha256: archiveHash,
-                payloadSha256: [hash(bytes)],
-              },
-            ],
-            history,
-          },
-        ],
-      },
+      sha256: reference.reference.sha256,
+      revision: index + 1,
+      status,
+      reason: 'Synthetic native security decision',
     }),
   );
   db.close();
   await withDesktop(
-    root,
+    data,
     async (page) => {
-      const enabled = page.getByRole('switch', {
+      const control = page.getByRole('switch', {
         name: 'Enable Native fixture 1',
+        exact: true,
       });
-      if (state === 'confirmed') {
-        await expect(enabled).toBeDisabled();
-        await expect(
-          page.getByRole('alert').filter({ hasText: 'installed mod matches' }),
-        ).toBeVisible();
-        const blocked = await page.evaluate(
-          (requestId) =>
-            window.__TAURI_INTERNALS__
-              .invoke('package_action', {
-                action: {
-                  kind: 'prepare',
-                  requestId,
-                  releaseId: 'fixture.core.1',
-                },
-              })
-              .catch((error) => error),
-          randomUUID(),
+      if (status === 'blocked') {
+        const current = await view(page);
+        expect(current.blocked[reference.reference.sha256]).toBe(
+          'Synthetic native security decision',
         );
-        expect(blocked.message).toContain('fixture.finding');
-        await page.screenshot({
-          path: 'test-results/native/security-confirmed.png',
+        expect(current.orderError).toContain('signed registry');
+        const rejected = await sharing(page, {
+          kind: 'review',
+          text: JSON.stringify(document),
         });
+        expect(rejected.entries[0].status).toBe('unresolved');
+        await control.click();
+        await expect(control).not.toBeChecked();
+        await expect(control).toBeDisabled();
       } else {
-        await expect(enabled).toBeEnabled();
+        await expect(control).toBeEnabled();
+        expect((await view(page)).orderError).toBeNull();
       }
-      await expect(
-        page.getByRole('button', { name: 'Uninstall Native fixture 1' }),
-      ).toBeEnabled();
-      await page
-        .getByRole('button', { name: 'Native fixture', exact: true })
-        .click();
-      const details = page.getByRole('complementary', { name: 'Mod details' });
-      await expect(
-        details.getByRole('heading', { name: 'Synthetic native finding' }),
-      ).toBeVisible();
-      await details
-        .getByText('Evidence and correction history', { exact: true })
-        .click();
-      await expect(
-        details.getByText(`Synthetic ${state} evidence`, { exact: true }),
-      ).toHaveCount(2);
-      await page.getByRole('button', { name: 'Catalog', exact: true }).click();
-      await expect(
-        page.getByText(
-          'Catalog security information has expired or the clock changed.',
-          { exact: false },
-        ),
-      ).toBeVisible();
     },
     offline,
   );
 }
-expect(await readFile(join(directory, 'Core.dll'), 'utf8')).toBe(
-  'changed native bytes',
-);
+expect(await readFile(file)).toEqual(bytes);
 console.log(
-  'Native packages passed: command permissions, offline reuse, retained failure, expired advisory controls, correction history and restart.',
+  'Native exact-reference import, offline verification, corruption, restart, export and retained security controls passed.',
 );

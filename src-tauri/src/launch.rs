@@ -223,12 +223,12 @@ mod tests {
             id: "missing".into(),
             name: "Test".into(),
             revision: 1,
-            entries: vec![crate::storage::ModReference {
-                mod_id: "mod".into(),
-                hash: "0".repeat(64),
-                origin: crate::storage::Origin::LocalImport,
-                release_id: None,
-            }],
+            entries: vec![crate::references::Reference::Local(
+                crate::references::LocalReference {
+                    mod_id: "mod".into(),
+                    sha256: crate::registry::Sha256::try_from("0".repeat(64)).unwrap(),
+                },
+            )],
         });
         assert!(requested(&records).unwrap_err().contains("cannot prepare"));
         assert_eq!(records.collections[0].entries.len(), 1);

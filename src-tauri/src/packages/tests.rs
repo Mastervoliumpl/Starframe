@@ -709,6 +709,7 @@ fn cancellation_preserves_cleanup_failures_in_operation_history() {
         Active {
             operation: op.clone(),
             entry: Some(entry),
+            registry_reference: None,
             source: None,
             cancel: Cancel::default(),
             progress: Arc::new(AtomicU64::new(0)),

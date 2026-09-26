@@ -1,6 +1,6 @@
 use super::{
-    Cancel, Kind, Operation, Packages, RegistryActive, RegistryEvent, RegistryRequest, Result,
-    Status, read_file,
+    Active, Cancel, Directory, Kind, Operation, Packages, PreparedImport, RegistryActive,
+    RegistryEvent, RegistryRequest, Result, Status, read_file, verify_existing,
 };
 use crate::{
     filesystem::pin,
@@ -194,6 +194,84 @@ fn network_error(error: RegistryError) -> String {
 }
 
 impl Packages {
+    pub(crate) fn verify_registry_installed(
+        &mut self,
+        storage: &mut Storage,
+        reference: &crate::registry::ExactReference,
+    ) -> Result<Operation> {
+        if !self.can_start(reference.sha256.as_str()) {
+            return Err("Package verification is busy. Retry shortly.".into());
+        }
+        storage
+            .require_registry_unblocked_hash(reference.sha256.as_str())
+            .map_err(|error| error.to_string())?;
+        let entry = storage
+            .installed_registry_releases()
+            .map_err(|error| error.to_string())?
+            .into_iter()
+            .find(|entry| &entry.reference == reference)
+            .ok_or("The exact registry content is missing.")?;
+        let prepared = storage
+            .prepared_artifact(reference.sha256.as_str())
+            .map_err(|error| error.to_string())?
+            .ok_or("The exact file inventory is missing.")?;
+        entry.installation.validate_files(&prepared.files)?;
+        let total = prepared
+            .files
+            .iter()
+            .map(|file| file.size_bytes)
+            .sum::<u64>()
+            .max(1);
+        let operation = Operation {
+            id: Uuid::new_v4().to_string(),
+            request_id: Uuid::new_v4().to_string(),
+            release_id: reference.release_id.0.to_string(),
+            hash: reference.sha256.as_str().to_owned(),
+            kind: Kind::RegistryVerification,
+            receipt_id: None,
+            status: Status::Preparing,
+            message: "Verifying existing exact registry content offline.".into(),
+            received_bytes: 0,
+            total_bytes: total,
+        };
+        storage
+            .save_package(&operation)
+            .map_err(|error| error.to_string())?;
+        let root = storage.package_root().to_owned();
+        let path = root.join("artifacts").join(reference.sha256.as_str());
+        let cancel = Cancel::default();
+        let worker_cancel = cancel.clone();
+        let (sender, result) = mpsc::sync_channel(1);
+        tauri::async_runtime::spawn_blocking(move || {
+            let outcome = (|| {
+                verify_existing(
+                    &mut Directory::open(&root)?,
+                    &path,
+                    &prepared,
+                    &worker_cancel,
+                )?;
+                Ok(PreparedImport {
+                    prepared,
+                    local: None,
+                })
+            })();
+            let _ = sender.send(outcome);
+        });
+        self.active.insert(
+            operation.id.clone(),
+            Active {
+                operation: operation.clone(),
+                entry: None,
+                registry_reference: Some(reference.clone()),
+                source: None,
+                cancel,
+                progress: Arc::new(AtomicU64::new(0)),
+                result,
+                ready: None,
+            },
+        );
+        Ok(operation)
+    }
     pub fn resume_registry_receipts(
         &mut self,
         storage: &Storage,

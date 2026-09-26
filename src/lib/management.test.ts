@@ -11,16 +11,21 @@ const entry: LibraryEntry = {
   name: 'Fixture',
   author: 'Fixture',
   version: '1',
+  kind: 'code',
+  testedGameBuild: '1',
   reference: {
-    modId: 'fixture',
-    hash: 'a'.repeat(64),
-    origin: 'catalog',
-    releaseId: 'fixture.1',
+    kind: 'registry',
+    reference: {
+      modId: 1,
+      sha256: 'a'.repeat(64),
+      releaseId: '7f7f7f7f-7f7f-4f7f-8f7f-7f7f7f7f7f7f',
+    },
   },
 };
 const data = (revision = '0'): ModView => ({
   advisories: null,
   findings: {},
+  blocked: {},
   localSources: [],
   localWatches: [],
   revision,
@@ -89,12 +94,21 @@ test('bulk edits use each confirmed revision and retain partial success on failu
   const manager = createManagement(transport);
   await manager.refresh();
   await manager.membership(
-    [entry, { ...entry, reference: { ...entry.reference, modId: 'other' } }],
+    [
+      entry,
+      {
+        ...entry,
+        reference: {
+          kind: 'local',
+          reference: { modId: 'other', sha256: 'b'.repeat(64) },
+        },
+      },
+    ],
     true,
   );
   expect(vi.mocked(transport.mods).mock.calls[2][0]).toMatchObject({
     expectedRevision: '1',
-    reference: { modId: 'other' },
+    reference: { kind: 'local', reference: { modId: 'other' } },
   });
   expect(get(manager).error).toContain('Missing required release');
   expect(get(manager).pending).toEqual([]);

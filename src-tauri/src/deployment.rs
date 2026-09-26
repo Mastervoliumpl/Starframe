@@ -19,6 +19,8 @@ mod registry;
 mod stream_tests;
 pub(crate) use content::Source;
 pub(crate) use registry::payload as registry_sources;
+#[cfg(test)]
+pub(crate) use registry::{import_lua as fixture_local, install_case as fixture_registry};
 
 type Result<T> = std::result::Result<T, String>;
 type Files = BTreeMap<String, String>;

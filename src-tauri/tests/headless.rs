@@ -69,7 +69,7 @@ fn headless_and_gui_share_local_operations_and_storage_ownership() {
     let (ok, restarted) = command(&data, "status", &[]);
     assert!(ok, "{restarted}");
     assert_eq!(
-        restarted["data"]["mods"]["library"][0]["reference"]["modId"],
+        restarted["data"]["mods"]["library"][0]["reference"]["reference"]["modId"],
         "fixture.headless"
     );
     assert_eq!(restarted["data"]["mods"]["activeCollection"], id);

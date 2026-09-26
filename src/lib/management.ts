@@ -2,8 +2,8 @@ import { writable } from 'svelte/store';
 import { confirmed, errorMessage } from './state';
 
 import type {
-  Reference,
-  LibraryEntry,
+  CollectionReference as Reference,
+  InstalledEntry as LibraryEntry,
   Release,
   ModView,
   PackageOperation,
@@ -14,8 +14,8 @@ import type {
   Advisory,
 } from './generated/management';
 export type {
-  Reference,
-  LibraryEntry,
+  CollectionReference as Reference,
+  InstalledEntry as LibraryEntry,
   Release,
   CatalogMod,
   ModView,
@@ -40,11 +40,30 @@ export interface ManagementTransport {
 }
 export const key = (reference: Reference) =>
   JSON.stringify([
-    reference.modId,
-    reference.hash,
-    reference.origin,
-    reference.releaseId,
+    reference.kind,
+    reference.reference.modId,
+    reference.kind === 'registry' ? reference.reference.releaseId : null,
+    reference.reference.sha256,
   ]);
+export const runtimeId = (reference: Reference) =>
+  reference.kind === 'registry'
+    ? `registry.${reference.reference.modId}`
+    : reference.reference.modId;
+export const referenceLabel = (reference: Reference) =>
+  reference.kind === 'registry'
+    ? `Mod ${reference.reference.modId}`
+    : reference.reference.modId;
+export const referenceRelease = (reference: Reference) =>
+  reference.kind === 'registry'
+    ? reference.reference.releaseId
+    : 'Local import';
+export const localKey = (
+  reference: import('./generated/management').Reference,
+) =>
+  key({
+    kind: 'local',
+    reference: { modId: reference.modId, sha256: reference.hash },
+  });
 export const transferring = (op: PackageOperation) =>
   op.status === 'preparing' || op.status === 'cancelling';
 export const findings = (
@@ -62,6 +81,7 @@ export const confirmedFinding = (
   data: ModView | null,
   hash: string | undefined,
 ) =>
+  !!(hash && data?.blocked[hash]) ||
   findings(data, hash).some(
     (advisory) => advisory.history.at(-1)?.state === 'confirmed',
   );

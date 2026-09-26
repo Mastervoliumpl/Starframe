@@ -297,6 +297,17 @@ fn unfinished_legacy_wal_does_not_become_committed_sqlite_data() {
     assert_eq!(tree(&source), before);
 }
 
+fn current_expected(source: &Path) -> BTreeMap<String, Vec<Vec<serde_json::Value>>> {
+    let mut records = expected(source);
+    records.insert("collections".into(), vec![]);
+    records.insert("collection_entries".into(), vec![]);
+    records.insert(
+        "preferences".into(),
+        vec![vec![serde_json::json!(1), serde_json::Value::Null]],
+    );
+    records
+}
+
 #[test]
 fn production_startup_and_backup_restore_preserve_legacy_records_and_artifacts() {
     for schema in 1..=3 {
@@ -305,7 +316,10 @@ fn production_startup_and_backup_restore_preserve_legacy_records_and_artifacts()
         fixture(&source, schema, true);
         let before = tree(&source);
         let store = Storage::open(&source).unwrap();
-        assert_eq!(snapshot(&store.conn, SCHEMA).unwrap(), expected(&source));
+        assert_eq!(
+            snapshot(&store.conn, SCHEMA).unwrap(),
+            current_expected(&source)
+        );
         assert_eq!(integer(&store.conn, "PRAGMA foreign_keys").unwrap(), 1);
         assert_eq!(integer(&store.conn, "PRAGMA synchronous").unwrap(), 2);
         assert_eq!(
@@ -317,19 +331,22 @@ fn production_startup_and_backup_restore_preserve_legacy_records_and_artifacts()
         );
         let backup = store.backup().unwrap();
         let restored = Storage::restore_into(&backup, &temp.path().join("restored")).unwrap();
-        assert_eq!(snapshot(&restored.conn, SCHEMA).unwrap(), expected(&source));
+        assert_eq!(
+            snapshot(&restored.conn, SCHEMA).unwrap(),
+            current_expected(&source)
+        );
         let legacy =
             Storage::restore_into(&source.join("backup"), &temp.path().join("legacy-restored"))
                 .unwrap();
         assert_eq!(
             snapshot(&legacy.conn, SCHEMA).unwrap(),
-            expected(&source.join("backup"))
+            current_expected(&source.join("backup"))
         );
         drop(store);
         let restarted = Storage::open(&source).unwrap();
         assert_eq!(
             snapshot(&restarted.conn, SCHEMA).unwrap(),
-            expected(&source)
+            current_expected(&source)
         );
         drop(restarted);
         for (path, bytes) in before {
@@ -410,7 +427,7 @@ fn interrupted_production_switch_and_backups_retry_without_replacing_originals()
         let store = Storage::open(&source).unwrap();
         assert_eq!(
             snapshot(&store.conn, SCHEMA).unwrap(),
-            expected(&source),
+            current_expected(&source),
             "{phase}"
         );
         if let Some(backup) = interrupted_backup {
