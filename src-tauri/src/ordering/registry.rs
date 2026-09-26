@@ -25,6 +25,36 @@ pub fn resolve_registry(
     installed: &[RegistryLibraryEntry],
     requested: &[ExactReference],
 ) -> Result<RegistryResolution, String> {
+    let (selected, edges) = selection_edges(installed, requested)?;
+    let mut adjustments = Vec::new();
+    for (from, targets) in edges.iter().enumerate() {
+        for &to in targets {
+            if from > to {
+                adjustments.push(RegistryAdjustment {
+                    before: requested[from].mod_id,
+                    after: requested[to].mod_id,
+                    message: format!(
+                        "{} must load before {}.",
+                        selected[from].display.name, selected[to].display.name
+                    ),
+                });
+            }
+        }
+    }
+    let effective = topological(&edges)
+        .into_iter()
+        .map(|index| requested[index].clone())
+        .collect();
+    Ok(RegistryResolution {
+        effective,
+        adjustments,
+    })
+}
+
+pub(super) fn selection_edges<'a>(
+    installed: &'a [RegistryLibraryEntry],
+    requested: &[ExactReference],
+) -> Result<(Vec<&'a RegistryLibraryEntry>, Vec<BTreeSet<usize>>), String> {
     if requested.len() > crate::runtime_contract::MAX_MODS {
         return Err("Starframe supports at most 256 active mods.".into());
     }
@@ -81,29 +111,7 @@ pub fn resolve_registry(
             names.join(" -> ")
         ));
     }
-    let mut adjustments = Vec::new();
-    for (from, targets) in edges.iter().enumerate() {
-        for &to in targets {
-            if from > to {
-                adjustments.push(RegistryAdjustment {
-                    before: requested[from].mod_id,
-                    after: requested[to].mod_id,
-                    message: format!(
-                        "{} must load before {}.",
-                        selected[from].display.name, selected[to].display.name
-                    ),
-                });
-            }
-        }
-    }
-    let effective = topological(&edges)
-        .into_iter()
-        .map(|index| requested[index].clone())
-        .collect();
-    Ok(RegistryResolution {
-        effective,
-        adjustments,
-    })
+    Ok((selected, edges))
 }
 
 #[cfg(test)]

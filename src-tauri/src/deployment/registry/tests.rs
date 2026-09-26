@@ -33,7 +33,11 @@ fn declared_code_activation_preserves_native_sources_and_content_is_not_runtime_
     let lua = install_case(&mut store, 0, 3, &requirements);
     let ai = install_case(&mut store, 3, 2, &[]);
     let selection = [lua.clone(), ai.clone(), map.clone(), managed.clone()];
-    let requested = activation::requested(&store, &selection).unwrap();
+    let selection = selection
+        .into_iter()
+        .map(crate::references::Reference::Registry)
+        .collect::<Vec<_>>();
+    let requested = crate::selection::requested(&store, &selection).unwrap();
     assert_eq!(requested["schemaVersion"], 4);
     assert_eq!(requested["mods"].as_array().unwrap().len(), 2);
     assert_eq!(requested["installedMods"].as_array().unwrap().len(), 2);
@@ -50,7 +54,7 @@ fn declared_code_activation_preserves_native_sources_and_content_is_not_runtime_
             "kind":"registry", "modId":lua.mod_id, "releaseId":lua.release_id, "sha256":lua.sha256
         })
     );
-    let sources = activation::payload(&store, &selection, &requested).unwrap();
+    let sources = crate::selection::payload(&store, &selection, &requested).unwrap();
     assert_eq!(sources.len(), 8);
     let root = temp.path().join("engine");
     fs::create_dir(&root).unwrap();
@@ -89,17 +93,17 @@ fn declared_code_activation_preserves_native_sources_and_content_is_not_runtime_
     drop(store);
     let store = Storage::open(&data).unwrap();
     assert_eq!(
-        activation::requested(&store, &selection).unwrap(),
+        crate::selection::requested(&store, &selection).unwrap(),
         requested
     );
-    assert!(activation::payload(&store, &selection[..3], &requested).is_err());
+    assert!(crate::selection::payload(&store, &selection[..3], &requested).is_err());
     let source = store
         .package_root()
         .join("artifacts")
         .join(lua.sha256.as_str())
         .join("LJ/lua/Example/main.lua");
     fs::write(source, b"changed source").unwrap();
-    assert!(activation::payload(&store, &selection, &requested).is_err());
+    assert!(crate::selection::payload(&store, &selection, &requested).is_err());
     assert_eq!(fs::read(root.join("original.game")).unwrap(), b"original");
 }
 
@@ -107,10 +111,130 @@ fn install(store: &mut Storage, ai: bool, id: u64) -> ExactReference {
     install_case(store, if ai { 3 } else { 2 }, id, &[])
 }
 
-#[test]
+#[tokio::test(flavor = "multi_thread")]
+async fn mixed_selection_reuses_local_imports_and_registry_content_offline() {
+    use crate::{references::Reference, selection};
+    let temp = tempfile::tempdir().unwrap();
+    let data = temp.path().join("data");
+    let mut store = Storage::open(&data).unwrap();
+    let lua = install_case(&mut store, 0, 1, &[]);
+    let map = install_case(&mut store, 2, 2, &[]);
+    let local = import_lua(&mut store, temp.path(), "fixture.local");
+    let disabled = import_lua(&mut store, temp.path(), "fixture.disabled");
+    let references = [
+        Reference::Registry(lua),
+        Reference::try_from(&local).unwrap(),
+        Reference::Registry(map),
+    ];
+    let activation = selection::requested(&store, &references).unwrap();
+    assert_eq!(activation["mods"].as_array().unwrap().len(), 2);
+    assert_eq!(activation["mods"][0]["modId"], "registry.1");
+    assert_eq!(activation["mods"][1]["modId"], "fixture.local");
+    assert_eq!(activation["mods"][1]["source"]["kind"], "local");
+    assert_eq!(activation["installedMods"].as_array().unwrap().len(), 3);
+    assert_eq!(activation["installedMods"][2]["modId"], "fixture.disabled");
+    assert_eq!(activation["omittedDisabledMods"], 0);
+    let sources = selection::payload(&store, &references, &activation).unwrap();
+    assert_eq!(sources.len(), 5);
+    assert!(
+        sources
+            .iter()
+            .any(|(path, _)| path.ends_with("LJ/lua/local.lua"))
+    );
+    assert!(
+        sources
+            .iter()
+            .all(|(path, _)| !path.contains("fixture.disabled"))
+    );
+    drop(store);
+    let store = Storage::open(&data).unwrap();
+    assert_eq!(
+        selection::requested(&store, &references).unwrap(),
+        activation
+    );
+    assert!(selection::payload(&store, &references, &activation).is_ok());
+    assert!(selection::payload(&store, &references[..1], &activation).is_err());
+    let copied = store
+        .artifact_directory(&local)
+        .unwrap()
+        .join("LJ/lua/local.lua");
+    fs::write(copied, b"changed retained copy").unwrap();
+    assert!(selection::payload(&store, &references, &activation).is_err());
+    assert_eq!(
+        fs::read(temp.path().join("fixture.local/LJ/lua/local.lua")).unwrap(),
+        b"return 'local fixture'"
+    );
+    assert!(store.prepared_artifact(&disabled.hash).unwrap().is_some());
+}
+
+fn import_lua(store: &mut Storage, root: &Path, id: &str) -> crate::storage::ModReference {
+    let source = root.join(id);
+    fs::create_dir_all(source.join("LJ/lua")).unwrap();
+    fs::write(source.join("LJ/lua/local.lua"), b"return 'local fixture'").unwrap();
+    fs::write(source.join(crate::local_import::MANIFEST), serde_json::to_vec(&serde_json::json!({
+        "schemaVersion":1,"modId":id,"name":id,"author":"fixture","version":"dev.1","layout":{"kind":"starframe_lua_zip"}
+    })).unwrap()).unwrap();
+    let mut queue = packages::Packages::open(store).unwrap();
+    let request = Uuid::new_v4().to_string();
+    queue
+        .import_local(store, &request, source.to_str().unwrap())
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+    loop {
+        queue.poll(store).unwrap();
+        let operation = store.package_request(&request).unwrap().unwrap();
+        if operation.status == Status::Completed {
+            break;
+        }
+        assert_eq!(operation.status, Status::Preparing, "{}", operation.message);
+        assert!(
+            std::time::Instant::now() < deadline,
+            "Local fixture import timed out"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    store
+        .load()
+        .unwrap()
+        .library
+        .into_iter()
+        .find(|entry| entry.reference.mod_id == id)
+        .unwrap()
+        .reference
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn mixed_inventory_bounds_disabled_library_without_excluding_active_code() {
+    use crate::{references::Reference, selection};
+    let temp = tempfile::tempdir().unwrap();
+    let mut store = Storage::open(&temp.path().join("data")).unwrap();
+    let registry = install_case(&mut store, 0, 1, &[]);
+    let local = import_lua(&mut store, temp.path(), "fixture.local");
+    let mut disabled = store.load().unwrap().library[0].clone();
+    // Disabled display records need no executable files or source declarations.
+    for number in 0..258 {
+        disabled.reference.mod_id = format!("fixture.disabled.{number}");
+        disabled.name = disabled.reference.mod_id.clone();
+        let revision = store.load().unwrap().revision;
+        store.put_library_entry(&disabled, revision).unwrap();
+    }
+    let references = [
+        Reference::Registry(registry),
+        Reference::try_from(&local).unwrap(),
+    ];
+    let activation = selection::requested(&store, &references).unwrap();
+    assert_eq!(activation["mods"].as_array().unwrap().len(), 2);
+    assert_eq!(activation["installedMods"].as_array().unwrap().len(), 256);
+    assert_eq!(activation["installedMods"][0]["modId"], "registry.1");
+    assert_eq!(activation["installedMods"][1]["modId"], "fixture.local");
+    assert_eq!(activation["omittedDisabledMods"], 4);
+    assert!(selection::payload(&store, &references, &activation).is_ok());
+}
+
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "Requires the pinned bootstrap cache under test-results; never launches the fake game"]
-fn shared_backend_registry_setup_reopens_offline_and_removes_only_owned_files() {
-    use crate::{backend, game, registry::activation};
+async fn shared_backend_registry_setup_reopens_offline_and_removes_only_owned_files() {
+    use crate::{backend, game, references::Reference, selection};
     let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let evidence = fs::canonicalize(workspace.join("test-results")).unwrap();
     let cache = fs::canonicalize(
@@ -126,9 +250,12 @@ fn shared_backend_registry_setup_reopens_offline_and_removes_only_owned_files() 
     let temp = tempfile::tempdir().unwrap();
     let data = temp.path().join("data");
     let mut store = Storage::open(&data).unwrap();
-    let selection = (0..4)
-        .map(|case| install_case(&mut store, case, case as u64 + 1, &[]))
+    let mut references = (0..4)
+        .map(|case| Reference::Registry(install_case(&mut store, case, case as u64 + 1, &[])))
         .collect::<Vec<_>>();
+    let local = import_lua(&mut store, temp.path(), "fixture.local");
+    import_lua(&mut store, temp.path(), "fixture.disabled");
+    references.insert(1, Reference::try_from(&local).unwrap());
     let game_root = temp.path().join("game");
     game::tests::fixture(&game_root, "engine");
     let game = game::inspect(&game_root).unwrap();
@@ -173,9 +300,9 @@ fn shared_backend_registry_setup_reopens_offline_and_removes_only_owned_files() 
     )
     .unwrap();
     let prepared =
-        backend::prepare_registry(&mut store, &game, &resources, &selection, false, &|| false)
+        backend::prepare_references(&mut store, &game, &resources, &references, false, &|| false)
             .unwrap();
-    assert_eq!(prepared, activation::requested(&store, &selection).unwrap());
+    assert_eq!(prepared, selection::requested(&store, &references).unwrap());
     assert_eq!(
         backend::readiness(&store, &game).unwrap(),
         Some(prepared.clone())
@@ -193,12 +320,12 @@ fn shared_backend_registry_setup_reopens_offline_and_removes_only_owned_files() 
         Some(prepared.clone())
     );
     assert_eq!(
-        backend::prepare_registry(&mut store, &game, &resources, &selection, false, &|| false)
+        backend::prepare_references(&mut store, &game, &resources, &references, false, &|| false)
             .unwrap(),
         prepared
     );
     assert!(
-        backend::prepare_registry(&mut store, &game, &resources, &selection, false, &|| true)
+        backend::prepare_references(&mut store, &game, &resources, &references, false, &|| true)
             .is_err()
     );
     assert_eq!(backend::readiness(&store, &game).unwrap(), Some(prepared));

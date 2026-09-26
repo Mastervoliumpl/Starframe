@@ -699,7 +699,7 @@ pub fn prepare_desktop(
     game: &game::Installation,
     resources: &Path,
     activation: &serde_json::Value,
-    registry_selection: Option<&[crate::registry::ExactReference]>,
+    registry_selection: Option<&[crate::references::Reference]>,
     cancelled: &impl Fn() -> bool,
 ) -> Result<usize> {
     crate::runtime_contract::read(
@@ -726,7 +726,7 @@ pub fn prepare_desktop(
         .map(|(path, bytes)| (path, Source::Bytes(bytes)))
         .collect();
     files.extend(match registry_selection {
-        Some(references) => crate::registry::activation::payload(store, references, activation)?,
+        Some(references) => crate::selection::payload(store, references, activation)?,
         None => crate::mods::payload(store, activation)?,
     });
     let mut guard = || {

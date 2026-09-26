@@ -67,8 +67,30 @@ impl From<PublicationOrder> for u64 {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
-#[serde(transparent)]
+#[serde(try_from = "String", into = "String")]
 pub struct ReleaseId(pub Uuid);
+
+impl TryFrom<String> for ReleaseId {
+    type Error = &'static str;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let id = Uuid::parse_str(&value).map_err(|_| "ReleaseID must be a canonical UUID v4")?;
+        if id.to_string() == value
+            && id.get_version_num() == 4
+            && id.get_variant() == uuid::Variant::RFC4122
+        {
+            Ok(Self(id))
+        } else {
+            Err("ReleaseID must be a canonical UUID v4")
+        }
+    }
+}
+
+impl From<ReleaseId> for String {
+    fn from(value: ReleaseId) -> Self {
+        value.0.to_string()
+    }
+}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
@@ -130,6 +152,14 @@ mod tests {
             assert!(serde_json::from_value::<ModId>(bad).is_err());
         }
         assert!(Sha256::try_from("A".repeat(64)).is_err());
+        for invalid in [
+            "00000000-0000-0000-0000-000000000000",
+            "00000000-0000-1000-8000-000000000001",
+            "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+            "00000000000040008000000000000001",
+        ] {
+            assert!(serde_json::from_value::<ReleaseId>(serde_json::json!(invalid)).is_err());
+        }
         assert!(serde_json::from_value::<ExactReference>(serde_json::json!({"modId":1,"releaseId":"00000000-0000-4000-8000-000000000001","sha256":"a".repeat(64),"unexpected":true})).is_err());
     }
 

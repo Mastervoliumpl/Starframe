@@ -96,14 +96,3 @@ pub fn requested(store: &Storage, references: &[ExactReference]) -> Result<Value
         "deploymentRevision":revision.to_string(),"installedMods":inventory,"omittedDisabledMods":0,"mods":mods
     })).map_err(|error| error.to_string())?, "activation")
 }
-
-pub(crate) fn payload(
-    store: &Storage,
-    references: &[ExactReference],
-    activation: &Value,
-) -> Result<Vec<(String, crate::deployment::Source)>, String> {
-    if &requested(store, references)? != activation {
-        return Err("The selected registry setup changed before preparation.".into());
-    }
-    super::super::deployment::registry_sources(store, references)
-}

@@ -110,11 +110,11 @@ pub fn prepare(
     prepare_selection(store, game, resources, None, dispatch, cancelled)
 }
 
-pub fn prepare_registry(
+pub fn prepare_references(
     store: &mut Storage,
     game: &game::Installation,
     resources: &Path,
-    references: &[crate::registry::ExactReference],
+    references: &[crate::references::Reference],
     dispatch: bool,
     cancelled: &impl Fn() -> bool,
 ) -> Result<Value, String> {
@@ -132,7 +132,7 @@ fn prepare_selection(
     store: &mut Storage,
     game: &game::Installation,
     resources: &Path,
-    references: Option<&[crate::registry::ExactReference]>,
+    references: Option<&[crate::references::Reference]>,
     dispatch: bool,
     cancelled: &impl Fn() -> bool,
 ) -> Result<Value, String> {
@@ -142,7 +142,7 @@ fn prepare_selection(
     let store = std::cell::RefCell::new(store);
     launch::prepare_latest(
         || match references {
-            Some(references) => crate::registry::activation::requested(&store.borrow(), references),
+            Some(references) => crate::selection::requested(&store.borrow(), references),
             None => mods::requested(&store.borrow()),
         },
         |activation| {

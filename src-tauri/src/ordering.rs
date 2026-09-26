@@ -4,6 +4,8 @@ use std::collections::{BTreeSet, HashMap};
 
 mod registry;
 pub use registry::{RegistryAdjustment, RegistryResolution, resolve_registry};
+mod mixed;
+pub use mixed::{MixedAdjustment, MixedResolution, resolve_mixed};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
