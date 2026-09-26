@@ -1,3 +1,4 @@
+pub mod activation;
 mod auth;
 #[cfg(windows)]
 mod credential;

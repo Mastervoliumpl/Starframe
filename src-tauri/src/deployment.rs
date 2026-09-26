@@ -18,6 +18,7 @@ mod registry;
 #[cfg(test)]
 mod stream_tests;
 pub(crate) use content::Source;
+pub(crate) use registry::payload as registry_sources;
 
 type Result<T> = std::result::Result<T, String>;
 type Files = BTreeMap<String, String>;
@@ -698,7 +699,7 @@ pub fn prepare_desktop(
     game: &game::Installation,
     resources: &Path,
     activation: &serde_json::Value,
-    registry_content: &[crate::registry::ExactReference],
+    registry_selection: Option<&[crate::registry::ExactReference]>,
     cancelled: &impl Fn() -> bool,
 ) -> Result<usize> {
     crate::runtime_contract::read(
@@ -724,8 +725,10 @@ pub fn prepare_desktop(
         .into_iter()
         .map(|(path, bytes)| (path, Source::Bytes(bytes)))
         .collect();
-    files.extend(crate::mods::payload(store, activation)?);
-    files.extend(registry::payload(store, registry_content)?);
+    files.extend(match registry_selection {
+        Some(references) => crate::registry::activation::payload(store, references, activation)?,
+        None => crate::mods::payload(store, activation)?,
+    });
     let mut guard = || {
         if cancelled() {
             return Err("Starframe is closing. Preparation stopped at a safe boundary.".into());

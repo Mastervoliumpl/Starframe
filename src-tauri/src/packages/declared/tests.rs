@@ -78,7 +78,7 @@ fn manifest(bytes: &[u8], plan: Option<Value>) -> VerifiedRelease {
     .unwrap()
 }
 
-fn managed_image() -> Vec<u8> {
+pub(crate) fn managed_image() -> Vec<u8> {
     let mut bytes = vec![0u8; 1024];
     bytes[..2].copy_from_slice(b"MZ");
     bytes[128..132].copy_from_slice(b"PE\0\0");

@@ -24,7 +24,7 @@ public static class Contracts
             var root = document.RootElement;
             CheckDuplicates(root);
             string schema = root.GetProperty("schemaVersion").GetRawText();
-            Require(kind == "activation" ? schema is "2" or "3" : schema == "1", "schema version");
+            Require(kind == "activation" ? schema is "2" or "3" or "4" : schema == "1", "schema version");
             Require(root.GetProperty("runtimeContractVersion").GetRawText() == "1", "runtime contract version");
             Require(Text(root, "integrationId", 64) == "starframe.bepinex", "integration ID");
             switch (kind)
@@ -47,7 +47,7 @@ public static class Contracts
     {
         var fields = new List<string> { "schemaVersion", "runtimeContractVersion", "integrationId", "deploymentRevision", "installedMods", "mods" };
         int omitted = 0;
-        if (root.GetProperty("schemaVersion").GetInt32() == 3)
+        if (root.GetProperty("schemaVersion").GetInt32() is 3 or 4)
         {
             fields.Add("omittedDisabledMods");
             Require(root.GetProperty("omittedDisabledMods").TryGetInt32(out omitted) && omitted >= 0, "omitted inventory count");
@@ -98,7 +98,18 @@ public static class Contracts
             var source = mod.GetProperty("source");
             switch (Text(source, "kind", 16))
             {
-                case "catalog": Fields(source, "kind", "releaseId"); Id(source, "releaseId"); break;
+                case "catalog":
+                    Require(root.GetProperty("schemaVersion").GetInt32() != 4, "obsolete catalog source");
+                    Fields(source, "kind", "releaseId"); Id(source, "releaseId"); break;
+                case "registry":
+                    Require(root.GetProperty("schemaVersion").GetInt32() == 4, "registry activation schema");
+                    Fields(source, "kind", "modId", "releaseId", "sha256");
+                    Require(source.GetProperty("modId").TryGetUInt64(out ulong nativeId) && nativeId is > 0 and <= 9_007_199_254_740_991, "registry ModID");
+                    Require(id == "registry." + nativeId.ToString(CultureInfo.InvariantCulture), "registry runtime identity");
+                    string releaseId = Text(source, "releaseId", 36);
+                    Require(Guid.TryParseExact(releaseId, "D", out var release) && releaseId == release.ToString("D") && releaseId[14] == '4' && "89ab".Contains(releaseId[19]), "registry ReleaseID");
+                    Require(Matches(Text(source, "sha256", 64), "[0-9a-f]{64}"), "registry archive hash");
+                    break;
                 case "local":
                     Fields(source, "kind", "contentId");
                     Require(Text(source, "contentId", 71) == ContentId(mod.GetProperty("files")), "local content ID");

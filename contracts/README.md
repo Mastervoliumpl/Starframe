@@ -2,7 +2,7 @@
 
 Issue [#11](https://github.com/Mastervoliumpl/Starframe/issues/11) implements the file boundary in [HANDOFF.md](../docs/HANDOFF.md). The runtime reads prepared files independently of the desktop database. These are internal formats; a public SDK has not been released.
 
-[Activation](fixtures/activation.json), [capabilities](fixtures/capabilities.json) and [report](fixtures/report.json) are executable examples. Both readers consume every case in [cases.json](fixtures/cases.json). Activation readers support `schemaVersion: 2` and `3`; capabilities/reports use `schemaVersion: 1`. All use `runtimeContractVersion: 1`; `integrationId` is `starframe.bepinex`. Unsupported versions, duplicate JSON properties, unknown/missing fields, unexpected null values, comments and trailing data are rejected. Product version is separate.
+[Activation](fixtures/activation.json), [capabilities](fixtures/capabilities.json) and [report](fixtures/report.json) are executable examples. Both readers consume every case in [cases.json](fixtures/cases.json). Activation readers currently support `schemaVersion: 2`, `3` and `4`; capabilities/reports use `schemaVersion: 1`. All use `runtimeContractVersion: 1`; `integrationId` is `starframe.bepinex`. Unsupported versions, duplicate JSON properties, unknown/missing fields, unexpected null values, comments and trailing data are rejected. Product version is separate. The schema 2/3 catalog reader is temporary during 0.7.0 implementation and must be removed under #89 before milestone acceptance.
 
 ## Bounds and activation
 
@@ -19,6 +19,10 @@ Paths are relative, forward-slash-separated ASCII paths of at most 240 bytes. Se
 These checks validate the document, not the filesystem. Deployment and activation must still resolve paths under their owned roots, reject reparse-point escapes, verify hashes and prevent assembly resolution outside the validated inventory. Callers must read files with the same byte limit before passing their contents to either reader. No validator call loads a DLL or executes a mod. Deployment and activation implement these checks in #12/#13; game/framework assemblies remain trusted dependencies, and managed mods are not sandboxed.
 
 `source.kind=catalog` has exactly `kind` and `releaseId`. `source.kind=local` has exactly `kind` and `contentId`. The local ID is `sha256:` followed by the hash of the canonical inventory bytes below. The reader verifies that ID against the declared inventory. It does not prove that the files on disk have those hashes.
+
+The registry preparation path writes schema 4. It retains the schema 3 bounds and required `omittedDisabledMods` field, rejects catalog sources, and accepts registry or local sources. A registry source contains exactly `kind`, numeric `modId`, canonical UUID v4 `releaseId` and lowercase archive `sha256`. ModIDs are positive integers within JavaScript's safe integer range. The runtime's private string ID is `registry.<modId>`; the native exact triple remains in the source record. Settings use that stable runtime ID across approved releases. Code roots include both ModID and ReleaseID, so separate logical approvals do not share a deployment root.
+
+Declared Lua and BepInEx Code packages use the existing activation adapter. Managed `entryAssembly` is resolved relative to the declaration's `sourceRoot`. Map/AI packages are deployed through the desktop owner and omitted from runtime Code entries and reports. Their dependencies still constrain the selected setup; placement alone does not establish gameplay support. The current registry builder includes selected Code inventory only. Mixed collections and bounded disabled library inventory remain part of #87. The 19 registry fixtures check source identity and rejection rules in both readers; a controlled activation test executes Starframe's own fixture assembly and verifies the Lua adapter callback in a separate process.
 
 ## Canonical local inventory
 

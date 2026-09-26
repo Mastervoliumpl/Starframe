@@ -2,7 +2,7 @@ use super::{Result, Source};
 use crate::{packages, registry::ExactReference, storage::Storage};
 use std::collections::BTreeSet;
 
-pub(super) fn payload(
+pub(crate) fn payload(
     store: &Storage,
     references: &[ExactReference],
 ) -> Result<Vec<(String, Source)>> {
@@ -20,31 +20,29 @@ pub(super) fn payload(
             .iter()
             .find(|entry| &entry.reference == reference)
             .ok_or("The exact registry release is not installed.")?;
-        if !matches!(
-            entry.installation,
-            crate::registry::installation::Installation::Content { .. }
-        ) {
-            return Err("Only declared Map and AI releases belong in content placement.".into());
-        }
         let prepared = packages::verify_registry_artifact(store, entry)?;
         let root = store
             .package_root()
             .join("artifacts")
             .join(reference.sha256.as_str());
         for file in prepared.files {
-            let target = entry
-                .installation
-                .content_path(&file.path)?
-                .ok_or("A content release has no declared game destination.")?;
-            // The shared deployment owner is rooted at <game>/engine.
-            let target = target
-                .strip_prefix("engine/")
-                .ok_or("The declared destination is outside the game engine.")?;
+            let target = match entry.installation.content_path(&file.path)? {
+                // The shared deployment owner is rooted at <game>/engine.
+                Some(target) => target
+                    .strip_prefix("engine/")
+                    .ok_or("The declared destination is outside the game engine.")?
+                    .to_owned(),
+                None => format!(
+                    "Starframe/{}/{}",
+                    crate::registry::activation::runtime_root(reference),
+                    file.path
+                ),
+            };
             if !paths.insert(target.to_ascii_lowercase()) {
                 return Err("Selected registry content has conflicting game paths.".into());
             }
             sources.push((
-                target.into(),
+                target,
                 Source::File {
                     path: root.join(file.path),
                     hash: file.sha256,

@@ -17,7 +17,7 @@ pub fn read(bytes: &[u8], kind: &str) -> Result<Value> {
     depth(&value, 0)?;
     require(
         if kind == "activation" {
-            matches!(value["schemaVersion"].as_u64(), Some(2 | 3))
+            matches!(value["schemaVersion"].as_u64(), Some(2..=4))
         } else {
             value["schemaVersion"].as_u64() == Some(1)
         },
@@ -49,7 +49,7 @@ fn activation(root: &Value) -> Result<()> {
         "installedMods",
         "mods",
     ];
-    if root["schemaVersion"] == 3 {
+    if matches!(root["schemaVersion"].as_u64(), Some(3 | 4)) {
         expected.push("omittedDisabledMods");
         require(
             root["omittedDisabledMods"]
@@ -158,8 +158,39 @@ fn activation(root: &Value) -> Result<()> {
         let source = &item["source"];
         match text(&source["kind"], 16, false)? {
             "catalog" => {
+                require(root["schemaVersion"] != 4, "obsolete catalog source")?;
                 fields(source, &["kind", "releaseId"])?;
                 id(&source["releaseId"])?;
+            }
+            "registry" => {
+                require(root["schemaVersion"] == 4, "registry activation schema")?;
+                fields(source, &["kind", "modId", "releaseId", "sha256"])?;
+                let native_id = source["modId"].as_u64().ok_or("registry ModID")?;
+                require(
+                    (1..=crate::registry::MAX_SAFE_INTEGER).contains(&native_id),
+                    "registry ModID",
+                )?;
+                require(
+                    mod_id == format!("registry.{native_id}"),
+                    "registry runtime identity",
+                )?;
+                let release_id = text(&source["releaseId"], 36, false)?;
+                let release =
+                    uuid::Uuid::parse_str(release_id).map_err(|error| error.to_string())?;
+                require(
+                    release.to_string() == release_id
+                        && release.get_version_num() == 4
+                        && release.get_variant() == uuid::Variant::RFC4122,
+                    "registry ReleaseID",
+                )?;
+                let hash = text(&source["sha256"], 64, false)?;
+                require(
+                    hash.len() == 64
+                        && hash
+                            .bytes()
+                            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)),
+                    "registry archive hash",
+                )?;
             }
             "local" => {
                 fields(source, &["kind", "contentId"])?;

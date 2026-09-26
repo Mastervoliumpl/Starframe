@@ -27,6 +27,8 @@ mod local;
 mod registry;
 pub use declared::prepare_registry_archive;
 #[cfg(test)]
+pub(crate) use declared::tests::managed_image;
+#[cfg(test)]
 mod tests;
 mod transfer;
 pub mod watch;

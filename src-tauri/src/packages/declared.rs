@@ -54,4 +54,4 @@ pub fn prepare_registry_archive(
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

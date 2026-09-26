@@ -4,7 +4,7 @@ use starframe::{
     packages::{self, Packages},
     storage::Storage,
 };
-use std::{path::Path, thread, time::Duration};
+use std::{io::Read, path::Path, thread, time::Duration};
 use uuid::Uuid;
 
 fn argument<'a>(args: &'a [String], index: usize, name: &str) -> Result<&'a str, String> {
@@ -61,7 +61,7 @@ fn wait_for_package(
 
 fn run(args: &[String]) -> Result<Value, String> {
     if args.len() < 2 {
-        return Err("Usage: starframe_headless <absolute-data-dir> <status|import|prepare-package|collection-create|collection-select|select-game|readiness|setup|launch> [arguments].".into());
+        return Err("Usage: starframe_headless <absolute-data-dir> <status|import|prepare-package|collection-create|collection-select|select-game|readiness|setup|setup-registry|launch> [arguments].".into());
     }
     let root = Path::new(&args[0]);
     if !root.is_absolute() {
@@ -155,6 +155,36 @@ fn run(args: &[String]) -> Result<Value, String> {
                 backend::prepare(&mut store, &game, resources, args[1] == "launch", &|| false)?;
             Ok(json!({"activation": activation}))
         }
+        "setup-registry" => {
+            exact_args(args, 5)?;
+            let game = installation(argument(args, 2, "game directory")?)?;
+            let resources = Path::new(argument(args, 3, "integration resource directory")?);
+            let selection = Path::new(argument(args, 4, "exact registry selection file")?);
+            if !resources.is_absolute() || !selection.is_absolute() {
+                return Err("Resource and selection paths must be absolute.".into());
+            }
+            let mut bytes = Vec::new();
+            std::fs::File::open(selection)
+                .map_err(|error| error.to_string())?
+                .take(starframe::runtime_contract::MAX_DOCUMENT_BYTES as u64 + 1)
+                .read_to_end(&mut bytes)
+                .map_err(|error| error.to_string())?;
+            if bytes.len() > starframe::runtime_contract::MAX_DOCUMENT_BYTES {
+                return Err("The exact selection file exceeds 1 MiB.".into());
+            }
+            let references: Vec<starframe::registry::ExactReference> =
+                serde_json::from_value(starframe::runtime_contract::unique_json(&bytes)?)
+                    .map_err(|error| error.to_string())?;
+            let activation = backend::prepare_registry(
+                &mut store,
+                &game,
+                resources,
+                &references,
+                false,
+                &|| false,
+            )?;
+            Ok(json!({"activation": activation}))
+        }
         _ => Err("Unknown headless command. Run without arguments for usage.".into()),
     }
 }
@@ -167,7 +197,9 @@ fn main() {
             let code = match args.get(1).map(String::as_str) {
                 Some("import" | "prepare-package") => "package_failed",
                 Some("collection-create" | "collection-select" | "status") => "mods_failed",
-                Some("select-game" | "readiness" | "setup" | "launch") => "game_failed",
+                Some("select-game" | "readiness" | "setup" | "setup-registry" | "launch") => {
+                    "game_failed"
+                }
                 _ => "invalid_command",
             };
             eprintln!(

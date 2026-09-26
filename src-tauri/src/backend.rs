@@ -107,12 +107,44 @@ pub fn prepare(
     dispatch: bool,
     cancelled: &impl Fn() -> bool,
 ) -> Result<Value, String> {
+    prepare_selection(store, game, resources, None, dispatch, cancelled)
+}
+
+pub fn prepare_registry(
+    store: &mut Storage,
+    game: &game::Installation,
+    resources: &Path,
+    references: &[crate::registry::ExactReference],
+    dispatch: bool,
+    cancelled: &impl Fn() -> bool,
+) -> Result<Value, String> {
+    prepare_selection(
+        store,
+        game,
+        resources,
+        Some(references),
+        dispatch,
+        cancelled,
+    )
+}
+
+fn prepare_selection(
+    store: &mut Storage,
+    game: &game::Installation,
+    resources: &Path,
+    references: Option<&[crate::registry::ExactReference]>,
+    dispatch: bool,
+    cancelled: &impl Fn() -> bool,
+) -> Result<Value, String> {
     if !resources.join("runtime/runtime-package.json").is_file() {
         return Err("This Starframe build does not include the game runtime. Use a build with runtime support to finish setup.".into());
     }
     let store = std::cell::RefCell::new(store);
     launch::prepare_latest(
-        || mods::requested(&store.borrow()),
+        || match references {
+            Some(references) => crate::registry::activation::requested(&store.borrow(), references),
+            None => mods::requested(&store.borrow()),
+        },
         |activation| {
             deployment::repair_missing(&mut store.borrow_mut(), game)?;
             deployment::prepare_desktop(
@@ -120,7 +152,7 @@ pub fn prepare(
                 game,
                 resources,
                 activation,
-                &[],
+                references,
                 cancelled,
             )
             .map(|_| ())
