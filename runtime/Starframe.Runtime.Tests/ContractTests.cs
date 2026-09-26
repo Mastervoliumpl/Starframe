@@ -33,7 +33,7 @@ public sealed class ContractTests
                 int fileCount = dimension switch { "files" => count, "totalFiles" => Math.Min(count - i * 1024, 1024), _ => 1 };
                 var files = new JsonArray();
                 for (int f = 0; f < fileCount; f++) files.Add(new JsonObject { ["path"] = $"LJ/lua/f{f}.lua", ["sha256"] = string.Concat(Enumerable.Repeat("ab", 32)) });
-                mods.Add(new JsonObject { ["modId"] = $"fixture.m{i}", ["root"] = $"mods/m{i}", ["source"] = new JsonObject { ["kind"] = "catalog", ["releaseId"] = $"fixture.m{i}.1" }, ["requires"] = new JsonArray(), ["entryAssembly"] = null, ["entryType"] = null, ["files"] = files });
+                mods.Add(new JsonObject { ["modId"] = $"fixture.m{i}", ["root"] = $"mods/m{i}", ["source"] = new JsonObject { ["kind"] = "local", ["contentId"] = Contracts.ContentId(JsonSerializer.SerializeToElement(files)) }, ["requires"] = new JsonArray(), ["entryAssembly"] = null, ["entryType"] = null, ["files"] = files });
             }
             var activation = new JsonObject { ["schemaVersion"] = 3, ["runtimeContractVersion"] = 1, ["integrationId"] = "starframe.bepinex", ["deploymentRevision"] = "1", ["installedMods"] = inventory, ["omittedDisabledMods"] = 0, ["mods"] = mods };
             bool accepted;

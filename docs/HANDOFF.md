@@ -1,5 +1,19 @@
 # Starframe 0.0.1 implementation handoff
 
+## Current milestone handoff: 0.7.0, 26 September 2026
+
+Implementation is complete on `codex/roadmap-native-integration-backlog`, draft [PR #78](https://github.com/Mastervoliumpl/Starframe/pull/78), at `0.7.0-dev.1`. Exact final-head and merged-main validation remain before merge/issue closeout. No installer/app release, website deployment or real-game mutation occurred. Later milestones remain unauthorized.
+
+The shared Rust backend, Steam manager session, signed exact registry approvals, authenticated streaming downloads/receipts, declared Code/Map/AI preparation, mixed native/local collections and native Mods browser are implemented. Current storage uses schema 20; normal persistence and recovery remain, while obsolete catalog formats are rejected with files retained. The entire catalog reader/publication/source/dependency system is retired. Local and mixed activation use schemas 3/4; Rust and C# reject catalog sources and obsolete schemas 1/2. Application updater signatures and keys remain separate.
+
+Website installation/discovery reference: PR #113 merge `1d616d43d90227ee9967091be039e6c3e695091e`, installation schema 1/full signed release schema 2. Original transport/trust/download fixtures pin `fcd81be6667e2595166698178d5f55074c5ee92a`. The website checkout remains read-only. The approved #101/#86 issue handoff is posted.
+
+Current implementation/runtime head is `80fd6d2bb4b2f5e037ee9a5378656a601736af05`. Required checks 36272773321 and audits 36272773238 are separate candidate gates. Previous storage required run 36271842325 failed in the updater fixture's five-second startup assertion after ten native cases passed; its audits passed. The fixture now uses the existing 30-second asynchronous bound and the isolated updater rerun passes. A final newer documentation head must pass its own checks before merge; merged-main checks must pass before closing the remaining issues and milestone 8.
+
+See the consolidated [0.7.0 acceptance record](verification/milestone-0.7.0.md) for issue-specific evidence, new versus reused checks and the ignored local review kit. Production downloads require an independently approved Ed25519 registry root; existing RSA/TUF and app Minisign keys are separate. The review kit recompiles the current runtime reader and verifies the unchanged accepted Bootstrap input. A fresh Bootstrap build against current game references fails because `MainMenuInterface` is absent. Current-game menu compatibility and Code/Map/AI gameplay are unverified release limits; no AI selector or future game adapter is implemented.
+
+The historical 0.0.1 contract below records initial decisions. Current behavior is in [DESIGN.md](../DESIGN.md), [ARCHITECTURE.md](../ARCHITECTURE.md), [ROADMAP.md](../ROADMAP.md) and the 0.7.0 acceptance record.
+
 Status: initial 0.0.1 handoff amended for 0.0.2 on 6 September 2026. The logo and first-version desktop layout remain accepted. DESIGN.md revision 0.7 supersedes the earlier in-game screen and specifies the revised launch action. This document defines the first implementation contract; it does not claim a working game integration or start the next implementation milestone.
 
 Read [DESIGN.md](../DESIGN.md), [ARCHITECTURE.md](../ARCHITECTURE.md), [DEVELOPMENT.md](../DEVELOPMENT.md) and the [version roadmap](../ROADMAP.md). The [design specimen](design/review.html) demonstrates the UI with fictional data. [Design review evidence](design/REVIEW.md) distinguishes browser checks from later native verification.

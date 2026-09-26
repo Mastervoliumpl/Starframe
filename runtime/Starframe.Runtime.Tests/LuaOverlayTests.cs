@@ -27,20 +27,22 @@ public class LuaOverlayTests
                         string file = Path.Combine(root, id, path);
                         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
                         File.WriteAllBytes(file, bytes);
+                        var files = new[] { new { path, sha256 = Convert.ToHexStringLower(SHA256.HashData(bytes)) } };
                         return new
                         {
                             modId = id,
-                            source = new { kind = "catalog", releaseId = id },
+                            source = new { kind = "local", contentId = Contracts.ContentId(JsonSerializer.SerializeToElement(files)) },
                             root = id,
                             entryAssembly = (string?)null,
                             entryType = (string?)null,
                             requires = System.Array.Empty<string>(),
-                            files = new[] { new { path, sha256 = Convert.ToHexStringLower(SHA256.HashData(bytes)) } }
+                            files
                         };
                     }).ToArray();
                     byte[] manifest = JsonSerializer.SerializeToUtf8Bytes(new
                     {
-                        schemaVersion = 2,
+                        schemaVersion = 3,
+                        omittedDisabledMods = 0,
                         runtimeContractVersion = 1,
                         integrationId = "starframe.bepinex",
                         deploymentRevision = "1",

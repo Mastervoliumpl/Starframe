@@ -34,7 +34,10 @@ runCli('signer', 'generate', '--ci', '-w', nextKey);
 runCli('signer', 'sign', '-f', nextKey, '-p', '', artifact);
 const nextSignature = (await readFile(`${artifact}.sig`, 'utf8')).trim();
 const official = 'https://github.com/Mastervoliumpl/Starframe/releases';
-let version = '0.6.1-alpha.1';
+const installedVersion = (await readFile(resolve('VERSION'), 'utf8')).trim();
+const versionParts = /^(\d+)\.(\d+)\.\d+/.exec(installedVersion);
+if (!versionParts) throw new Error('Invalid installed version fixture.');
+let version = `${versionParts[1]}.${Number(versionParts[2]) + 1}.0-alpha.1`;
 let mode = 'available';
 let requests = 0;
 const server = createServer((req, res) => {
@@ -127,7 +130,7 @@ try {
       await settings(page);
       await expect(
         page.getByRole('heading', { name: `Update available: ${version}` }),
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 30000 });
       await page
         .getByRole('heading', { name: `Update available: ${version}` })
         .scrollIntoViewIfNeeded();
@@ -151,7 +154,7 @@ try {
       ).toHaveCount(0);
       await expect(
         page.getByRole('heading', { name: `Update available: ${version}` }),
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 30000 });
       await page
         .getByLabel('Update channel', { exact: true })
         .selectOption('stable');

@@ -1,6 +1,11 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import type { Management, ModView } from '../lib/management';
+  import {
+    key,
+    referenceLabel,
+    type Management,
+    type ModView,
+  } from '../lib/management';
   import LoadOrder from './LoadOrder.svelte';
   import CollectionSharing from './CollectionSharing.svelte';
   let sharing: CollectionSharing;
@@ -117,11 +122,8 @@
             .slice(0, 3)
             .map(
               (r) =>
-                $manager.data?.library.find(
-                  (e) =>
-                    e.reference.modId === r.modId &&
-                    e.reference.hash === r.hash,
-                )?.name ?? `${r.modId} (unavailable)`,
+                $manager.data?.library.find((e) => key(e.reference) === key(r))
+                  ?.name ?? `${referenceLabel(r)} (unavailable)`,
             )
             .join(', ') || 'Empty collection'}{collection.entries.length > 3
             ? '…'
@@ -170,9 +172,9 @@
           <details>
             <summary>Import details</summary>
             <ol>
-              {#each imported.entries as entry (entry.reference.modId)}
+              {#each imported.entries as entry (key(entry.reference))}
                 <li>
-                  <strong>{entry.reference.modId}</strong>
+                  <strong>{referenceLabel(entry.reference)}</strong>
                   <p class:error={entry.status === 'unresolved'}>
                     {entry.message}
                   </p>

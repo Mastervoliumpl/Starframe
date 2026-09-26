@@ -34,7 +34,7 @@ impl Storage {
             rusqlite::params![import.collection_id, document.name],
         )?;
         for (position, reference) in document.entries.iter().enumerate() {
-            tx.execute("INSERT INTO collection_entries (collection_id,position,mod_id,hash,origin,release_id) VALUES (?,?,?,?,?,?)", rusqlite::params![import.collection_id, position as i64, reference.mod_id, reference.hash, reference.origin.as_str(), reference.release_id])?;
+            write_collection_entry(&tx, &import.collection_id, position, reference)?;
         }
         tx.execute(
             "INSERT INTO collection_imports (collection_id,record) VALUES (?,?)",

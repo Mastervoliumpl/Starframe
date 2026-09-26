@@ -37,7 +37,12 @@ const rebuilt = async (page, previous) => {
     .not.toBe(previous.hash);
   const current = await head(page);
   expect(current).toBeDefined();
-  expect((await list(page)).enabled).toEqual([current]);
+  expect((await list(page)).enabled).toEqual([
+    {
+      kind: 'local',
+      reference: { modId: current.modId, sha256: current.hash },
+    },
+  ]);
   return current;
 };
 const deployed = async (text) => {

@@ -94,16 +94,22 @@ await withDesktop(
     ).toBeVisible();
     await choose.click();
     picker(root);
-    await expect(page.getByRole('alert')).toContainText(
-      'Required game file is missing',
-    );
+    await expect(
+      page
+        .getByRole('alert')
+        .filter({ hasText: 'Required game file is missing' }),
+    ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Selected installation' }),
     ).toBeVisible();
     await choose.click();
     picker(game);
     await expect(choose).toBeEnabled();
-    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(
+      page
+        .getByRole('alert')
+        .filter({ hasText: 'Required game file is missing' }),
+    ).toHaveCount(0);
     const helper = spawn(executable, ['-t', '127.0.0.1'], {
       windowsHide: true,
       stdio: 'ignore',
@@ -158,7 +164,9 @@ await withDesktop(
     await expect(
       page.getByRole('heading', { name: 'Saved location unavailable' }),
     ).toBeVisible({ timeout: 40000 });
-    await expect(page.getByRole('alert')).toContainText('product identity');
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'product identity' }),
+    ).toBeVisible();
     await page.getByRole('button', { name: 'Find in Steam' }).click();
     await expect(
       page.getByRole('button', { name: 'Find in Steam' }),

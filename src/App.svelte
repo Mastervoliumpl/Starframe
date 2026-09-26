@@ -5,6 +5,7 @@
   import DiagnosticList from './features/DiagnosticList.svelte';
   import GameSettings from './features/GameSettings.svelte';
   import AppUpdates from './features/AppUpdates.svelte';
+  import AuthSettings from './features/AuthSettings.svelte';
   import LaunchBar from './features/LaunchBar.svelte';
   import ModList from './features/ModList.svelte';
   import Collections from './features/Collections.svelte';
@@ -12,11 +13,14 @@
   import PackageDownloads from './features/PackageDownloads.svelte';
   import { createManagement, confirmedFinding } from './lib/management';
   import { createDesktop } from './lib/state';
+  import RegistryBrowser from './features/RegistryBrowser.svelte';
+  import { createRegistry } from './lib/registry';
+  import { createAuth } from './lib/auth';
   import { getTransport } from './lib/native';
 
   const pages = [
     { id: 'mods', label: 'My mods' },
-    { id: 'catalog', label: 'Catalog' },
+    { id: 'browse', label: 'Mods' },
     { id: 'collections', label: 'Collections' },
     { id: 'downloads', label: 'Downloads' },
     { id: 'settings', label: 'Settings' },
@@ -25,16 +29,21 @@
   type Page = (typeof pages)[number]['id'];
   let page = $state<Page>('mods');
   let desktop = $state(createDesktop(null));
+  let auth = $state(createAuth(null));
   let manager = $state(createManagement(null));
+  let registry = $state(createRegistry(null));
+  $effect(() => {
+    if (registry.account($auth.session?.accountId ?? null))
+      void registry.browse();
+  });
   let drawer: HTMLDialogElement;
   let menu: HTMLButtonElement;
   let heading: HTMLHeadingElement;
   let fail = $state(false);
   const operations = $derived($desktop.snapshot?.operations ?? []);
-  const catalog = $derived($desktop.snapshot?.catalog);
   const affectedInstalled = $derived(
     $manager.data?.library.filter((entry) =>
-      confirmedFinding($manager.data, entry.reference.hash),
+      confirmedFinding($manager.data, entry.reference.reference.sha256),
     ).length ?? 0,
   );
   const managementError = $derived(
@@ -80,6 +89,10 @@
     void getTransport().then((transport) => {
       if (disposed) return;
       desktop = createDesktop(transport);
+      auth = createAuth(transport);
+      void auth.restore();
+      registry = createRegistry(transport);
+      registry.start();
       manager = createManagement(transport);
       stopManagement = manager.start();
       stop = desktop.startWatching();
@@ -93,6 +106,8 @@
     };
     wide.addEventListener('change', closeDrawer);
     return () => {
+      auth.stop();
+      registry.stop();
       disposed = true;
       stop?.();
       stopManagement?.();
@@ -154,9 +169,9 @@
       {#if affectedInstalled}<div class="error" role="alert">
           <p>
             {affectedInstalled} installed {affectedInstalled === 1
-              ? 'mod matches'
-              : 'mods match'} confirmed security findings. Affected selections block
-            launch through Starframe. Files and settings are retained.
+              ? 'mod has a'
+              : 'mods have'} retained registry security block. Affected selections
+            block launch through Starframe. Files and settings are retained.
           </p>
           <button onclick={() => navigate('mods')}>Review affected mods</button>
         </div>{/if}
@@ -183,72 +198,21 @@
             >
           </p>{/if}
         <ModList
-          mode="mods"
-          catalogFresh={catalog?.fresh ?? false}
           {manager}
           game={$desktop.snapshot?.game}
           unavailable={$desktop.connection !== 'connected'}
           onsource={(id) => desktop.open(id)}
         />
       </section>
-      <section class="page" hidden={page !== 'catalog'} aria-label="Catalog">
-        <div class="catalog-status">
-          <h2>Approved release catalog</h2>
-          <p role="status" aria-live={page === 'catalog' ? 'polite' : 'off'}>
-            {#if catalog?.checking}
-              Checking for catalog changes…
-            {:else if catalog?.revision}
-              Catalog revision {catalog.revision}. {catalog.releaseCount} approved
-              releases.
-            {:else}
-              No catalog is cached yet.
-            {/if}
-          </p>
-          {#if catalog?.error}
-            <p class="error" role="alert">{catalog.error}</p>
-            {#if catalog.revision}<p>
-                Cached revision {catalog.revision} remains available.
-              </p>{/if}
-          {/if}
-          {#if catalog?.lastSuccess}
-            <p class="muted">
-              Last successful check: {new Date(
-                Number(catalog.lastSuccess) * 1000,
-              ).toLocaleString()}
-            </p>
-          {/if}
-          {#if catalog?.fresh && catalog.expires}<p>
-              Security information verified. Valid until {new Date(
-                Number(catalog.expires) * 1000,
-              ).toLocaleString()}.
-            </p>
-          {:else}<p class="error">
-              {catalog?.expires
-                ? 'Catalog security information has expired or the clock changed.'
-                : 'Catalog security information has not been verified.'} New downloads
-              are paused until a signed refresh succeeds. Verified library copies
-              remain available offline; confirmed findings still apply.
-            </p>{/if}
-          <p>
-            Downloads come from authors. Curation does not guarantee that a
-            binary is free of malware.
-          </p>
-          <button onclick={() => desktop.open('repository')}
-            >View Starframe on GitHub</button
-          >
-        </div>
-        {#if managementError}<p class="error" role="alert">
-            {managementError}<button onclick={() => manager.dismissError()}
-              >Dismiss</button
-            >
-          </p>{/if}
-        <ModList
-          mode="catalog"
-          catalogFresh={catalog?.fresh ?? false}
+      <section class="page" hidden={page !== 'browse'} aria-label="Mods">
+        <RegistryBrowser
+          {registry}
           {manager}
-          game={$desktop.snapshot?.game}
-          unavailable={$desktop.connection !== 'connected'}
-          onsource={(id) => desktop.open(id)}
+          active={page === 'browse'}
+          gameBuild={$desktop.snapshot?.game.selected?.build}
+          onsettings={() => navigate('settings')}
+          ondownloads={() => navigate('downloads')}
+          onsource={(id) => desktop.open(`registry:${id}`)}
         />
       </section>
       <section
@@ -327,6 +291,7 @@
         {/if}
       </section>
       <section class="page" hidden={page !== 'settings'} aria-label="Settings">
+        <AuthSettings {auth} unavailable={$desktop.connection === 'preview'} />
         <div class="settings-section">
           <h2>Saved data</h2>
           {#if $desktop.snapshot?.savedData.status === 'ready'}

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-registry-retry-receipts"
+description = "Enables the registry_retry_receipts command without any pre-configured scope."
+commands.allow = ["registry_retry_receipts"]
+
+[[permission]]
+identifier = "deny-registry-retry-receipts"
+description = "Denies the registry_retry_receipts command without any pre-configured scope."
+commands.deny = ["registry_retry_receipts"]

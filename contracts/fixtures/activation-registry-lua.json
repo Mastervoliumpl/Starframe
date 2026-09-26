@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 4,
+  "runtimeContractVersion": 1,
+  "integrationId": "starframe.bepinex",
+  "deploymentRevision": "12",
+  "installedMods": [
+    {
+      "modId": "registry.1",
+      "name": "Registry code fixture",
+      "version": "display label"
+    }
+  ],
+  "mods": [
+    {
+      "modId": "registry.1",
+      "source": {
+        "kind": "registry",
+        "modId": 1,
+        "releaseId": "11111111-1111-4111-8111-111111111111",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "root": "mods/registry-1/11111111-1111-4111-8111-111111111111",
+      "entryAssembly": null,
+      "entryType": null,
+      "requires": [],
+      "files": [
+        {
+          "path": "LJ/lua/main.lua",
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ]
+    }
+  ],
+  "omittedDisabledMods": 0
+}

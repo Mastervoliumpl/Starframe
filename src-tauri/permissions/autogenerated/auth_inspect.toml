@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-auth-inspect"
+description = "Enables the auth_inspect command without any pre-configured scope."
+commands.allow = ["auth_inspect"]
+
+[[permission]]
+identifier = "deny-auth-inspect"
+description = "Denies the auth_inspect command without any pre-configured scope."
+commands.deny = ["auth_inspect"]

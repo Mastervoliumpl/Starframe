@@ -4,7 +4,7 @@ Version 0.3.0 completes the internal curated-mod workflow in issues #16–#19. T
 
 ## Delivered
 
-- [Catalog](catalog.md): validated exact release identities, independent refresh, offline cache and atomic metadata replacement. [Schema additions](../../catalog/README.md) distinguish maintenance, compatibility findings and withdrawal reasons.
+- [Catalog](catalog.md): validated exact release identities, independent refresh, offline cache and atomic metadata replacement. [Schema additions](https://github.com/Mastervoliumpl/Starframe/blob/9c1bad48273b67bc8e55e6ede81f8fd4126568a6/catalog/README.md) distinguish maintenance, compatibility findings and withdrawal reasons.
 - [Package preparation](packages.md): bounded downloads, hash verification, guarded ZIP extraction, immutable library content, cancellation and persistent failures.
 - [Mod lifecycle](mods.md): revision-checked enable/disable, automatic stopped-game deployment, streamed recovery, uninstall confirmation, settings retention and retryable cleanup.
 - [Management screens](management.md): live lists/details, search and selection, bulk actions, source links, compatibility messages, download progress and exact-release retry.

@@ -1,6 +1,6 @@
 # Using Starframe
 
-This guide describes the 0.6.0 development build for Windows 11 x64, with acceptance on Windows 11 25H2. A signed development draft exists for maintainer testing; no public app release is available yet. Obtain future public installers from [Starframe's official releases](https://github.com/Mastervoliumpl/Starframe/releases). Other operating systems and architectures are outside the initial support scope.
+This guide describes the current 0.7.0 development build for Windows 11 x64. Prior Windows 11 25H2 installer acceptance is retained. The signed 0.6.0 development draft remains for maintainer testing; no public app release or 0.7.0 installer is available yet. Obtain future public installers from [Starframe's official releases](https://github.com/Mastervoliumpl/Starframe/releases). Other operating systems and architectures are outside the initial support scope.
 
 ## Install and select the game
 
@@ -12,7 +12,11 @@ In Settings, use **Find in Steam** or **Choose game folder**, then select the Sa
 
 ## Install and enable mods
 
-In Catalog, inspect the release and choose Install. Downloads shows preparation and any failure. Downloads come from the author's recorded source. Curation records a review of that exact release; it does not guarantee that its code is harmless.
+Open Mods and sign in through Settings using Steam on Starframe’s website. Search or filter the bounded results, then open a mod’s details. Select the release you want from its history and choose Install this release. Downloads shows transfer, preparation, retry/cancel controls and any failure. Approval applies to that exact release; it does not guarantee that its code is harmless.
+
+For a dependency, choose Find releases to see its exact or version-range constraint and matching history. A suggestion identifies the newest usable match on that page; check older pages when needed. Choose installation explicitly, then enable the required releases in My mods. To update, install your chosen newer release, disable the previous selection and enable the new one. Installed versions and exported/shared references keep their exact identities.
+
+Production registry downloads in this development build need a separately approved registry trust root. Local fixture acceptance does not provision that root or establish hosted Steam readiness. Installed mods and local imports remain available.
 
 Installed releases appear in My mods. Enabling a release adds it to the active collection. Collections hold names and ordered mod references. Required dependencies constrain the effective order; drag priority changes order where those constraints permit it. Later supported Lua overlays take precedence when they supply the same path.
 
@@ -32,11 +36,15 @@ Local builds must be supplied separately with their metadata and imported into t
 
 Settings provides **Stable** and **Preview** app-update channels. New prerelease installations default to Preview; stable installations default to Stable. Starframe checks after startup and periodically while open. You choose when to update, or choose Later. Updates verify the installer signature, wait for the game and file operations, preserve app data and reopen Starframe. Closing Starframe stops its background work; it does not install a service or a persistent updater.
 
-Catalog refresh is separate. Fresh signed metadata permits new catalog downloads. Failed refreshes retain the cached catalog, but unverified or expired information pauses new downloads until a valid refresh. Installed copies remain usable offline, subject to already known confirmed security blocks. A suspected finding is shown as unconfirmed. A confirmed match blocks new downloads and activation through Starframe while preserving files and settings. Disable the affected mod and review its evidence; removal cannot undo code that already ran.
+Mods refresh is separate from app updates. Discovery runs after sign-in and every five minutes while Starframe is open; manual refresh keeps your filters. A failed refresh identifies previous results. New downloads require a valid manager session and fresh signed approval/security metadata. Installed copies remain usable offline, subject to retained signed security blocks. A block stops new downloads and activation through Starframe while preserving files and settings. Removal cannot undo code that already ran.
 
 Run setup again to reinstall missing or damaged app files without deleting saved data. For full removal, use Windows Installed apps. Close Starframe and the game first. Uninstall removes Starframe's recorded game integration and then the app. A conflict or unavailable game location stops cleanup so you can correct it and retry.
 
 **Keep my library, collections and settings** starts unchecked. Leave it unchecked to delete Starframe-managed data; select it to retain that data for a later installation. Original local-import sources, game saves and unowned game configuration remain. Do not manually delete recovery records to get past a cleanup error.
+
+## Saved data in 0.7.0
+
+Current registry/local records and collections survive restart. Schema 19 records are retained after backup and removal of catalog-only rows. Earlier pre-release databases and collection exports are unsupported. An unsupported database produces an error and remains on disk; it is never silently replaced. Close Starframe and retain the entire old app-data directory before choosing a separate new data directory. Preserve original local sources and game recovery records. Do not delete game files to clear a storage error.
 
 ## Troubleshooting and reporting
 
@@ -48,7 +56,7 @@ Run setup again to reinstall missing or damaged app files without deleting saved
 | Runtime preparation or uninstall stopped | Close the game, read the conflicting-file/location message, correct the cause and retry. Preserve recovery files. |
 | Collection cannot be applied | Resolve the listed dependency, missing release or security block. Keep the exact references supplied by the sender. |
 | Update signature rejected | Keep the current installation and report the release identity. Do not disable verification. |
-| Catalog unavailable or expired | Check the connection and refresh again; use already installed mods while offline. |
+| Mods unavailable or session ended | Check the connection, refresh or sign in again; use already installed mods while offline. |
 
 Help & logs contains a responsiveness check using simulated transfers and memory hashing. It does not download mods or modify game files. Log export is not implemented. Diagnostics are not automatically attached to a report.
 
@@ -58,6 +66,10 @@ Use **Report a mod problem** for ordinary problems and **Report a security conce
 
 The integration supports Starframe managed entries, compatible BepInEx 5 Unity/Mono component plugins and the tested Lua overlay layout. Ladder Reporter 0.3.0 has [recorded installed-game acceptance](verification/ladder-reporter-catalog.md). [Six other Remmy catalog releases](verification/remmy-catalog.md) have archive/metadata review, not recorded gameplay acceptance through Starframe. They must not be described as gameplay-tested. Sanctuary HUD 0.8.0's bundled voice packs use an author-specific fixed path that Starframe does not populate; its fallback and limits are recorded in that review.
 
-[BepInEx compatibility](bepinex-mods.md) excludes BepInEx 6, preloader patchers, plugins requiring earlier loading and reliance on a file-backed `Assembly.Location`. Maps and AI packages remain unsupported. Initialization success does not prove later gameplay or multiplayer behavior. Do not install a duplicate plugin through another loader. DLL hot reload and automatic multiplayer mod synchronization are not available.
+[BepInEx compatibility](bepinex-mods.md) excludes BepInEx 6, preloader patchers, plugins requiring earlier loading and reliance on a file-backed `Assembly.Location`. Registry Map and AI declarations have verified fake-game file placement. Map/AI loading and gameplay remain unverified; Starframe adds no AI selector. Initialization success does not prove later gameplay or multiplayer behavior. Do not install a duplicate plugin through another loader. DLL hot reload and automatic multiplayer mod synchronization are not available.
 
 Existing default-display and keyboard results are retained. Additional high-contrast, screen-reader and unusual scaling combinations are not part of 0.6.0 acceptance; report a concrete usability problem with its display settings so it can be investigated.
+
+## Current internal build limits
+
+The 0.7.0 internal review build has local registry acceptance, with production downloads paused until an independently approved registry trust root is provisioned. Current-game menu compatibility is also unverified: a fresh plugin build against the installed game references cannot find `MainMenuInterface`. The review input retains the unchanged, accepted earlier Bootstrap plugin and the current runtime reader. Map/AI placement is verified in fake games; gameplay and AI selection are not established. See [0.7.0 acceptance](verification/milestone-0.7.0.md) before treating this build as a distributable release.

@@ -24,7 +24,6 @@ impl Default for Core {
                 app_version: env!("CARGO_PKG_VERSION").into(),
                 operations: vec![],
                 saved_data: SavedData::Loading,
-                catalog: Default::default(),
                 updates: Default::default(),
                 game: Default::default(),
             },
@@ -45,13 +44,6 @@ impl Core {
     }
     pub fn shell_ready(&self) -> bool {
         self.subscriber.is_some()
-    }
-
-    pub fn catalog(&mut self, status: crate::model::CatalogStatus) {
-        if !self.stopped && self.snapshot.catalog != status {
-            self.snapshot.catalog = status;
-            self.changed();
-        }
     }
 
     pub fn closing_game_operation(&mut self) {

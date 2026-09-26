@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-registry-history"
+description = "Enables the registry_history command without any pre-configured scope."
+commands.allow = ["registry_history"]
+
+[[permission]]
+identifier = "deny-registry-history"
+description = "Denies the registry_history command without any pre-configured scope."
+commands.deny = ["registry_history"]

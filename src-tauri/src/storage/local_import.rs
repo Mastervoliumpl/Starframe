@@ -66,7 +66,11 @@ impl Storage {
             .collections
             .iter()
             .find(|c| Some(&c.id) == records.active_collection.as_ref());
-        let advance = active.filter(|c| c.entries.contains(&previous.reference));
+        let previous_reference =
+            crate::references::Reference::try_from(&previous.reference).map_err(Error::Invalid)?;
+        let local_reference =
+            crate::references::Reference::try_from(&local.reference).map_err(Error::Invalid)?;
+        let advance = active.filter(|c| c.entries.contains(&previous_reference));
         let advance = match advance {
             Some(collection)
                 if self.conn.query_row(
@@ -84,24 +88,29 @@ impl Storage {
                 .entries
                 .iter()
                 .map(|r| {
-                    if r == &previous.reference {
-                        local.reference.clone()
+                    if r == &previous_reference {
+                        local_reference.clone()
                     } else {
                         r.clone()
                     }
                 })
                 .collect::<Vec<_>>();
-            let catalog = self.catalog_cache()?.and_then(|c| c.catalog);
+            let registry = self.installed_registry_releases()?;
             let mut locals = self.local_sources()?;
             locals.push(local.clone());
-            crate::ordering::resolve_with_locals(catalog.as_ref(), &locals, &entries)
-                .map_err(Error::Invalid)?;
+            crate::ordering::resolve_mixed(&registry, &locals, &entries).map_err(Error::Invalid)?;
             let mut total = 0;
             for reference in entries {
-                if reference == local.reference {
+                if matches!(&reference, crate::references::Reference::Registry(reference)
+                    if registry.iter().any(|entry| &entry.reference == reference
+                        && matches!(entry.installation, crate::registry::installation::Installation::Content { .. })))
+                {
+                    continue;
+                }
+                if reference == local_reference {
                     total += prepared.files.iter().map(|f| f.size_bytes).sum::<u64>();
                 } else {
-                    let files = self.prepared_artifact(&reference.hash)?.ok_or_else(|| {
+                    let files = self.prepared_artifact(reference.hash())?.ok_or_else(|| {
                         Error::Invalid("A required managed copy is missing.".into())
                     })?;
                     total += files.files.iter().map(|f| f.size_bytes).sum::<u64>();
@@ -124,6 +133,8 @@ impl Storage {
             request_id: Uuid::new_v4().to_string(),
             release_id: "local-import".into(),
             hash: prepared.hash.clone(),
+            kind: crate::packages::Kind::Package,
+            receipt_id: None,
             status: crate::packages::Status::Preparing,
             message: "Saving the verified local rebuild.".into(),
             received_bytes: size,
@@ -139,7 +150,7 @@ impl Storage {
             &operation,
             &local.entry(),
             prepared,
-            Some(local),
+            local,
             advance.map(|c| (c.id.as_str(), &previous.reference)),
         );
         if let Err(error) = result {

@@ -1,6 +1,12 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import type { Management, SharingReply } from '../lib/management';
+  import {
+    key,
+    referenceLabel,
+    referenceRelease,
+    type Management,
+    type SharingReply,
+  } from '../lib/management';
   let { manager, unavailable }: { manager: Management; unavailable: boolean } =
     $props();
   let dialog: HTMLDialogElement;
@@ -134,16 +140,17 @@
       substituted.
     </p>
     <ol class="import-review">
-      {#each reply.entries as entry (entry.reference.modId)}
+      {#each reply.entries as entry (key(entry.reference))}
         <li>
           <strong
-            >{$manager.data?.catalog?.mods.find(
-              (m) => m.id === entry.reference.modId,
-            )?.name ?? entry.reference.modId}</strong
+            >{$manager.data?.library.find(
+              (installed) => key(installed.reference) === key(entry.reference),
+            )?.name ?? referenceLabel(entry.reference)}</strong
           >
           <p class="muted">
-            {entry.reference.modId} · {entry.reference.releaseId ??
-              'Local-only content'}
+            {referenceLabel(entry.reference)} · {referenceRelease(
+              entry.reference,
+            )}
           </p>
           <p class:error={entry.status === 'unresolved'}>{entry.message}</p>
         </li>

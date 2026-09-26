@@ -48,7 +48,7 @@ def check(root: Path, integration: Path) -> None:
         if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
             raise ValueError(f'Installer resource hash mismatch: {name}')
     activation = json.loads((integration / 'runtime/Starframe/activation.json').read_text(encoding='utf-8'))
-    if activation != dict(schemaVersion=2, runtimeContractVersion=1,
+    if activation != dict(schemaVersion=3, omittedDisabledMods=0, runtimeContractVersion=1,
                           integrationId='starframe.bepinex', deploymentRevision='0',
                           installedMods=[], mods=[]):
         raise ValueError('Installer runtime must have an empty initial activation')

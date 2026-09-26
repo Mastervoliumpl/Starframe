@@ -1,5 +1,8 @@
 use super::*;
 use crate::{mods, sharing};
+fn collection_ref(reference: &crate::storage::ModReference) -> crate::references::Reference {
+    crate::references::Reference::try_from(reference).unwrap()
+}
 use serde_json::json;
 
 #[test]
@@ -75,7 +78,7 @@ fn setup() -> (tempfile::TempDir, Storage, LocalSource) {
     mods::action(
         &mut store,
         mods::Action::SetEnabled {
-            reference: local.reference.clone(),
+            reference: collection_ref(&local.reference),
             enabled: true,
             expected_revision: revision,
         },
@@ -113,7 +116,7 @@ fn build(store: &Storage, source: &LocalSource) -> PreparedImport {
 }
 
 #[test]
-fn migration_watches_unambiguous_sources_and_reimport_selects_an_ambiguous_source() {
+fn restart_preserves_selected_source_and_reimport_selects_the_requested_build() {
     for multiple in [false, true] {
         let (root, mut store, original) = setup();
         if multiple {
@@ -128,14 +131,8 @@ fn migration_watches_unambiguous_sources_and_reimport_selects_an_ambiguous_sourc
                 .unwrap();
         }
         drop(store);
-        let db = rusqlite::Connection::open(root.path().join("data/sqlite/state.db")).unwrap();
-        db.execute_batch(
-            "DROP TABLE app_updates; DROP TABLE catalog_security; DROP TABLE local_watches; PRAGMA user_version=11;",
-        )
-        .unwrap();
-        drop(db);
         let mut store = Storage::open(&root.path().join("data")).unwrap();
-        assert_eq!(store.local_watches().unwrap().len(), usize::from(!multiple));
+        assert_eq!(store.local_watches().unwrap().len(), 1);
         if multiple {
             let next = build(&store, &original);
             let operation = Operation {
@@ -143,6 +140,8 @@ fn migration_watches_unambiguous_sources_and_reimport_selects_an_ambiguous_sourc
                 request_id: Uuid::new_v4().to_string(),
                 release_id: "local-import".into(),
                 hash: next.prepared.hash.clone(),
+                kind: crate::packages::Kind::Package,
+                receipt_id: None,
                 status: Status::Completed,
                 message: "Reimport fixture".into(),
                 received_bytes: 1,
@@ -151,7 +150,7 @@ fn migration_watches_unambiguous_sources_and_reimport_selects_an_ambiguous_sourc
             let local = next.local.as_ref().unwrap();
             store.save_package(&operation).unwrap();
             store
-                .complete_import(&operation, &local.entry(), &next.prepared, Some(local))
+                .complete_import(&operation, &local.entry(), &next.prepared, local)
                 .unwrap();
             assert_eq!(store.local_watches().unwrap()[0].source, *local);
         } else {
@@ -176,7 +175,7 @@ fn watching_keeps_invalid_output_and_accepts_only_the_settled_latest_build() {
     });
     assert_eq!(
         mods::view(&store).unwrap().enabled,
-        vec![original.reference.clone()]
+        vec![collection_ref(&original.reference)]
     );
     fs::write(&manifest, metadata).unwrap();
     fs::write(source.join("LJ/lua/local.lua"), b"return 'first'").unwrap();
@@ -188,7 +187,7 @@ fn watching_keeps_invalid_output_and_accepts_only_the_settled_latest_build() {
     let latest = store.local_watches().unwrap()[0].source.clone();
     assert_eq!(
         mods::view(&store).unwrap().enabled,
-        vec![latest.reference.clone()]
+        vec![collection_ref(&latest.reference)]
     );
     assert_eq!(
         fs::read(
@@ -210,7 +209,6 @@ fn watching_keeps_invalid_output_and_accepts_only_the_settled_latest_build() {
         .unwrap(),
         b"return 'original'"
     );
-    assert!(store.catalog_cache().unwrap().is_none());
 }
 
 #[test]
@@ -264,7 +262,10 @@ fn rebuild_commit_preserves_shared_exact_references_and_inactive_collections() {
             .unwrap()
     );
     for collection in store.load().unwrap().collections {
-        assert_eq!(collection.entries, vec![original.reference.clone()]);
+        assert_eq!(
+            collection.entries,
+            vec![collection_ref(&original.reference)]
+        );
     }
     let exported = sharing::action(&mut store, sharing::Action::Export { id: imported.id })
         .unwrap()
@@ -272,7 +273,7 @@ fn rebuild_commit_preserves_shared_exact_references_and_inactive_collections() {
         .unwrap();
     assert_eq!(
         sharing::Portable::read(&exported).unwrap().entries,
-        vec![original.reference]
+        vec![collection_ref(&original.reference)]
     );
 }
 
@@ -294,7 +295,7 @@ fn missing_sources_recover_and_uninstall_rejects_a_late_prepared_build() {
     let next = build(&store, &original);
     let revision = store.load().unwrap().revision;
     store
-        .uninstall_mod(&original.reference, revision, true)
+        .uninstall_reference(&collection_ref(&original.reference), revision, true)
         .unwrap();
     assert!(
         !store
@@ -360,7 +361,7 @@ fn rebuild_transaction_failure_preserves_head_collection_and_previous_bytes() {
     assert_eq!(store.local_watches().unwrap()[0].source, original);
     assert_eq!(
         mods::view(&store).unwrap().enabled,
-        vec![original.reference.clone()]
+        vec![collection_ref(&original.reference)]
     );
     database
         .execute_batch("DROP TRIGGER reject_watch;")

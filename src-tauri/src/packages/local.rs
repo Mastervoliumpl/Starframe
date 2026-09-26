@@ -50,7 +50,7 @@ impl Packages {
             }
             return Ok(operation);
         }
-        if self.active.len() >= 3
+        if self.active.len() + self.registry_active.len() >= 3
             || self
                 .active
                 .values()
@@ -70,6 +70,8 @@ impl Packages {
             request_id: request_id.into(),
             release_id: "local-import".into(),
             hash: "0".repeat(64),
+            kind: Kind::Package,
+            receipt_id: None,
             status: Status::Preparing,
             message: "Copying and verifying the local source. See Downloads for the result.".into(),
             received_bytes: 0,
@@ -99,6 +101,7 @@ impl Packages {
             Active {
                 operation: operation.clone(),
                 entry: None,
+                registry_reference: None,
                 source: Some(path.into()),
                 cancel,
                 progress,

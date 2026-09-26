@@ -1,5 +1,8 @@
 use super::*;
-use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::{
+    panic::{AssertUnwindSafe, catch_unwind},
+    time::Instant,
+};
 
 const INPUT_LIMIT: usize = 65_536;
 
@@ -43,10 +46,7 @@ fn mutate(seed: &[u8], state: &mut u64) -> Vec<u8> {
 }
 
 fn corpus() -> Vec<(String, Vec<u8>)> {
-    let mut corpus = vec![(
-        "catalog".into(),
-        serde_json::to_vec(&catalog(artifact(b"inert archive"))).unwrap(),
-    )];
+    let mut corpus = Vec::new();
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../contracts/fixtures");
     let mut paths: Vec<_> = fs::read_dir(fixtures)
         .unwrap()
@@ -84,14 +84,6 @@ fn corpus() -> Vec<(String, Vec<u8>)> {
 
 fn probe(kind: &str, bytes: &[u8]) -> bool {
     match kind {
-        "catalog" => match Catalog::read(bytes) {
-            Ok(value) => {
-                value.validate().unwrap();
-                Catalog::read(&serde_json::to_vec(&value).unwrap()).unwrap();
-                true
-            }
-            Err(_) => false,
-        },
         "path" => {
             let Ok(path) = std::str::from_utf8(bytes) else {
                 return false;

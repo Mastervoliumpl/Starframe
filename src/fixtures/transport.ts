@@ -1,27 +1,22 @@
 import type { Snapshot } from '../lib/generated/model';
 import type { Transport } from '../lib/state';
+import type { AuthSession, AuthTransport } from '../lib/auth';
+import type { RegistryTransport } from '../lib/registry';
 import { version } from '../../package.json';
 import { fixtureManagement } from './management';
+import { fixtureRegistry } from './registry';
 import { emptyUpdates } from './updates';
 
 // Browser tests opt into this fixture with ?fixture; production builds omit it.
-export function fixtureTransport(): Transport {
+export function fixtureTransport(): Transport &
+  AuthTransport &
+  RegistryTransport {
   let snapshot: Snapshot = {
     sessionId: 'browser-fixture',
     revision: '0',
     appVersion: version,
     operations: [],
     updates: emptyUpdates(),
-    catalog: {
-      revision: '1',
-      releaseCount: 0,
-      checking: false,
-      lastChecked: null,
-      lastSuccess: null,
-      expires: '4102444800',
-      fresh: true,
-      error: null,
-    },
     game: {
       launch: {
         phase: 'setup_required',
@@ -44,7 +39,20 @@ export function fixtureTransport(): Transport {
       activeCollectionName: null,
     },
   };
-  const catalogCase = new URLSearchParams(location.search).get('catalog');
+  const authCase = new URLSearchParams(location.search).get('auth');
+  let authSession: AuthSession | null = new URLSearchParams(
+    location.search,
+  ).has('registry')
+    ? {
+        accountId: '33333333-3333-4333-8333-333333333333',
+        profile: { displayName: 'Fixture user', avatarUrl: null },
+        context: 'manager',
+        authenticatedAt: '2026-09-24T00:00:00Z',
+        expiresAt: '2099-01-01T00:00:00Z',
+        capabilities: ['download_mod'],
+        isOwner: false,
+      }
+    : null;
   if (new URLSearchParams(location.search).has('update')) {
     snapshot.updates.release = {
       version: '0.6.1',
@@ -52,21 +60,48 @@ export function fixtureTransport(): Transport {
     };
     snapshot.updates.message = 'An update is available.';
   }
-  if (catalogCase === 'offline') {
-    snapshot.catalog.lastChecked = '1788820000';
-    snapshot.catalog.lastSuccess = '1788819700';
-    snapshot.catalog.error =
-      'Fixture connection failed. Starframe will retry automatically.';
-  } else if (catalogCase === 'expired' || catalogCase === 'unverified') {
-    snapshot.catalog.fresh = false;
-    snapshot.catalog.expires = catalogCase === 'expired' ? '1788819700' : null;
-  } else if (catalogCase === 'update') {
-    snapshot.catalog.checking = true;
-  }
   let receiver: ((snapshot: Snapshot) => void) | undefined;
   let work: ReturnType<typeof setInterval>;
   const publish = () => receiver?.(structuredClone(snapshot));
   return {
+    ...fixtureRegistry(),
+    async authRestore() {
+      return authSession;
+    },
+    async authInspect() {
+      return authSession;
+    },
+    async authStart() {
+      if (authCase === 'confirmed')
+        return {
+          displayCode: 'A1B2C3D4',
+          verificationUri:
+            'https://starframemanager.com/sign-in?manager=11111111-1111-4111-8111-111111111111',
+          expiresAt: '2099-01-01T00:00:00Z',
+          intervalSeconds: 5,
+        };
+      throw new Error('Sign-in requires the desktop app.');
+    },
+    async authPoll() {
+      if (authCase === 'confirmed') {
+        authSession = {
+          accountId: '33333333-3333-4333-8333-333333333333',
+          profile: { displayName: 'Fixture user', avatarUrl: null },
+          context: 'manager',
+          authenticatedAt: '2026-09-24T00:00:00Z',
+          expiresAt: '2099-01-01T00:00:00Z',
+          capabilities: ['download_mod'],
+          isOwner: false,
+        };
+        return 'signed_in';
+      }
+      throw new Error('Sign-in requires the desktop app.');
+    },
+    async authSignOut() {
+      authSession = null;
+      return { serverRevoked: true };
+    },
+    async authCancel() {},
     async update(action) {
       const updates = snapshot.updates;
       if (action.kind === 'later') updates.dismissed = true;
@@ -108,18 +143,8 @@ export function fixtureTransport(): Transport {
       receiver = receive;
       publish();
       const heartbeat = setInterval(publish, 2000);
-      const catalogUpdate =
-        catalogCase === 'update'
-          ? setTimeout(() => {
-              snapshot.catalog.revision = '2';
-              snapshot.catalog.checking = false;
-              snapshot.revision = String(Number(snapshot.revision) + 1);
-              publish();
-            }, 1500)
-          : undefined;
       return () => {
         clearInterval(heartbeat);
-        clearTimeout(catalogUpdate);
         if (receiver === receive) receiver = undefined;
       };
     },

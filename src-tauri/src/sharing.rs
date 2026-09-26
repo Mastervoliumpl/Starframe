@@ -1,7 +1,7 @@
 use crate::{
-    catalog::Catalog,
     packages::{Packages, Status as PackageStatus},
-    storage::{ModReference, Origin, Records, Storage},
+    references::Reference,
+    storage::{Records, Storage},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -16,7 +16,7 @@ pub struct Portable {
     pub format: String,
     pub schema_version: u32,
     pub name: String,
-    pub entries: Vec<ModReference>,
+    pub entries: Vec<Reference>,
 }
 
 impl Portable {
@@ -25,13 +25,14 @@ impl Portable {
             return Err("Collection files must be at most 1 MiB.".into());
         }
         let document: Self =
-            serde_json::from_str(text).map_err(|e| format!("Invalid collection file: {e}"))?;
+            serde_json::from_value(crate::runtime_contract::unique_json(text.as_bytes())?)
+                .map_err(|e| format!("Invalid collection file: {e}"))?;
         document.validate()?;
         Ok(document)
     }
     pub(crate) fn validate(&self) -> Result<()> {
-        if self.format != "starframe-collection" || self.schema_version != 1 {
-            return Err("Unsupported collection format or version. Ask the sender for a version 1 Starframe collection.".into());
+        if self.format != "starframe-collection" || self.schema_version != 2 {
+            return Err("Unsupported collection format or version. Ask the sender for a version 2 Starframe collection.".into());
         }
         if self.name.trim().is_empty()
             || self.name.chars().count() > 200
@@ -46,20 +47,12 @@ impl Portable {
         }
         let mut ids = HashSet::new();
         for reference in &self.entries {
-            crate::storage::validate_reference(reference).map_err(|e| e.to_string())?;
-            for id in std::iter::once(&reference.mod_id).chain(reference.release_id.iter()) {
-                if id.len() > 128
-                    || !id.bytes().enumerate().all(|(i, b)| {
-                        b.is_ascii_lowercase()
-                            || b.is_ascii_digit()
-                            || (i > 0 && b"._-".contains(&b))
-                    })
-                {
-                    return Err("Mod and release IDs must use lowercase letters, digits, dots, underscores or hyphens.".into());
-                }
-            }
-            if !ids.insert(&reference.mod_id) {
-                return Err("A collection cannot contain two references to the same mod.".into());
+            reference.validate()?;
+            if !ids.insert(reference.runtime_id()) {
+                return Err(
+                    "A collection cannot contain two references with the same runtime identity."
+                        .into(),
+                );
             }
         }
         Ok(())
@@ -82,7 +75,7 @@ pub enum Status {
 #[cfg_attr(test, derive(ts_rs::TS))]
 #[cfg_attr(test, ts(rename = "ImportEntry"))]
 pub struct Entry {
-    pub reference: ModReference,
+    pub reference: Reference,
     pub status: Status,
     pub message: String,
     pub operation_id: Option<String>,
@@ -135,67 +128,174 @@ pub struct Reply {
     pub order_error: Option<String>,
 }
 
-fn assess(
-    reference: &ModReference,
-    records: &Records,
-    catalog: Option<&Catalog>,
-    requested: &[ModReference],
-) -> Result<String> {
-    let exact = records.library.iter().any(|e| &e.reference == reference);
-    if reference.origin == Origin::LocalImport {
-        return if exact {
-            Ok("Matching local content is present; verify its files before reuse.".into())
-        } else {
-            Err("Local-only content is missing. Obtain this exact build from its author; no download source is approved.".into())
-        };
-    }
-    let catalog = catalog.ok_or("Approved catalog is unavailable. Retry after refresh.")?;
-    let (owner, release) = catalog.releases().find(|(_, r)| Some(&r.id) == reference.release_id.as_ref())
-        .ok_or("The exact release is not in the approved catalog. Ask the sender to repair this reference.")?;
-    if owner.id != reference.mod_id || release.artifact.sha256 != reference.hash {
-        return Err(
-            "The shared identity differs from catalog approval. No substitute was selected.".into(),
-        );
-    }
-    catalog.downloadable(&release.id)?;
-    for dependency in &release.requires {
-        if !requested.iter().any(|r| {
-            r.origin == Origin::Catalog
-                && r.release_id.as_ref() == Some(dependency)
-                && catalog.releases().any(|(m, release)| {
-                    m.id == r.mod_id
-                        && release.id == *dependency
-                        && release.artifact.sha256 == r.hash
-                })
-        }) {
-            return Err(format!(
-                "Required release {dependency} is missing from this collection. Ask the sender to include its exact reference."
-            ));
-        }
-    }
-    Ok(if exact {
-        "Already downloaded; verify local files before reuse."
-    } else {
-        "Download and verify this exact approved release."
-    }
-    .into())
+pub enum OnlineAction {
+    Plan {
+        id: String,
+    },
+    Fail {
+        id: String,
+        reference: crate::registry::ExactReference,
+        message: String,
+    },
+    Install {
+        id: String,
+        reference: crate::registry::ExactReference,
+        request: Box<crate::packages::RegistryRequest>,
+        approval: Box<crate::packages::RegistryApproval>,
+    },
 }
 
+pub enum OnlineReply {
+    Plan(Vec<crate::registry::ExactReference>),
+    Install(Option<crate::packages::Operation>),
+    Failed,
+}
+
+pub fn online_action(
+    store: &mut Storage,
+    packages: &mut Packages,
+    action: OnlineAction,
+) -> Result<OnlineReply> {
+    let id = match &action {
+        OnlineAction::Plan { id }
+        | OnlineAction::Fail { id, .. }
+        | OnlineAction::Install { id, .. } => id,
+    };
+    let mut import = store
+        .collection_imports()
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .find(|import| &import.collection_id == id)
+        .ok_or("This imported collection no longer exists.")?;
+    match action {
+        OnlineAction::Plan { .. } => {
+            let installed = crate::mods::library(store)?;
+            let mut missing = Vec::new();
+            for entry in &mut import.entries {
+                let Reference::Registry(reference) = &entry.reference else {
+                    continue;
+                };
+                if entry.status != Status::Unresolved
+                    || installed
+                        .iter()
+                        .any(|installed| installed.reference == entry.reference)
+                {
+                    continue;
+                }
+                if let Err(message) =
+                    store.require_registry_unblocked_hash(reference.sha256.as_str())
+                {
+                    entry.message = message.to_string();
+                    continue;
+                }
+                entry.status = Status::Preparing;
+                entry.operation_id = None;
+                entry.message = "Checking fresh signed approval for this exact release.".into();
+                missing.push(reference.clone());
+            }
+            if !missing.is_empty() {
+                store
+                    .save_import(&import)
+                    .map_err(|error| error.to_string())?;
+            }
+            Ok(OnlineReply::Plan(missing))
+        }
+        OnlineAction::Fail {
+            reference, message, ..
+        } => {
+            if let Some(entry) = import.entries.iter_mut().find(|entry| {
+                entry.reference == Reference::Registry(reference.clone())
+                    && entry.status == Status::Preparing
+                    && entry.operation_id.is_none()
+            }) {
+                entry.status = Status::Unresolved;
+                entry.message = message;
+                store
+                    .save_import(&import)
+                    .map_err(|error| error.to_string())?;
+            }
+            Ok(OnlineReply::Failed)
+        }
+        OnlineAction::Install {
+            reference,
+            request,
+            approval,
+            ..
+        } => {
+            let entry = import
+                .entries
+                .iter_mut()
+                .find(|entry| {
+                    entry.reference == Reference::Registry(reference.clone())
+                        && entry.status == Status::Preparing
+                        && entry.operation_id.is_none()
+                })
+                .ok_or("This exact shared download is no longer pending.")?;
+            if *request.auth_cancel.borrow() {
+                return Err("Sign-in changed. Retry import after signing in.".into());
+            }
+            store
+                .require_registry_unblocked_hash(reference.sha256.as_str())
+                .map_err(|error| error.to_string())?;
+            if !packages.can_start(reference.sha256.as_str()) {
+                return Ok(OnlineReply::Install(None));
+            }
+            let operation = if store
+                .installed_registry_releases()
+                .map_err(|error| error.to_string())?
+                .iter()
+                .any(|entry| entry.reference == reference)
+            {
+                packages.verify_registry_installed(store, &reference)?
+            } else {
+                crate::backend::approved_registry_install(
+                    store,
+                    packages,
+                    &Uuid::new_v4().to_string(),
+                    &reference,
+                    *request,
+                    *approval,
+                )?
+            };
+            entry.operation_id = Some(operation.id.clone());
+            entry.message =
+                "Preparing the exact signed release. See Downloads for progress or cancellation."
+                    .into();
+            if let Err(error) = store.save_import(&import) {
+                packages.cancel(store, &operation.id)?;
+                return Err(error.to_string());
+            }
+            Ok(OnlineReply::Install(Some(operation)))
+        }
+    }
+}
+
+fn assess(store: &Storage, reference: &Reference) -> Result<String> {
+    store
+        .require_registry_unblocked_hash(reference.hash())
+        .map_err(|error| error.to_string())?;
+    if crate::mods::library(store)?
+        .iter()
+        .any(|entry| &entry.reference == reference)
+    {
+        return Ok(
+            "Matching exact content is available; verify its files for offline reuse.".into(),
+        );
+    }
+    Err(match reference {
+        Reference::Local(_)=>"Local-only content is missing. Obtain and import this exact build from its author; no registry download is approved.",
+        Reference::Registry(_)=>"The exact registry release is missing. A signed-in registry download is required; no replacement was selected.",
+    }.into())
+}
 fn review(store: &Storage, document: &Portable) -> Result<Reply> {
-    let records = store.load().map_err(|e| e.to_string())?;
-    let catalog = store
-        .catalog_cache()
-        .map_err(|e| e.to_string())?
-        .and_then(|c| c.catalog);
     let entries = document
         .entries
         .iter()
         .map(|reference| {
-            let (status, message) =
-                match assess(reference, &records, catalog.as_ref(), &document.entries) {
-                    Ok(message) => (Status::Pending, message),
-                    Err(message) => (Status::Unresolved, message),
-                };
+            let (status, message) = match assess(store, reference) {
+                Ok(message) => (Status::Pending, message),
+                Err(message) => (Status::Unresolved, message),
+            };
             Entry {
                 reference: reference.clone(),
                 status,
@@ -229,7 +329,7 @@ pub fn action(store: &mut Storage, action: Action) -> Result<Reply> {
                 .ok_or("This collection no longer exists.")?;
             let document = Portable {
                 format: "starframe-collection".into(),
-                schema_version: 1,
+                schema_version: 2,
                 name: collection.name.clone(),
                 entries: collection.entries.clone(),
             };
@@ -289,7 +389,7 @@ pub fn action(store: &mut Storage, action: Action) -> Result<Reply> {
                 store,
                 &Portable {
                     format: "starframe-collection".into(),
-                    schema_version: 1,
+                    schema_version: 2,
                     name: collection.name.clone(),
                     entries: collection.entries.clone(),
                 },
@@ -338,95 +438,88 @@ pub fn recover(store: &mut Storage) -> Result<()> {
 }
 
 pub fn poll(store: &mut Storage, packages: &mut Packages) -> Result<bool> {
-    let records = store.load().map_err(|e| e.to_string())?;
-    let catalog = store
-        .catalog_cache()
-        .map_err(|e| e.to_string())?
-        .and_then(|c| c.catalog);
     let operations = packages.operations(store)?;
     let mut changed = false;
-    for mut import in store.collection_imports().map_err(|e| e.to_string())? {
+    for mut import in store
+        .collection_imports()
+        .map_err(|error| error.to_string())?
+    {
         let mut dirty = false;
-        let requested = &records
-            .collections
-            .iter()
-            .find(|c| c.id == import.collection_id)
-            .ok_or("Imported collection is missing.")?
-            .entries;
         for entry in &mut import.entries {
             if entry.status == Status::Preparing {
+                if entry.operation_id.is_none() {
+                    continue;
+                }
                 let operation = operations
                     .iter()
-                    .find(|op| Some(&op.id) == entry.operation_id.as_ref());
+                    .find(|operation| Some(&operation.id) == entry.operation_id.as_ref());
+                if operation.is_some_and(|operation| {
+                    matches!(
+                        operation.status,
+                        PackageStatus::Preparing | PackageStatus::Cancelling
+                    )
+                }) {
+                    continue;
+                }
                 match operation {
-                    Some(op)
-                        if matches!(
-                            op.status,
-                            PackageStatus::Preparing | PackageStatus::Cancelling
-                        ) =>
-                    {
-                        continue;
+                    Some(operation) if operation.status == PackageStatus::Completed => {
+                        match assess(store, &entry.reference) {
+                            Ok(_) => {
+                                entry.status = Status::Ready;
+                                entry.message = "Exact content verified and available.".into();
+                            }
+                            Err(message) => {
+                                entry.status = Status::Unresolved;
+                                entry.message = message;
+                            }
+                        }
                     }
-                    Some(op)
-                        if op.status == PackageStatus::Completed
-                            && records
-                                .library
-                                .iter()
-                                .any(|e| e.reference == entry.reference) =>
-                    {
-                        entry.status = Status::Ready;
-                        entry.message = "Exact package verified and available.".into();
-                    }
-                    other => {
+                    Some(operation) => {
                         entry.status = Status::Unresolved;
-                        entry.message = other.map_or("Package operation is missing. Retry import.".into(), |op| if op.status == PackageStatus::Completed { "The saved approval identity does not match. No substitute was selected.".into() } else { op.message.clone() });
+                        entry.message = operation.message.clone();
+                    }
+                    None => {
+                        entry.status = Status::Unresolved;
+                        entry.message = "Verification operation is missing. Retry import.".into();
                     }
                 }
                 dirty = true;
             }
-            if entry.status != Status::Pending {
+            if entry.status != Status::Pending || !packages.can_start(entry.reference.hash()) {
                 continue;
             }
-            match assess(&entry.reference, &records, catalog.as_ref(), requested) {
+            let result = assess(store, &entry.reference).and_then(|_| match &entry.reference {
+                Reference::Local(_) => {
+                    packages.verify_local(store, &entry.reference.local_reference().unwrap())
+                }
+                Reference::Registry(reference) => {
+                    packages.verify_registry_installed(store, reference)
+                }
+            });
+            match result {
+                Ok(operation) => {
+                    entry.status = Status::Preparing;
+                    entry.message =
+                        "Verifying exact content. See Downloads for progress or cancellation."
+                            .into();
+                    entry.operation_id = Some(operation.id);
+                }
                 Err(message) => {
                     entry.status = Status::Unresolved;
                     entry.message = message;
-                    dirty = true;
-                }
-                Ok(_) if !packages.can_start(&entry.reference.hash) => (),
-                Ok(_) => {
-                    let result = if entry.reference.origin == Origin::LocalImport {
-                        packages.verify_local(store, &entry.reference)
-                    } else {
-                        packages.start(
-                            store,
-                            &Uuid::new_v4().to_string(),
-                            entry.reference.release_id.as_deref().unwrap(),
-                        )
-                    };
-                    match result {
-                        Ok(op) => {
-                            entry.status = Status::Preparing;
-                            entry.message = "Preparing the exact package. See Downloads for progress or cancellation.".into();
-                            entry.operation_id = Some(op.id);
-                        }
-                        Err(message) => {
-                            entry.status = Status::Unresolved;
-                            entry.message = message;
-                        }
-                    }
-                    dirty = true;
                 }
             }
+            dirty = true;
         }
         if dirty {
-            store.save_import(&import).map_err(|e| e.to_string())?;
+            store
+                .save_import(&import)
+                .map_err(|error| error.to_string())?;
             changed = true;
         }
     }
     Ok(changed)
 }
-
 pub(crate) fn active_error(store: &Storage, records: &Records) -> Result<Option<String>> {
     let Some(id) = &records.active_collection else {
         return Ok(None);
@@ -445,6 +538,6 @@ pub(crate) fn active_error(store: &Storage, records: &Records) -> Result<Option<
             .entries
             .iter()
             .find(|e| &e.reference == reference && e.status != Status::Ready)
-            .map(|e| format!("{}: {}", reference.mod_id, e.message))
+            .map(|e| format!("{}: {}", reference.runtime_id(), e.message))
     }))
 }

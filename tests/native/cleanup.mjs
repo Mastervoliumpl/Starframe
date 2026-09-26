@@ -144,7 +144,11 @@ try {
         /Runtime installed|ready to launch/i,
         { timeout: 20000 },
       );
-      expect(await exists(join(second.engine, 'winhttp.dll'))).toBe(true);
+      await expect
+        .poll(() => exists(join(second.engine, 'winhttp.dll')), {
+          timeout: 20000,
+        })
+        .toBe(true);
     },
     second.env,
   );

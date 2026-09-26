@@ -14,9 +14,13 @@ use std::{
 use uuid::Uuid;
 
 mod content;
+mod registry;
 #[cfg(test)]
 mod stream_tests;
 pub(crate) use content::Source;
+pub(crate) use registry::payload as registry_sources;
+#[cfg(test)]
+pub(crate) use registry::{import_lua as fixture_local, install_case as fixture_registry};
 
 type Result<T> = std::result::Result<T, String>;
 type Files = BTreeMap<String, String>;
@@ -676,7 +680,7 @@ fn external_dll(
 }
 
 /// Development entry: deploy an explicitly selected, hash-inventoried runtime package.
-/// Author downloads must pass catalog/package approval before using this boundary.
+/// Registry downloads must pass signed release approval before using this boundary.
 pub fn install_runtime(
     store: &mut Storage,
     game: &game::Installation,
@@ -697,6 +701,7 @@ pub fn prepare_desktop(
     game: &game::Installation,
     resources: &Path,
     activation: &serde_json::Value,
+    registry_selection: Option<&[crate::references::Reference]>,
     cancelled: &impl Fn() -> bool,
 ) -> Result<usize> {
     crate::runtime_contract::read(
@@ -722,7 +727,10 @@ pub fn prepare_desktop(
         .into_iter()
         .map(|(path, bytes)| (path, Source::Bytes(bytes)))
         .collect();
-    files.extend(crate::mods::payload(store, activation)?);
+    files.extend(match registry_selection {
+        Some(references) => crate::selection::payload(store, references, activation)?,
+        None => crate::mods::payload(store, activation)?,
+    });
     let mut guard = || {
         if cancelled() {
             return Err("Starframe is closing. Preparation stopped at a safe boundary.".into());

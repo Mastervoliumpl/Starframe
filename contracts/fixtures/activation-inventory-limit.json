@@ -1,5 +1,6 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
+  "omittedDisabledMods": 0,
   "runtimeContractVersion": 1,
   "integrationId": "starframe.bepinex",
   "deploymentRevision": "12",
@@ -1294,8 +1295,8 @@
     {
       "modId": "example.core",
       "source": {
-        "kind": "catalog",
-        "releaseId": "example.core.1"
+        "kind": "local",
+        "contentId": "sha256:e3f0ed8720b2c4ccc547ef09171368dda733aa29eaa04ff531e2413f445004a6"
       },
       "root": "example.core/1",
       "entryAssembly": "Example.Core.dll",

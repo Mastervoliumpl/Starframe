@@ -23,6 +23,29 @@ pub(crate) fn verify_artifact(store: &Storage, reference: &ModReference) -> Resu
     Ok(prepared)
 }
 
+pub(crate) fn verify_registry_artifact(
+    store: &Storage,
+    entry: &crate::storage::RegistryLibraryEntry,
+) -> Result<Prepared> {
+    let hash = entry.reference.sha256.as_str();
+    store
+        .require_registry_unblocked_hash(hash)
+        .map_err(|error| error.to_string())?;
+    let prepared = store
+        .prepared_artifact(hash)
+        .map_err(|error| error.to_string())?
+        .ok_or("The exact registry release has no verified file inventory. Install it again.")?;
+    entry.installation.validate_files(&prepared.files)?;
+    let mut directory = Directory::open(store.package_root())?;
+    verify_existing(
+        &mut directory,
+        &store.package_root().join("artifacts").join(hash),
+        &prepared,
+        &Cancel::default(),
+    )?;
+    Ok(prepared)
+}
+
 pub(crate) fn remove_artifact(store: &Storage, hash: &str) -> Result<()> {
     if store
         .load()
@@ -30,6 +53,11 @@ pub(crate) fn remove_artifact(store: &Storage, hash: &str) -> Result<()> {
         .library
         .iter()
         .any(|entry| entry.reference.hash == hash)
+        || store
+            .installed_registry_releases()
+            .map_err(|error| error.to_string())?
+            .iter()
+            .any(|entry| entry.reference.sha256.as_str() == hash)
     {
         return Err("This artifact is still in the library. Cleanup retained it.".into());
     }
@@ -171,94 +199,6 @@ impl Directory {
         }
         Ok(())
     }
-}
-
-pub(super) async fn prepare(
-    root: PathBuf,
-    id: String,
-    artifact: Artifact,
-    previous: Option<Prepared>,
-    client: reqwest::Client,
-    cancel: Cancel,
-    progress: Arc<AtomicU64>,
-) -> Result<Prepared> {
-    let worker_artifact = artifact.clone();
-    let worker_cancel = cancel.clone();
-    let stage_id = id.clone();
-    let setup = tauri::async_runtime::spawn_blocking(move || {
-        let mut directory = Directory::open(&root)?;
-        directory.directory("artifacts")?;
-        let final_path = root.join("artifacts").join(&worker_artifact.sha256);
-        if let Some(previous) = previous {
-            verify_existing(&mut directory, &final_path, &previous, &worker_cancel)?;
-            layout(&previous.files, &worker_artifact.layout)?;
-            return Ok((directory, None, Some(previous)));
-        }
-        let stage = directory.directory(&format!("package-staging/{stage_id}"))?;
-        Ok::<_, String>((directory, Some(stage), None))
-    })
-    .await
-    .map_err(|e| format!("Package staging worker failed: {e}"))??;
-    let (mut directory, stage, previous) = setup;
-    if let Some(previous) = previous {
-        return Ok(previous);
-    }
-    let stage = stage.ok_or("Package staging was not created.")?;
-    let archive = stage.join("download.zip");
-    let mut file = tokio::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&archive)
-        .await
-        .map_err(|e| format!("Cannot create package download: {e}"))?;
-    let downloaded = tokio::select! {
-        _ = cancel.cancelled() => Err(CANCELLED.into()),
-        _ = tokio::time::sleep(Duration::from_secs(300)) => Err("Package transfer exceeded five minutes. Retry on a faster connection.".into()),
-        result = transfer::download(&client, &artifact, &mut file, &progress) => result,
-    };
-    let downloaded = match downloaded {
-        Ok(()) => file
-            .sync_all()
-            .await
-            .map_err(|e| format!("Cannot flush the package download: {e}")),
-        Err(error) => Err(error),
-    };
-    drop(file);
-    if let Err(error) = downloaded {
-        return tauri::async_runtime::spawn_blocking(move || match directory.remove_stage(&id) {
-            Ok(()) => Err(error),
-            Err(cleanup) => Err(format!(
-                "{error} Staging {id} was retained because cleanup failed: {cleanup}"
-            )),
-        })
-        .await
-        .map_err(|e| e.to_string())?;
-    }
-    tauri::async_runtime::spawn_blocking(move || {
-        let outcome = (|| {
-        cancel.check()?;
-        let content = directory.directory(&format!("package-staging/{id}/content"))?;
-        let prepared = extract(&archive, &content, &artifact, &cancel)?;
-        cancel.check()?;
-        let final_path = directory.root.join("artifacts").join(&artifact.sha256);
-        match fs::symlink_metadata(&final_path) {
-            Ok(_) => {
-                // A crash may leave promoted bytes without a database commit. Never overwrite them.
-                verify_existing(&mut directory, &final_path, &prepared, &cancel)?;
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                directory.pins.remove(&content);
-                fs::rename(&content, &final_path).map_err(|e| format!("Cannot promote the verified package: {e}. Retry after checking app-data permissions."))?;
-            }
-            Err(e) => return Err(e.to_string()),
-        }
-        Ok(prepared)
-        })();
-        match directory.remove_stage(&id) {
-            Ok(()) => outcome,
-            Err(cleanup) => Err(format!("{} Staging {id} was retained because cleanup failed: {cleanup}", outcome.err().unwrap_or_else(|| "Package files verified; library commit was withheld.".into()))),
-        }
-    }).await.map_err(|e| format!("Package extraction worker failed: {e}"))?
 }
 
 pub(super) fn verify_existing(

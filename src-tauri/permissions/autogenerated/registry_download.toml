@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-registry-download"
+description = "Enables the registry_download command without any pre-configured scope."
+commands.allow = ["registry_download"]
+
+[[permission]]
+identifier = "deny-registry-download"
+description = "Denies the registry_download command without any pre-configured scope."
+commands.deny = ["registry_download"]

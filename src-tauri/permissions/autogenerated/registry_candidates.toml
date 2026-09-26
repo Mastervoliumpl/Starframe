@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-registry-candidates"
+description = "Enables the registry_candidates command without any pre-configured scope."
+commands.allow = ["registry_candidates"]
+
+[[permission]]
+identifier = "deny-registry-candidates"
+description = "Denies the registry_candidates command without any pre-configured scope."
+commands.deny = ["registry_candidates"]

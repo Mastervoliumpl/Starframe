@@ -1,101 +1,69 @@
 use super::*;
 use crate::{mods, sharing};
+fn collection_ref(reference: &crate::storage::ModReference) -> crate::references::Reference {
+    crate::references::Reference::try_from(reference).unwrap()
+}
 use serde_json::json;
 use std::time::Instant;
 
-#[tokio::test(flavor = "multi_thread")]
-async fn known_payload_findings_follow_renamed_local_copies_without_deleting_sources() {
-    use crate::catalog::{advisories::*, authentication::tests::verified};
+#[test]
+fn retained_registry_hash_blocks_local_activation_without_deleting_sources() {
     let root = tempfile::tempdir().unwrap();
     let source = root.path().join("source");
-    fixture(&source, "fixture.local", false);
-    let mut store = Storage::open(&root.path().join("data")).unwrap();
+    let data = root.path().join("data");
+    fixture(&source, "fixture.local", true);
+    let mut store = Storage::open(&data).unwrap();
     let mut queue = Packages::open(&mut store).unwrap();
     let reference = import(&mut queue, &mut store, &source);
-    let prepared = store.prepared_artifact(&reference.hash).unwrap().unwrap();
-    let mut advisories = Advisories {
-        schema_version: 1,
-        revision: "1".into(),
-        advisories: vec![Advisory {
-            id: "synthetic.payload".into(),
-            title: "Synthetic payload finding".into(),
-            affected: vec![AffectedArtifact {
-                release_id: "fixture.catalog.1".into(),
-                sha256: "a".repeat(64),
-                payload_sha256: vec![prepared.files[0].sha256.clone()],
-            }],
-            history: vec![Finding {
-                recorded_at: 1,
-                state: State::Suspected,
-                explanation: "Unconfirmed synthetic evidence".into(),
-                evidence: vec!["https://example.invalid/evidence".into()],
-                recommended_action: "Review the synthetic evidence".into(),
-            }],
-        }],
+    let enabled = |store: &mut Storage, enabled| {
+        let expected_revision = store.load().unwrap().revision.to_string();
+        mods::action(
+            store,
+            mods::Action::SetEnabled {
+                reference: collection_ref(&reference),
+                enabled,
+                expected_revision,
+            },
+        )
     };
-    store
-        .save_verified_catalog(&verified(1, &advisories).await, 100)
-        .unwrap();
-    let expected_revision = store.load().unwrap().revision.to_string();
-    mods::action(
-        &mut store,
-        mods::Action::SetEnabled {
-            reference: reference.clone(),
-            enabled: true,
-            expected_revision,
-        },
+    enabled(&mut store, true).unwrap();
+    mods::requested(&store).unwrap();
+    // Seed a retained decision; signed ingestion and rollback have separate registry tests.
+    let db = rusqlite::Connection::open(data.join("sqlite/state.db")).unwrap();
+    let record = json!({"sha256":reference.hash,"revision":1,"status":"blocked","reason":"Synthetic retained registry block"});
+    db.execute(
+        "INSERT INTO registry_decisions (sha256,revision,record) VALUES (?,1,?)",
+        rusqlite::params![reference.hash, record.to_string()],
     )
     .unwrap();
-    mods::requested(&store).unwrap();
-    advisories.revision = "2".into();
-    let mut confirmed = advisories.advisories[0].current().clone();
-    confirmed.recorded_at = 2;
-    confirmed.state = State::Confirmed;
-    advisories.advisories[0].history.push(confirmed);
-    store
-        .save_verified_catalog(&verified(2, &advisories).await, 101)
-        .unwrap();
     assert!(
         mods::requested(&store)
             .unwrap_err()
-            .contains("synthetic.payload")
+            .contains("security decision")
     );
-    let renamed = root.path().join("renamed");
-    fixture(&renamed, "fixture.renamed", false);
-    fs::rename(renamed.join("Mod.dll"), renamed.join("Other.dll")).unwrap();
-    let mut manifest: serde_json::Value =
-        serde_json::from_slice(&fs::read(renamed.join(MANIFEST)).unwrap()).unwrap();
-    manifest["layout"]["entryAssembly"] = json!("Other.dll");
-    fs::write(
-        renamed.join(MANIFEST),
-        serde_json::to_vec(&manifest).unwrap(),
+    assert_eq!(
+        mods::view(&store).unwrap().blocked[&reference.hash],
+        "Synthetic retained registry block"
+    );
+    enabled(&mut store, false).unwrap();
+    assert!(enabled(&mut store, true).is_err());
+    drop(queue);
+    drop(store);
+    let mut store = Storage::open(&data).unwrap();
+    assert!(enabled(&mut store, true).is_err());
+    assert!(source.join("LJ/lua/local.lua").is_file());
+    let record = json!({"sha256":reference.hash,"revision":2,"status":"cleared","reason":"Synthetic explicit correction"});
+    db.execute(
+        "UPDATE registry_decisions SET revision=2, record=? WHERE sha256=?",
+        rusqlite::params![record.to_string(), reference.hash],
     )
     .unwrap();
-    let copy = import(&mut queue, &mut store, &renamed);
-    assert_ne!(copy.hash, reference.hash);
-    let expected_revision = store.load().unwrap().revision.to_string();
-    assert!(
-        mods::action(
-            &mut store,
-            mods::Action::SetEnabled {
-                reference: copy.clone(),
-                enabled: true,
-                expected_revision
-            }
-        )
-        .err()
-        .unwrap()
-        .contains("synthetic.payload")
-    );
-    assert!(source.join("Mod.dll").exists());
-    assert!(renamed.join("Other.dll").exists());
-    assert_eq!(store.load().unwrap().library.len(), 2);
-    assert!(
-        store
-            .artifact_directory(&copy)
-            .unwrap()
-            .join("Other.dll")
-            .exists()
+    enabled(&mut store, true).unwrap();
+    mods::requested(&store).unwrap();
+    assert!(mods::view(&store).unwrap().blocked.is_empty());
+    assert_eq!(
+        fs::read(source.join("LJ/lua/local.lua")).unwrap(),
+        b"return 'fixture'"
     );
 }
 
@@ -164,20 +132,18 @@ fn offline_dll_and_folder_imports_use_managed_copies_and_retain_sources_after_re
         let before = fs::read(&original).unwrap();
         let mut store = Storage::open(&data).unwrap();
         let mut queue = Packages::open(&mut store).unwrap();
-        assert!(store.catalog_cache().unwrap().is_none());
         let reference = import(&mut queue, &mut store, &chosen);
-        assert!(store.catalog_cache().unwrap().is_none());
         let revision = store.load().unwrap().revision.to_string();
         let view = mods::action(
             &mut store,
             mods::Action::SetEnabled {
-                reference: reference.clone(),
+                reference: collection_ref(&reference),
                 enabled: true,
                 expected_revision: revision,
             },
         )
         .unwrap();
-        assert_eq!(view.enabled, vec![reference.clone()]);
+        assert_eq!(view.enabled, vec![collection_ref(&reference)]);
         assert!(view.order_error.is_none());
         let activation = mods::requested(&store).unwrap();
         assert_eq!(activation["mods"][0]["source"]["kind"], "local");
@@ -203,7 +169,7 @@ fn offline_dll_and_folder_imports_use_managed_copies_and_retain_sources_after_re
         mods::action(
             &mut store,
             mods::Action::Uninstall {
-                reference: reference.clone(),
+                reference: collection_ref(&reference),
                 expected_revision: revision,
                 confirm_references: true,
             },
@@ -254,9 +220,9 @@ fn content_matches_across_source_locations_and_collections_keep_unmatched_requir
     assert_eq!(store.load().unwrap().library.len(), 1);
     let text = serde_json::to_string(&sharing::Portable {
         format: "starframe-collection".into(),
-        schema_version: 1,
+        schema_version: 2,
         name: "Local sharing fixture".into(),
-        entries: vec![reference.clone()],
+        entries: vec![collection_ref(&reference)],
     })
     .unwrap();
     let review =
@@ -323,13 +289,16 @@ fn local_dependencies_are_enabled_exactly_and_constrain_manual_order() {
     let view = mods::action(
         &mut store,
         mods::Action::SetEnabled {
-            reference: dependent_ref.clone(),
+            reference: collection_ref(&dependent_ref),
             enabled: true,
             expected_revision,
         },
     )
     .unwrap();
-    assert_eq!(view.enabled, vec![core_ref.clone(), dependent_ref.clone()]);
+    assert_eq!(
+        view.enabled,
+        vec![collection_ref(&core_ref), collection_ref(&dependent_ref)]
+    );
     let view = mods::action(
         &mut store,
         mods::Action::Reorder {
@@ -340,12 +309,12 @@ fn local_dependencies_are_enabled_exactly_and_constrain_manual_order() {
     .unwrap();
     assert_eq!(
         view.order.unwrap().effective,
-        vec![core_ref.clone(), dependent_ref]
+        vec![collection_ref(&core_ref), collection_ref(&dependent_ref)]
     );
     let view = mods::action(
         &mut store,
         mods::Action::SetEnabled {
-            reference: core_ref,
+            reference: collection_ref(&core_ref),
             enabled: false,
             expected_revision: view.revision,
         },
@@ -495,4 +464,65 @@ fn local_junctions_and_locked_build_outputs_are_rejected_without_source_changes(
         fs::read(source.join("LJ/lua/local.lua")).unwrap(),
         b"return 'fixture'"
     );
+}
+
+#[test]
+fn three_local_workers_are_bounded_and_cancellation_wins_before_commit() {
+    let root = tempfile::tempdir().unwrap();
+    let mut store = Storage::open(&root.path().join("data")).unwrap();
+    let mut queue = Packages::open(&mut store).unwrap();
+    let sources: Vec<_> = (0..4)
+        .map(|i| {
+            let source = root.path().join(format!("source{i}"));
+            fixture(&source, &format!("fixture.local{i}"), true);
+            source
+        })
+        .collect();
+    let mut started = Vec::new();
+    for source in sources.iter().take(3) {
+        let request = Uuid::new_v4().to_string();
+        let op = queue
+            .import_local(&mut store, &request, source.to_str().unwrap())
+            .unwrap();
+        assert_eq!(
+            queue
+                .import_local(&mut store, &request, source.to_str().unwrap())
+                .unwrap()
+                .id,
+            op.id
+        );
+        started.push(op);
+    }
+    assert!(
+        queue
+            .import_local(
+                &mut store,
+                &Uuid::new_v4().to_string(),
+                sources[3].to_str().unwrap()
+            )
+            .unwrap_err()
+            .contains("three")
+    );
+    queue.cancel(&mut store, &started[0].id).unwrap();
+    assert_eq!(
+        wait(&mut queue, &mut store, &started[0].request_id).status,
+        Status::Cancelled
+    );
+    for op in &started[1..] {
+        assert_eq!(
+            wait(&mut queue, &mut store, &op.request_id).status,
+            Status::Completed
+        );
+    }
+    assert!(!queue.busy());
+    assert_eq!(store.load().unwrap().library.len(), 2);
+    let fourth = import(&mut queue, &mut store, &sources[3]);
+    assert_eq!(fourth.mod_id, "fixture.local3");
+    assert_eq!(store.load().unwrap().library.len(), 3);
+    for source in sources {
+        assert_eq!(
+            fs::read(source.join("LJ/lua/local.lua")).unwrap(),
+            b"return 'fixture'"
+        );
+    }
 }

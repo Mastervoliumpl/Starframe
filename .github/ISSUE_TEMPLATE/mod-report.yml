@@ -1,5 +1,5 @@
 name: Mod problem
-description: Report compatibility, installation or catalog information problems.
+description: Report compatibility, installation or registry information problems.
 title: '[Mod report] '
 body:
   - type: markdown

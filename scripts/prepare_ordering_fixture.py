@@ -4,7 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from prepare_runtime_fixture import prepare
+from prepare_runtime_fixture import content_id, prepare
 
 
 def prepare_ordering(destination: Path, runtime: Path, fixture: Path, reverse: bool) -> None:
@@ -22,9 +22,10 @@ def prepare_ordering(destination: Path, runtime: Path, fixture: Path, reverse: b
         content = f'return "{mod_id}"\n'.encode()
         path.write_bytes(content)
         manifest['installedMods'].append(dict(modId=mod_id, name=mod_id, version='fixture'))
-        manifest['mods'].append(dict(modId=mod_id, source=dict(kind='catalog', releaseId=mod_id), root=root,
+        files = [dict(path=relative, sha256=hashlib.sha256(content).hexdigest())]
+        manifest['mods'].append(dict(modId=mod_id, source=dict(kind='local', contentId=content_id(files)), root=root,
                                      entryAssembly=None, entryType=None, requires=[],
-                                     files=[dict(path=relative, sha256=hashlib.sha256(content).hexdigest())]))
+                                     files=files))
     manifest['deploymentRevision'] = '401' if reverse else '400'
     manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     inventory = [dict(path=p.relative_to(destination).as_posix(), sha256=hashlib.sha256(p.read_bytes()).hexdigest())

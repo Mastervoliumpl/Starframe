@@ -1,4 +1,6 @@
-# SQLite verification and recovery
+# Historical SQLite verification and recovery
+
+The following is historical 0.1.1 evidence. Milestone 0.7.0 removes obsolete conversion/readers under the owner's format waiver. Current schema 20 and guarded recovery are recorded in [catalog retirement](catalog-retirement.md); current restore accepts schema 19/20 SQLite backups and never resets unsupported data.
 
 Milestone 0.1.1, issues #40 and #41. The 0.1.1 application uses rusqlite 0.40.2, default features disabled, bundled plus backup. libsqlite3-sys 0.38.2 embeds SQLite 3.53.2. No system SQLite installation, network database or Turso runtime is required. The local checks and build comparison below pass. Required CI is the final merge gate on [PR #42](https://github.com/Mastervoliumpl/Starframe/pull/42).
 

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Starframe.Runtime.Tests;
@@ -11,6 +12,74 @@ namespace Starframe.Runtime.Tests;
 [TestClass]
 public sealed class ActivationTests
 {
+    [TestMethod]
+    public void RegistryIdentityKeepsManagedAndLuaActivationOnTheExistingAdapter()
+    {
+        if (Environment.GetEnvironmentVariable("STARFRAME_REGISTRY_FIXTURE_WORKER") != "1")
+        {
+            // Managed activation permits one assembly-loading session per process.
+            var start = new System.Diagnostics.ProcessStartInfo("dotnet") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+            start.ArgumentList.Add("vstest");
+            start.ArgumentList.Add(typeof(ActivationTests).Assembly.Location);
+            start.ArgumentList.Add("--TestCaseFilter:FullyQualifiedName=Starframe.Runtime.Tests.ActivationTests.RegistryIdentityKeepsManagedAndLuaActivationOnTheExistingAdapter");
+            start.Environment["STARFRAME_REGISTRY_FIXTURE_WORKER"] = "1";
+            using var worker = System.Diagnostics.Process.Start(start)!;
+            var output = worker.StandardOutput.ReadToEndAsync();
+            var error = worker.StandardError.ReadToEndAsync();
+            if (!worker.WaitForExit(30_000))
+            {
+                worker.Kill(entireProcessTree: true);
+                Assert.Fail("The isolated registry activation fixture timed out.");
+            }
+            Assert.AreEqual(0, worker.ExitCode, output.GetAwaiter().GetResult() + error.GetAwaiter().GetResult());
+            return;
+        }
+        string root = Path.Combine(Path.GetTempPath(), "starframe-registry-activation-" + Guid.NewGuid());
+        try
+        {
+            byte[] dll = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixture-binaries/Starframe.FixtureMods.dll"));
+            byte[] lua = System.Text.Encoding.UTF8.GetBytes("return 'fixture'");
+            string managedRoot = "mods/registry-1/11111111-1111-4111-8111-111111111111";
+            string luaRoot = "mods/registry-2/22222222-2222-4222-8222-222222222222";
+            Directory.CreateDirectory(Path.Combine(root, managedRoot));
+            Directory.CreateDirectory(Path.Combine(root, luaRoot, "LJ/lua"));
+            File.WriteAllBytes(Path.Combine(root, managedRoot, "Starframe.FixtureMods.dll"), dll);
+            File.WriteAllBytes(Path.Combine(root, luaRoot, "LJ/lua/main.lua"), lua);
+            byte[] manifest = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                schemaVersion = 4,
+                runtimeContractVersion = 1,
+                integrationId = "starframe.bepinex",
+                deploymentRevision = "1",
+                omittedDisabledMods = 0,
+                installedMods = new[] { "registry.1", "registry.2" }.Select(id => new { modId = id, name = id, version = "fixture" }),
+                mods = new[] {
+                    new {
+                        modId = "registry.1", source = new { kind = "registry", modId = 1UL, releaseId = "11111111-1111-4111-8111-111111111111", sha256 = new string('a', 64) },
+                        root = managedRoot, entryAssembly = (string?)"Starframe.FixtureMods.dll", entryType = (string?)"Starframe.FixtureMods.First",
+                        requires = System.Array.Empty<string>(), files = new[] { new { path = "Starframe.FixtureMods.dll", sha256 = Convert.ToHexStringLower(SHA256.HashData(dll)) } }
+                    },
+                    new {
+                        modId = "registry.2", source = new { kind = "registry", modId = 2UL, releaseId = "22222222-2222-4222-8222-222222222222", sha256 = new string('b', 64) },
+                        root = luaRoot, entryAssembly = (string?)null, entryType = (string?)null,
+                        requires = new[] { "registry.1" }, files = new[] { new { path = "LJ/lua/main.lua", sha256 = Convert.ToHexStringLower(SHA256.HashData(lua)) } }
+                    }
+                }
+            });
+            var applied = new List<string>();
+            using var session = new ActivationSession(_ => { }, new[] { "netstandard", "System.Runtime" }, applyLua: (id, files) =>
+            {
+                applied.Add(id);
+                CollectionAssert.AreEqual(lua, files["LJ/LUA/MAIN.LUA"]);
+            });
+            using var report = Contracts.Read(session.Activate(root, manifest), "report");
+            CollectionAssert.AreEqual(new[] { "loaded", "loaded" }, report.RootElement.GetProperty("mods").EnumerateArray().Select(mod => mod.GetProperty("outcome").GetString()).ToArray());
+            CollectionAssert.AreEqual(new[] { "registry.2" }, applied);
+            Assert.IsTrue(session.Settings.ContainsKey("registry.1"));
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
     [TestMethod]
     public void OrderedActivationFailurePropagationDisabledInventoryAndShutdown()
     {
@@ -37,7 +106,8 @@ public sealed class ActivationTests
             }
             var manifest = JsonSerializer.SerializeToUtf8Bytes(new
             {
-                schemaVersion = 2,
+                schemaVersion = 3,
+                omittedDisabledMods = 0,
                 runtimeContractVersion = 1,
                 integrationId = "starframe.bepinex",
                 deploymentRevision = "20",
@@ -45,7 +115,7 @@ public sealed class ActivationTests
                 mods = specs.Select(s => new
                 {
                     modId = s.Item1,
-                    source = new { kind = "catalog", releaseId = s.Item1 },
+                    source = new { kind = "local", contentId = Contracts.ContentId(JsonSerializer.SerializeToElement(new[] { new { path = "Starframe.FixtureMods.dll", sha256 = hash } })) },
                     root = s.Item1,
                     entryAssembly = "Starframe.FixtureMods.dll",
                     entryType = "Starframe.FixtureMods." + s.Item2,
@@ -108,7 +178,14 @@ public sealed class ActivationTests
             string manifest = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "fixtures/activation-content.json"));
             foreach (bool valid in new[] { false, true })
             {
-                string text = valid ? manifest.Replace(new string('0', 64), Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(file)))) : manifest;
+                var activation = JsonNode.Parse(manifest)!;
+                var mod = activation["mods"]![0]!;
+                if (valid)
+                {
+                    mod["files"]![0]!["sha256"] = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(file)));
+                    mod["source"]!["contentId"] = Contracts.ContentId(JsonSerializer.SerializeToElement(mod["files"]));
+                }
+                string text = activation.ToJsonString();
                 using var session = new ActivationSession(_ => { }, System.Array.Empty<string>());
                 using var report = Contracts.Read(session.Activate(root, System.Text.Encoding.UTF8.GetBytes(text)), "report");
                 Assert.AreEqual(valid ? "unsupported_content" : "invalid_payload", report.RootElement.GetProperty("mods")[0].GetProperty("errorCode").GetString());

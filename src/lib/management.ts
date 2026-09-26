@@ -2,22 +2,18 @@ import { writable } from 'svelte/store';
 import { confirmed, errorMessage } from './state';
 
 import type {
-  Reference,
-  LibraryEntry,
-  Release,
+  CollectionReference as Reference,
+  InstalledEntry as LibraryEntry,
   ModView,
   PackageOperation,
   ModAction,
   PackageAction,
   SharingAction,
   SharingReply,
-  Advisory,
 } from './generated/management';
 export type {
-  Reference,
-  LibraryEntry,
-  Release,
-  CatalogMod,
+  CollectionReference as Reference,
+  InstalledEntry as LibraryEntry,
   ModView,
   PackageOperation,
   ModAction,
@@ -36,45 +32,49 @@ export interface ManagementTransport {
   sharing(action: SharingAction): Promise<SharingReply>;
   mods(action: ModAction): Promise<ModView>;
   packages(action: PackageAction): Promise<PackageOperation[]>;
+  retryRegistryReceipts(): Promise<number>;
 }
 export const key = (reference: Reference) =>
   JSON.stringify([
-    reference.modId,
-    reference.hash,
-    reference.origin,
-    reference.releaseId,
+    reference.kind,
+    reference.reference.modId,
+    reference.kind === 'registry' ? reference.reference.releaseId : null,
+    reference.reference.sha256,
   ]);
+export const runtimeId = (reference: Reference) =>
+  reference.kind === 'registry'
+    ? `registry.${reference.reference.modId}`
+    : reference.reference.modId;
+export const referenceLabel = (reference: Reference) =>
+  reference.kind === 'registry'
+    ? `Mod ${reference.reference.modId}`
+    : reference.reference.modId;
+export const referenceRelease = (reference: Reference) =>
+  reference.kind === 'registry'
+    ? reference.reference.releaseId
+    : 'Local import';
+export const localKey = (
+  reference: import('./generated/management').Reference,
+) =>
+  key({
+    kind: 'local',
+    reference: { modId: reference.modId, sha256: reference.hash },
+  });
 export const transferring = (op: PackageOperation) =>
   op.status === 'preparing' || op.status === 'cancelling';
-export const findings = (
-  data: ModView | null,
-  hash: string | undefined,
-): Advisory[] => {
-  const ids = hash ? (data?.findings[hash] ?? []) : [];
-  return (
-    data?.advisories?.advisories.filter((advisory) =>
-      ids.includes(advisory.id),
-    ) ?? []
-  );
-};
 export const confirmedFinding = (
   data: ModView | null,
   hash: string | undefined,
-) =>
-  findings(data, hash).some(
-    (advisory) => advisory.history.at(-1)?.state === 'confirmed',
-  );
+) => !!(hash && data?.blocked[hash]);
 export const bytes = (value: number) =>
   `${(value / 1024 / 1024).toLocaleString(undefined, { maximumFractionDigits: 1 })} MiB`;
 export function compatibility(
-  release: Release | undefined,
-  build: string | undefined,
+  build: string | null,
+  selected: string | undefined,
 ) {
-  if (!release) return 'Compatibility metadata unavailable';
-  if (!build) return 'Choose a game to check compatibility';
-  if (release.compatibilityProblems.some((p) => p.gameBuild === build))
-    return 'Known compatibility problem';
-  return release.testedGameBuilds.includes(build)
+  if (!build) return 'Compatibility metadata unavailable';
+  if (!selected) return 'Choose a game to check compatibility';
+  return build === selected
     ? 'Tested with this version'
     : 'Not tested with this version';
 }
@@ -232,16 +232,9 @@ export function createManagement(transport: ManagementTransport | null) {
         if (!stopped) update({ data });
       });
     },
-    install(releaseId: string) {
-      return run(`install:${releaseId}`, async () => {
-        const operations = await confirmed(
-          transport!.packages({
-            kind: 'prepare',
-            releaseId,
-            requestId: crypto.randomUUID(),
-          }),
-        );
-        if (!stopped) update({ operations });
+    retryReceipts() {
+      return run('receipts', async () => {
+        await confirmed(transport!.retryRegistryReceipts());
       });
     },
     cancel(operationId: string) {

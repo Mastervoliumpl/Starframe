@@ -30,7 +30,7 @@ def prepare(destination: Path, runtime: Path, archive: Path) -> None:
         (plugin / name).write_bytes(value)
     activation = package / 'Starframe/activation.json'
     activation.parent.mkdir()
-    activation.write_text(json.dumps(dict(schemaVersion=2, runtimeContractVersion=1,
+    activation.write_text(json.dumps(dict(schemaVersion=3, omittedDisabledMods=0, runtimeContractVersion=1,
         integrationId='starframe.bepinex', deploymentRevision='0', installedMods=[], mods=[])) + '\n', encoding='utf-8')
     inventory = [dict(path=p.relative_to(package).as_posix(), sha256=hashlib.sha256(p.read_bytes()).hexdigest())
                  for p in sorted(package.rglob('*')) if p.is_file()]

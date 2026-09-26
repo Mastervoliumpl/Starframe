@@ -1,14 +1,16 @@
 import { expect, test } from '@playwright/test';
 
 const reference = (index: number) => ({
-  modId: `fixture.mod${index}`,
-  hash: index.toString(16).padStart(64, '0'),
-  origin: 'catalog',
-  releaseId: `fixture.mod${index}.1`,
+  kind: 'registry',
+  reference: {
+    modId: index + 1,
+    sha256: index.toString(16).padStart(64, '0'),
+    releaseId: `11111111-1111-4111-8111-${(index + 1).toString(16).padStart(12, '0')}`,
+  },
 });
 const document = JSON.stringify({
   format: 'starframe-collection',
-  schemaVersion: 1,
+  schemaVersion: 2,
   name: 'Shared setup',
   entries: [reference(1), reference(0), reference(3), reference(2)],
 });
@@ -87,7 +89,7 @@ test('import rejects an unsupported format and untrusted links without creating 
     name: 'Or paste collection JSON',
   });
   const unsupported = document.replace(
-    '"schemaVersion":1',
+    '"schemaVersion":2',
     '"schemaVersion":99',
   );
   await dialog.getByLabel('Choose a collection file').setInputFiles({

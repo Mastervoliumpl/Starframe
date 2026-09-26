@@ -24,8 +24,12 @@ fn shared_activation_boundaries() {
         };
         let inventory: Vec<_> = (0..inventory_count).map(|i| serde_json::json!({"modId":format!("fixture.m{i}"),"name":"Fixture","version":"1"})).collect();
         let mods: Vec<_> = (0..mod_count).map(|i| {
-            let files = match dimension { "files" => count, "totalFiles" => (count - i * 1024).min(1024), _ => 1 };
-            serde_json::json!({"modId":format!("fixture.m{i}"),"root":format!("mods/m{i}"),"source":{"kind":"catalog","releaseId":format!("fixture.m{i}.1")},"requires":[],"entryAssembly":null,"entryType":null,"files":(0..files).map(|f| serde_json::json!({"path":format!("LJ/lua/f{f}.lua"),"sha256":"ab".repeat(32)})).collect::<Vec<_>>()})
+            let count = match dimension { "files" => count, "totalFiles" => (count - i * 1024).min(1024), _ => 1 };
+            let files: Vec<_> = (0..count).map(|f| serde_json::json!({"path":format!("LJ/lua/f{f}.lua"),"sha256":"ab".repeat(32)})).collect();
+            let content_id = if files.len() <= runtime_contract::MAX_FILES_PER_MOD {
+                runtime_contract::content_id(&serde_json::json!(files)).unwrap()
+            } else { format!("sha256:{}", "0".repeat(64)) };
+            serde_json::json!({"modId":format!("fixture.m{i}"),"root":format!("mods/m{i}"),"source":{"kind":"local","contentId":content_id},"requires":[],"entryAssembly":null,"entryType":null,"files":files})
         }).collect();
         let activation = serde_json::json!({"schemaVersion":3,"runtimeContractVersion":1,"integrationId":"starframe.bepinex","deploymentRevision":"1","installedMods":inventory,"omittedDisabledMods":0,"mods":mods});
         let result =

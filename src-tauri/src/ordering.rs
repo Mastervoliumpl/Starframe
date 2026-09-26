@@ -1,6 +1,11 @@
-use crate::{catalog::Catalog, storage::ModReference};
+use crate::storage::ModReference;
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap};
+
+mod registry;
+pub use registry::{RegistryAdjustment, RegistryResolution, resolve_registry};
+mod mixed;
+pub use mixed::{MixedAdjustment, MixedResolution, resolve_mixed};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -19,12 +24,7 @@ pub struct Adjustment {
     pub message: String,
 }
 
-pub fn resolve(catalog: &Catalog, requested: &[ModReference]) -> Result<Resolution, String> {
-    resolve_with_locals(Some(catalog), &[], requested)
-}
-
-pub fn resolve_with_locals(
-    catalog: Option<&Catalog>,
+pub fn resolve_locals(
     locals: &[crate::local_import::LocalSource],
     requested: &[ModReference],
 ) -> Result<Resolution, String> {
@@ -41,7 +41,7 @@ pub fn resolve_with_locals(
                 reference.mod_id
             ));
         }
-        let release = crate::mods::metadata(catalog, locals, reference).map_err(|e| {
+        let release = crate::mods::metadata(locals, reference).map_err(|e| {
             format!(
                 "Exact release metadata for {} is unavailable: {e}",
                 reference.mod_id
@@ -99,27 +99,10 @@ pub fn resolve_with_locals(
             }
         }
     }
-    let mut incoming = vec![0; requested.len()];
-    for targets in &edges {
-        for &to in targets {
-            incoming[to] += 1;
-        }
-    }
-    let mut ready: BTreeSet<_> = incoming
-        .iter()
-        .enumerate()
-        .filter_map(|(i, &n)| (n == 0).then_some(i))
+    let effective: Vec<_> = topological(&edges)
+        .into_iter()
+        .map(|index| requested[index].clone())
         .collect();
-    let mut effective = Vec::new();
-    while let Some(index) = ready.pop_first() {
-        effective.push(requested[index].clone());
-        for &to in &edges[index] {
-            incoming[to] -= 1;
-            if incoming[to] == 0 {
-                ready.insert(to);
-            }
-        }
-    }
     let effective_positions: HashMap<_, _> = effective
         .iter()
         .enumerate()
@@ -160,6 +143,31 @@ pub fn resolve_with_locals(
         effective,
         adjustments,
     })
+}
+
+fn topological(edges: &[BTreeSet<usize>]) -> Vec<usize> {
+    let mut incoming = vec![0; edges.len()];
+    for targets in edges {
+        for &to in targets {
+            incoming[to] += 1;
+        }
+    }
+    let mut ready: BTreeSet<_> = incoming
+        .iter()
+        .enumerate()
+        .filter_map(|(index, &count)| (count == 0).then_some(index))
+        .collect();
+    let mut effective = Vec::new();
+    while let Some(index) = ready.pop_first() {
+        effective.push(index);
+        for &to in &edges[index] {
+            incoming[to] -= 1;
+            if incoming[to] == 0 {
+                ready.insert(to);
+            }
+        }
+    }
+    effective
 }
 
 fn cycle(edges: &[BTreeSet<usize>]) -> Option<Vec<usize>> {

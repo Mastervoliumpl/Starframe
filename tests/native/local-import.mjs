@@ -104,7 +104,7 @@ await withDesktop(
         action: { kind: 'list' },
       }),
     );
-    expect(view.catalog).toBeNull();
+    expect(view).not.toHaveProperty('catalog');
     expect(view.orderError).toBeNull();
     expect(view.localSources[0].path).toBe(source);
     reference = view.library[0].reference;
@@ -132,7 +132,14 @@ await withDesktop(
     await expect(enabled).toBeChecked();
     expect(
       await readFile(
-        join(data, 'artifacts', reference.hash, 'LJ', 'lua', 'fixture.lua'),
+        join(
+          data,
+          'artifacts',
+          reference.reference.sha256,
+          'LJ',
+          'lua',
+          'fixture.lua',
+        ),
       ),
     ).toEqual(original);
     await writeFile(content, 'author next build\n');
@@ -152,7 +159,7 @@ await withDesktop(
     await stat(join(source, 'starframe.local.json'));
     await expect
       .poll(async () =>
-        stat(join(data, 'artifacts', reference.hash)).then(
+        stat(join(data, 'artifacts', reference.reference.sha256)).then(
           () => true,
           () => false,
         ),

@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 4,
+  "runtimeContractVersion": 1,
+  "integrationId": "starframe.bepinex",
+  "deploymentRevision": "12",
+  "installedMods": [
+    {
+      "modId": "example.core",
+      "name": "Example Core",
+      "version": "1.0.0"
+    },
+    {
+      "modId": "example.disabled",
+      "name": "Disabled <b>text</b>",
+      "version": "1.0.0"
+    },
+    {
+      "modId": "registry.1",
+      "name": "Registry code fixture",
+      "version": "display label"
+    }
+  ],
+  "mods": [
+    {
+      "modId": "example.core",
+      "source": {
+        "kind": "local",
+        "contentId": "sha256:e3f0ed8720b2c4ccc547ef09171368dda733aa29eaa04ff531e2413f445004a6"
+      },
+      "root": "example.core/1",
+      "entryAssembly": "Example.Core.dll",
+      "entryType": "Example.Core.Entry",
+      "requires": [],
+      "files": [
+        {
+          "path": "Example.Core.dll",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "path": "data/rules.txt",
+          "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ]
+    },
+    {
+      "modId": "registry.1",
+      "source": {
+        "kind": "registry",
+        "modId": 1,
+        "releaseId": "11111111-1111-4111-8111-111111111111",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "root": "mods/registry-1/11111111-1111-4111-8111-111111111111",
+      "entryAssembly": "Example.Core.dll",
+      "entryType": "Example.Core.Entry",
+      "requires": [],
+      "files": [
+        {
+          "path": "Example.Core.dll",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "path": "data/rules.txt",
+          "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ]
+    }
+  ],
+  "omittedDisabledMods": 0
+}

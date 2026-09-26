@@ -4,7 +4,7 @@ Decision: select bundled SQLite through rusqlite for milestone 0.1.1, before 0.2
 
 ## Why switch
 
-The accepted product has one desktop database owner, short local transactions and ordinary relational records. Catalog refresh uses HTTP/JSON; collection sharing uses portable JSON files. Downloads and imported binaries stay in files. The C# runtime reads prepared manifests and never opens the desktop database. Native game support in 0.7.0 changes the integration adapter, not that ownership model.
+The accepted product has one desktop database owner, short local transactions and ordinary relational records. Catalog refresh uses HTTP/JSON; collection sharing uses portable JSON files. Downloads and imported binaries stay in files. The C# runtime reads prepared manifests and never opens the desktop database. Future native game support changes the integration adapter, not that ownership model; that work has no assigned milestone.
 
 SQLite covers these requirements, including constraints, joins, ordered reads, immediate transactions, migrations and recovery. There is no accepted requirement for database replication, cloud accounts, vector queries, change-data capture or concurrent writers. No specified post-0.7.0 feature needs them either. The unpublished game API is an integration uncertainty, not a reason to couple the desktop database to Turso. A future product change introducing a shared remote database would require its own decision.
 

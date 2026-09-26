@@ -2,5 +2,32 @@
   "identifier": "main",
   "description": "Local desktop state and diagnostic commands for the main window.",
   "windows": ["main"],
-  "permissions": ["allow-watch-state", "allow-update-action", "allow-start-diagnostic", "allow-cancel-operation", "allow-open-external", "allow-game-action", "allow-package-action", "allow-pick-local-source", "allow-mod-action", "allow-sharing-action", "allow-save-collection-file"]
+  "permissions": [
+    "allow-watch-state",
+    "allow-update-action",
+    "allow-start-diagnostic",
+    "allow-cancel-operation",
+    "allow-open-external",
+    "allow-game-action",
+    "allow-package-action",
+    "allow-pick-local-source",
+    "allow-mod-action",
+    "allow-sharing-action",
+    "allow-save-collection-file",
+    "allow-registry-list",
+    "allow-registry-options",
+    "allow-registry-detail",
+    "allow-registry-release",
+    "allow-registry-history",
+    "allow-registry-install",
+    "allow-registry-candidates",
+    "allow-registry-download",
+    "allow-registry-retry-receipts",
+    "allow-auth-restore",
+    "allow-auth-inspect",
+    "allow-auth-poll",
+    "allow-auth-start",
+    "allow-auth-cancel",
+    "allow-auth-sign-out"
+  ]
 }

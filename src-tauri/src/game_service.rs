@@ -1,10 +1,9 @@
 use crate::{
     app::Shared,
-    model::{CatalogStatus, CommandError, GameAction, SavedData},
+    model::{CommandError, GameAction, SavedData},
 };
 use starframe::{
-    catalog::refresh::Refresh,
-    deployment,
+    backend, deployment,
     game::{self, GameView, Running},
     launch::{self, LaunchView, Phase},
     packages::{self, Packages},
@@ -35,6 +34,10 @@ enum Request {
         starframe::sharing::Action,
         tokio::sync::oneshot::Sender<Result<starframe::sharing::Reply, String>>,
     ),
+    SharedRegistry(
+        starframe::sharing::OnlineAction,
+        tokio::sync::oneshot::Sender<Result<starframe::sharing::OnlineReply, String>>,
+    ),
     Mod(
         starframe::mods::Action,
         tokio::sync::oneshot::Sender<Result<starframe::mods::View, String>>,
@@ -43,6 +46,22 @@ enum Request {
         packages::Action,
         tokio::sync::oneshot::Sender<Result<Vec<packages::Operation>, String>>,
     ),
+    RegistryPackage(
+        String,
+        Box<packages::RegistryRequest>,
+        tokio::sync::oneshot::Sender<Result<Vec<packages::Operation>, String>>,
+    ),
+    RegistryInstall(
+        String,
+        starframe::registry::ExactReference,
+        Box<packages::RegistryRequest>,
+        Box<packages::RegistryApproval>,
+        tokio::sync::oneshot::Sender<Result<Vec<packages::Operation>, String>>,
+    ),
+    RegistryReceipts(
+        Box<packages::ReceiptRequest>,
+        tokio::sync::oneshot::Sender<Result<usize, String>>,
+    ),
     Discover,
     Setup,
     Launch,
@@ -50,12 +69,59 @@ enum Request {
     Select(String),
     Picked(Result<Option<PathBuf>, String>),
 }
+#[derive(Clone)]
 pub struct GameService {
     sender: SyncSender<Request>,
     busy: Arc<AtomicBool>,
     writing: Arc<AtomicBool>,
 }
 impl GameService {
+    pub async fn registry_install(
+        &self,
+        request_id: String,
+        reference: starframe::registry::ExactReference,
+        request: packages::RegistryRequest,
+        approval: packages::RegistryApproval,
+    ) -> Result<Vec<packages::Operation>, CommandError> {
+        let (reply, result) = tokio::sync::oneshot::channel();
+        self.sender
+            .try_send(Request::RegistryInstall(
+                request_id,
+                reference,
+                Box::new(request),
+                Box::new(approval),
+                reply,
+            ))
+            .map_err(|_| {
+                CommandError::new("package_busy", "The storage worker is busy. Retry shortly.")
+            })?;
+        result
+            .await
+            .map_err(|_| CommandError::new("package_unavailable", "The package worker stopped."))?
+            .map_err(|message| CommandError::new("registry_install_failed", &message))
+    }
+    pub async fn shared_registry(
+        &self,
+        action: starframe::sharing::OnlineAction,
+    ) -> Result<starframe::sharing::OnlineReply, CommandError> {
+        let (reply, result) = tokio::sync::oneshot::channel();
+        let sender = self.sender.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            sender.send(Request::SharedRegistry(action, reply))
+        })
+        .await
+        .map_err(|_| CommandError::new("sharing_unavailable", "The collection worker stopped."))?
+        .map_err(|_| CommandError::new("sharing_unavailable", "The collection worker stopped."))?;
+        result
+            .await
+            .map_err(|_| {
+                CommandError::new(
+                    "sharing_unavailable",
+                    "Collection sharing is unavailable. Restart Starframe.",
+                )
+            })?
+            .map_err(|message| CommandError::new("sharing_failed", &message))
+    }
     pub async fn update(&self, action: starframe::updates::Action) -> Result<(), CommandError> {
         let (reply, result) = tokio::sync::oneshot::channel();
         self.sender
@@ -129,6 +195,51 @@ impl GameService {
                 )
             })?
             .map_err(|message| CommandError::new("package_failed", &message))
+    }
+    pub async fn registry_package(
+        &self,
+        request_id: String,
+        request: packages::RegistryRequest,
+    ) -> Result<Vec<packages::Operation>, CommandError> {
+        let (reply, result) = tokio::sync::oneshot::channel();
+        self.sender
+            .try_send(Request::RegistryPackage(
+                request_id,
+                Box::new(request),
+                reply,
+            ))
+            .map_err(|_| {
+                CommandError::new("package_busy", "The storage worker is busy. Retry shortly.")
+            })?;
+        result
+            .await
+            .map_err(|_| {
+                CommandError::new(
+                    "package_unavailable",
+                    "Package preparation is unavailable. Restart Starframe.",
+                )
+            })?
+            .map_err(|message| CommandError::new("registry_download_failed", &message))
+    }
+    pub async fn registry_receipts(
+        &self,
+        request: packages::ReceiptRequest,
+    ) -> Result<usize, CommandError> {
+        let (reply, result) = tokio::sync::oneshot::channel();
+        self.sender
+            .try_send(Request::RegistryReceipts(Box::new(request), reply))
+            .map_err(|_| {
+                CommandError::new("package_busy", "The storage worker is busy. Retry shortly.")
+            })?;
+        result
+            .await
+            .map_err(|_| {
+                CommandError::new(
+                    "package_unavailable",
+                    "Package preparation is unavailable. Restart Starframe.",
+                )
+            })?
+            .map_err(|message| CommandError::new("registry_receipt_failed", &message))
     }
     pub fn writing(&self) -> bool {
         self.writing.load(Ordering::SeqCst)
@@ -272,33 +383,9 @@ fn prepare(
     dispatch: bool,
 ) -> Result<serde_json::Value, String> {
     let resources = resources(app)?;
-    if !resources.join("runtime/runtime-package.json").is_file() {
-        return Err("This Starframe build does not include the game runtime. Use a build with runtime support to finish setup.".into());
-    }
-    let store = std::cell::RefCell::new(store);
-    launch::prepare_latest(
-        || starframe::mods::requested(&store.borrow()),
-        |activation| {
-            deployment::repair_missing(&mut store.borrow_mut(), game)?;
-            deployment::prepare_desktop(
-                &mut store.borrow_mut(),
-                game,
-                &resources,
-                activation,
-                &|| core.lock().expect("state lock").stopped,
-            )
-            .map(|_| ())
-        },
-        || {
-            if core.lock().expect("state lock").stopped {
-                return Err("Starframe closed before launch was requested.".into());
-            }
-            if dispatch {
-                windows_game::launch(game)?;
-            }
-            Ok(())
-        },
-    )
+    backend::prepare(store, game, &resources, dispatch, &|| {
+        core.lock().expect("state lock").stopped
+    })
 }
 
 pub fn start(app: tauri::AppHandle, core: Shared) -> GameService {
