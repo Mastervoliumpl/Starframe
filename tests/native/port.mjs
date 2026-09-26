@@ -23,7 +23,7 @@ export async function waitForDebugPortRelease(port) {
           });
         }),
       {
-        timeout: 10000,
+        timeout: 30000,
         message: `Waiting for debug port ${port} to stop listening`,
       },
     )

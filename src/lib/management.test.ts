@@ -55,6 +55,7 @@ test('an old refresh cannot overwrite an acknowledged edit; repeated input is ig
     saveCollection: vi.fn(),
     pickLocalSource: vi.fn(),
     packages: vi.fn().mockResolvedValue([]),
+    retryRegistryReceipts: vi.fn().mockResolvedValue(0),
   };
   const manager = createManagement(transport);
   await manager.refresh();
@@ -83,6 +84,7 @@ test('bulk edits use each confirmed revision and retain partial success on failu
     saveCollection: vi.fn(),
     pickLocalSource: vi.fn(),
     packages: vi.fn().mockResolvedValue([]),
+    retryRegistryReceipts: vi.fn().mockResolvedValue(0),
   };
   const manager = createManagement(transport);
   await manager.refresh();
@@ -106,6 +108,7 @@ test('silent operation replies time out without claiming installation', async ()
     saveCollection: vi.fn(),
     pickLocalSource: vi.fn(),
     packages: vi.fn().mockImplementation(() => new Promise(() => {})),
+    retryRegistryReceipts: vi.fn().mockResolvedValue(0),
   });
   const install = manager.install('fixture.1');
   await vi.advanceTimersByTimeAsync(5000);

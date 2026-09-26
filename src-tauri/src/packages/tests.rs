@@ -229,6 +229,8 @@ fn operation(artifact: &Artifact) -> Operation {
         request_id: Uuid::new_v4().to_string(),
         release_id: "fixture.core.1".into(),
         hash: artifact.sha256.clone(),
+        kind: Kind::Package,
+        receipt_id: None,
         status: Status::Preparing,
         message: "Preparing".into(),
         received_bytes: 0,

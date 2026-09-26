@@ -398,5 +398,100 @@
     "file": "activation-v3-incomplete-inventory.json",
     "kind": "activation",
     "valid": false
+  },
+  {
+    "file": "activation-registry-managed.json",
+    "kind": "activation",
+    "valid": true
+  },
+  {
+    "file": "activation-registry-lua.json",
+    "kind": "activation",
+    "valid": true
+  },
+  {
+    "file": "activation-registry-local-mixed.json",
+    "kind": "activation",
+    "valid": true
+  },
+  {
+    "file": "activation-registry-safe-integer-limit.json",
+    "kind": "activation",
+    "valid": true
+  },
+  {
+    "file": "activation-registry-unknown-schema.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-registry-old-schema.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-registry-catalog-source.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-registry-zero-id.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-registry-unsafe-id.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-registry-float-id.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-registry-text-id.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-registry-identity-mismatch.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-registry-nil-release.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-registry-upper-release.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-registry-bad-release.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-registry-upper-hash.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-registry-short-hash.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-registry-source-extra.json",
+    "kind": "activation",
+    "valid": false
+  },
+  {
+    "file": "activation-registry-source-missing.json",
+    "kind": "activation",
+    "valid": false
   }
 ]

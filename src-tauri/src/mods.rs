@@ -338,6 +338,9 @@ pub fn action(store: &mut Storage, action: Action) -> Result<View> {
                     &mut BTreeSet::new(),
                 )?;
                 for reference in needed {
+                    store
+                        .require_registry_unblocked_hash(&reference.hash)
+                        .map_err(|e| e.to_string())?;
                     let prepared = store
                         .prepared_artifact(&reference.hash)
                         .map_err(|e| e.to_string())?
@@ -543,6 +546,14 @@ fn dependency_entries(
 
 pub fn requested(store: &Storage) -> Result<Value> {
     let records = store.load().map_err(|e| e.to_string())?;
+    if records.active_collection.as_ref().is_some_and(|id| {
+        !records
+            .collections
+            .iter()
+            .any(|collection| &collection.id == id)
+    }) {
+        return Err("The active collection is missing.".into());
+    }
     if let Some(error) = crate::sharing::active_error(store, &records)? {
         return Err(error);
     }
@@ -551,10 +562,31 @@ pub fn requested(store: &Storage) -> Result<Value> {
         .iter()
         .find(|c| Some(&c.id) == records.active_collection.as_ref())
         .map_or(&[][..], |c| c.entries.as_slice());
-    let (inventory, omitted) = inventory(&records, entries);
+    let catalog = if entries.is_empty() {
+        None
+    } else {
+        catalog(store)?
+    };
+    requested_entries(store, &records, entries, catalog)
+}
+
+pub(crate) fn requested_local(store: &Storage, entries: &[ModReference]) -> Result<Value> {
+    for reference in entries {
+        crate::references::Reference::try_from(reference)?;
+    }
+    let records = store.load().map_err(|e| e.to_string())?;
+    requested_entries(store, &records, entries, None)
+}
+
+fn requested_entries(
+    store: &Storage,
+    records: &Records,
+    entries: &[ModReference],
+    catalog: Option<Catalog>,
+) -> Result<Value> {
+    let (inventory, omitted) = inventory(records, entries);
     if entries.is_empty() {
-        let mut value = crate::launch::requested(&records)?;
-        value["schemaVersion"] = json!(3);
+        let mut value = json!({"schemaVersion":3,"runtimeContractVersion":1,"integrationId":"starframe.bepinex","deploymentRevision":records.revision.to_string(),"mods":[]});
         value["installedMods"] = inventory;
         value["omittedDisabledMods"] = json!(omitted);
         return runtime_contract::read(
@@ -562,7 +594,6 @@ pub fn requested(store: &Storage) -> Result<Value> {
             "activation",
         );
     }
-    let catalog = catalog(store)?;
     let security = store.catalog_security().map_err(|e| e.to_string())?;
     let locals = store.local_sources().map_err(|e| e.to_string())?;
     for reference in entries {
@@ -578,6 +609,9 @@ pub fn requested(store: &Storage) -> Result<Value> {
     let mut mods = Vec::new();
     let mut total_bytes = 0;
     for reference in &ordered {
+        store
+            .require_registry_unblocked_hash(&reference.hash)
+            .map_err(|e| e.to_string())?;
         let release = metadata(catalog.as_ref(), &locals, reference)?;
         let prepared = store
             .prepared_artifact(&reference.hash)
@@ -662,18 +696,25 @@ pub(crate) fn payload(store: &Storage, activation: &Value) -> Result<Vec<(String
         return Err("The requested collection changed before preparation.".into());
     }
     let records = store.load().map_err(|e| e.to_string())?;
+    let entries = records
+        .collections
+        .iter()
+        .find(|collection| Some(&collection.id) == records.active_collection.as_ref())
+        .map_or(&[][..], |collection| collection.entries.as_slice());
+    payload_entries(store, activation, entries)
+}
+
+pub(crate) fn payload_entries(
+    store: &Storage,
+    activation: &Value,
+    entries: &[ModReference],
+) -> Result<Vec<(String, Source)>> {
     let mut sources = Vec::new();
     for item in activation["mods"].as_array().ok_or("Invalid activation.")? {
-        let reference = records
-            .collections
+        let reference = entries
             .iter()
-            .find(|c| Some(&c.id) == records.active_collection.as_ref())
-            .and_then(|c| {
-                c.entries
-                    .iter()
-                    .find(|r| Some(r.mod_id.as_str()) == item["modId"].as_str())
-            })
-            .ok_or("An active reference is missing from the collection.")?;
+            .find(|reference| Some(reference.mod_id.as_str()) == item["modId"].as_str())
+            .ok_or("An active reference is missing from the selection.")?;
         let prepared = packages::verify_artifact(store, reference)?;
         let base = store
             .artifact_directory(reference)

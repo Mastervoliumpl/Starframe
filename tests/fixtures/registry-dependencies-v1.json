@@ -1,0 +1,1285 @@
+{
+  "websiteContractRevision": "1d616d43d90227ee9967091be039e6c3e695091e",
+  "valid": [
+    {
+      "dependency": {
+        "modId": 2,
+        "kind": "exact",
+        "releaseId": "22222222-2222-4222-8222-222222222222"
+      },
+      "candidates": [
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "preview label",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "0.9.9",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+different",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.9.9",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "2.0.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.1",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.2",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.10",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-beta",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-18446744073709551617",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551616.0.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551617.0.0+build",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551618.0.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "01.0.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "v1.0.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-01",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha..1",
+          "matches": true
+        }
+      ]
+    },
+    {
+      "dependency": {
+        "modId": 2,
+        "kind": "range",
+        "minimum": "1.0.0",
+        "before": "2.0.0",
+        "includePrerelease": false
+      },
+      "candidates": [
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "preview label",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "0.9.9",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+different",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.9.9",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "2.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.1",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.2",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.10",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-beta",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-18446744073709551617",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551616.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551617.0.0+build",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551618.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "01.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "v1.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-01",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha..1",
+          "matches": false
+        }
+      ]
+    },
+    {
+      "dependency": {
+        "modId": 2,
+        "kind": "range",
+        "minimum": null,
+        "before": "2.0.0",
+        "includePrerelease": false
+      },
+      "candidates": [
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "preview label",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "0.9.9",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+different",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.9.9",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "2.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.1",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.2",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.10",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-beta",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-18446744073709551617",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551616.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551617.0.0+build",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551618.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "01.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "v1.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-01",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha..1",
+          "matches": false
+        }
+      ]
+    },
+    {
+      "dependency": {
+        "modId": 2,
+        "kind": "range",
+        "minimum": "1.0.0",
+        "before": null,
+        "includePrerelease": false
+      },
+      "candidates": [
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "preview label",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "0.9.9",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+different",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.9.9",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "2.0.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.1",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.2",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.10",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-beta",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-18446744073709551617",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551616.0.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551617.0.0+build",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551618.0.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "01.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "v1.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-01",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha..1",
+          "matches": false
+        }
+      ]
+    },
+    {
+      "dependency": {
+        "modId": 2,
+        "kind": "range",
+        "minimum": "1.0.0-alpha.2",
+        "before": "1.0.0",
+        "includePrerelease": true
+      },
+      "candidates": [
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "preview label",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "0.9.9",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+different",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.9.9",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "2.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.1",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.2",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.10",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-beta",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-18446744073709551617",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551616.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551617.0.0+build",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551618.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "01.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "v1.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-01",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha..1",
+          "matches": false
+        }
+      ]
+    },
+    {
+      "dependency": {
+        "modId": 2,
+        "kind": "range",
+        "minimum": "1.0.0-alpha.2",
+        "before": "1.0.0",
+        "includePrerelease": false
+      },
+      "candidates": [
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "preview label",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "0.9.9",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+different",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.9.9",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "2.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.1",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.2",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.10",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-beta",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-18446744073709551617",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551616.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551617.0.0+build",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551618.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "01.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "v1.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-01",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha..1",
+          "matches": false
+        }
+      ]
+    },
+    {
+      "dependency": {
+        "modId": 2,
+        "kind": "range",
+        "minimum": "18446744073709551616.0.0",
+        "before": "18446744073709551618.0.0",
+        "includePrerelease": false
+      },
+      "candidates": [
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "preview label",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "0.9.9",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+different",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.9.9",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "2.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.1",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.2",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.10",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-beta",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-18446744073709551617",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551616.0.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551617.0.0+build",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551618.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "01.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "v1.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-01",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha..1",
+          "matches": false
+        }
+      ]
+    },
+    {
+      "dependency": {
+        "modId": 2,
+        "kind": "range",
+        "minimum": "1.0.0-18446744073709551616",
+        "before": "1.0.0",
+        "includePrerelease": true
+      },
+      "candidates": [
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "preview label",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "0.9.9",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+different",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.9.9",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "2.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.1",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.2",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.10",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-beta",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-18446744073709551617",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551616.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551617.0.0+build",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551618.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "01.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "v1.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-01",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha..1",
+          "matches": false
+        }
+      ]
+    },
+    {
+      "dependency": {
+        "modId": 2,
+        "kind": "range",
+        "minimum": "1.0.0+first",
+        "before": "2.0.0+other",
+        "includePrerelease": false
+      },
+      "candidates": [
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "preview label",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "0.9.9",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+different",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.9.9",
+          "matches": true
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "2.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.1",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.2",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha.10",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-beta",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-18446744073709551617",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551616.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551617.0.0+build",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "18446744073709551618.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "01.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "v1.0.0",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-01",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0+",
+          "matches": false
+        },
+        {
+          "modId": 2,
+          "releaseId": "22222222-2222-4222-8222-222222222222",
+          "versionLabel": "1.0.0-alpha..1",
+          "matches": false
+        }
+      ]
+    }
+  ],
+  "invalid": [
+    [
+      {
+        "kind": "range",
+        "modId": 2,
+        "minimum": null,
+        "before": null,
+        "includePrerelease": false
+      }
+    ],
+    [
+      {
+        "kind": "range",
+        "modId": 2,
+        "minimum": "2.0.0",
+        "before": "1.0.0",
+        "includePrerelease": false
+      }
+    ],
+    [
+      {
+        "kind": "range",
+        "modId": 2,
+        "minimum": "1.0.0",
+        "before": "1.0.0+build",
+        "includePrerelease": false
+      }
+    ],
+    [
+      {
+        "kind": "range",
+        "modId": 2,
+        "minimum": "^1.0.0",
+        "before": null,
+        "includePrerelease": false
+      }
+    ],
+    [
+      {
+        "kind": "range",
+        "modId": 2,
+        "minimum": "1.0.0-01",
+        "before": null,
+        "includePrerelease": false
+      }
+    ],
+    [
+      {
+        "kind": "range",
+        "modId": 2,
+        "minimum": "1.0",
+        "before": null,
+        "includePrerelease": false
+      }
+    ],
+    [
+      {
+        "kind": "range",
+        "modId": 2,
+        "minimum": "",
+        "before": null,
+        "includePrerelease": false
+      }
+    ],
+    [
+      {
+        "kind": "range",
+        "modId": 2,
+        "minimum": "1.0.0",
+        "before": null,
+        "includePrerelease": false
+      },
+      {
+        "kind": "range",
+        "modId": 2,
+        "minimum": "2.0.0",
+        "before": null,
+        "includePrerelease": false
+      }
+    ],
+    [
+      {
+        "kind": "exact",
+        "modId": 1,
+        "releaseId": "22222222-2222-4222-8222-222222222222"
+      }
+    ],
+    [
+      {
+        "kind": "exact",
+        "modId": 2,
+        "releaseId": "00000000-0000-0000-0000-000000000000"
+      }
+    ],
+    [
+      {
+        "kind": "range",
+        "modId": 2,
+        "minimum": "1.0.0",
+        "includePrerelease": false
+      }
+    ]
+  ]
+}

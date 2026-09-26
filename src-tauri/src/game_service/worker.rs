@@ -252,10 +252,7 @@ impl Worker {
             }
         }
         if let (Ok(Some(queue)), Some(store)) = (&mut self.packages, &mut self.storage) {
-            match queue.poll(store).and_then(|changed| {
-                starframe::sharing::poll(store, queue)
-                    .map(|imports_changed| changed || imports_changed)
-            }) {
+            match backend::poll_packages(store, queue) {
                 Ok(true) => self.core.lock().expect("state lock").saved_data(
                     saved_status(store)
                         .unwrap_or_else(|message| SavedData::Unavailable { message }),
@@ -367,7 +364,7 @@ impl Worker {
         if observation != self.recovery_observation {
             self.session.wait = None;
             self.session.prepared = match (self.storage.as_ref(), self.view.selected.as_ref()) {
-                (Some(store), Some(game)) => match deployment::prepared_activation(store, game) {
+                (Some(store), Some(game)) => match backend::readiness(store, game) {
                     Ok(value) => value,
                     Err(error) => {
                         self.view.launch = LaunchView::new(Phase::Failed, &error);

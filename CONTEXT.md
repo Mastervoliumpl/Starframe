@@ -9,19 +9,22 @@ A modification with a stable identity, independent of any particular release or 
 _Avoid_: Using a filename or version number as the mod's identity.
 
 **Release**:
-A particular published version of a mod. Approval applies to an individual release, not automatically to every release of its mod.
+A particular published version of a mod. Approval applies to an individual release, not automatically to every release of its mod. A website ReleaseID is an opaque UUID. Its version label is display text and may not be SemVer.
 _Avoid_: Using release and mod interchangeably.
 
 **Artifact**:
-The specific downloadable file for a release, such as a ZIP archive. One release can offer several artifacts for different installation layouts.
+The exact ZIP bytes for a website release, identified by SHA-256 and byte size. Historical GitHub catalog releases could offer several artifacts; the 0.7.0 registry contract identifies one approved archive per release.
 _Avoid_: Treating every download attached to a release as interchangeable.
 
 **Catalog**:
-The maintainer's list of approved releases, their download locations, and relevant compatibility information.
-_Avoid_: Marketplace, mod hosting service.
+The pre-0.7.0 GitHub list of approved releases. It is historical once the website registry replaces it.
+
+**Registry**:
+The website service's approved mod and release records. Its numeric ModID identifies a mod; a UUID ReleaseID identifies an exact published release. A collection reference also pins the archive SHA-256. Signed registry metadata and security decisions use a trust root separate from app-update signing.
+_Avoid_: Treating a version label, file name, legacy catalog ID or SteamID as a release identity.
 
 **Local import**:
-A mod supplied from the user's computer rather than obtained through the curated catalog. It has the same management and load-order behavior, but no catalog release-update checks.
+A mod supplied from the user's computer rather than obtained through the registry. It has the same management and load-order behavior, but no registry release-update checks. Its local identity stays separate from website ModID.
 _Avoid_: Unmanaged mod, approved release.
 
 **Local build**:

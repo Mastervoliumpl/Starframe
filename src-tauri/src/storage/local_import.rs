@@ -124,6 +124,8 @@ impl Storage {
             request_id: Uuid::new_v4().to_string(),
             release_id: "local-import".into(),
             hash: prepared.hash.clone(),
+            kind: crate::packages::Kind::Package,
+            receipt_id: None,
             status: crate::packages::Status::Preparing,
             message: "Saving the verified local rebuild.".into(),
             received_bytes: size,

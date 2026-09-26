@@ -1,0 +1,387 @@
+{
+  "websiteContractRevision": "1d616d43d90227ee9967091be039e6c3e695091e",
+  "cases": {
+    "schemaVersion": 1,
+    "valid": [
+      {
+        "name": "code-lua-overlay",
+        "modType": "code",
+        "plan": {
+          "schemaVersion": 1,
+          "kind": "code",
+          "loader": "lua",
+          "entryPath": "LJ/lua/Example/main.lua"
+        },
+        "inventory": [
+          {
+            "path": "LJ/lua/Example/main.lua",
+            "bytes": 12,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "dll": false
+          },
+          {
+            "path": "LJ/lua/Example/helper.lua",
+            "bytes": 8,
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "dll": false
+          }
+        ]
+      },
+      {
+        "name": "code-bepinex-entry",
+        "modType": "code",
+        "plan": {
+          "schemaVersion": 1,
+          "kind": "code",
+          "loader": "bepinex5",
+          "sourceRoot": "Package",
+          "entryAssembly": "Example.dll",
+          "entryType": "Example.Plugin"
+        },
+        "inventory": [
+          {
+            "path": "Package/Example.dll",
+            "bytes": 128,
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "dll": true
+          },
+          {
+            "path": "Package/README.txt",
+            "bytes": 18,
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "dll": false
+          }
+        ]
+      },
+      {
+        "name": "map-with-relative-assets",
+        "modType": "map",
+        "plan": {
+          "schemaVersion": 1,
+          "kind": "map",
+          "sourceRoot": "Maps/Example",
+          "destination": "sanctuary_maps",
+          "folder": "Example"
+        },
+        "inventory": [
+          {
+            "path": "Maps/Example/Example.sanmap",
+            "bytes": 32,
+            "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "dll": false
+          },
+          {
+            "path": "Maps/Example/Textures/height.png",
+            "bytes": 22,
+            "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "dll": false
+          }
+        ]
+      },
+      {
+        "name": "ai-lua-folder",
+        "modType": "ai",
+        "plan": {
+          "schemaVersion": 1,
+          "kind": "ai",
+          "sourceRoot": "AI/Example",
+          "destination": "sanctuary_ai_mods",
+          "folder": "Example"
+        },
+        "inventory": [
+          {
+            "path": "AI/Example/AIInit.lua",
+            "bytes": 16,
+            "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "dll": false
+          },
+          {
+            "path": "AI/Example/formers/rush.lua",
+            "bytes": 14,
+            "sha256": "2222222222222222222222222222222222222222222222222222222222",
+            "dll": false
+          }
+        ]
+      }
+    ],
+    "invalid": [
+      {
+        "name": "missing-code-entry",
+        "from": "code-bepinex-entry",
+        "change": {
+          "entryAssembly": "Missing.dll"
+        }
+      },
+      {
+        "name": "wrong-primary-type",
+        "from": "map-with-relative-assets",
+        "modType": "code"
+      },
+      {
+        "name": "unsafe-source-path",
+        "from": "map-with-relative-assets",
+        "change": {
+          "sourceRoot": "../Maps"
+        }
+      },
+      {
+        "name": "arbitrary-destination",
+        "from": "ai-lua-folder",
+        "change": {
+          "destination": "C:/Game"
+        }
+      },
+      {
+        "name": "missing-map-file",
+        "from": "map-with-relative-assets",
+        "removePath": "Maps/Example/Example.sanmap"
+      },
+      {
+        "name": "mixed-ai-dll",
+        "from": "ai-lua-folder",
+        "addFile": {
+          "path": "AI/Example/Plugin.dll",
+          "bytes": 128,
+          "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "dll": true
+        }
+      },
+      {
+        "name": "outside-declared-root",
+        "from": "map-with-relative-assets",
+        "addFile": {
+          "path": "Other/file.txt",
+          "bytes": 3,
+          "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "dll": false
+        }
+      }
+    ]
+  },
+  "releases": [
+    {
+      "name": "code-lua-overlay",
+      "envelope": {
+        "signed": {
+          "type": "starframe-release",
+          "schemaVersion": 2,
+          "revision": 1,
+          "issuedAt": "2026-09-24T00:00:00.000Z",
+          "expiresAt": "2026-09-25T00:00:00.000Z",
+          "securityRevision": 1,
+          "release": {
+            "modId": 1,
+            "releaseId": "11111111-1111-4111-8111-111111111111",
+            "versionLabel": "1.0.0",
+            "artifact": {
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "bytes": 2147483648
+            },
+            "submissionState": "approved",
+            "publicationOrder": 4,
+            "publishedAt": "2026-09-20T00:00:00Z",
+            "createdAt": "2026-09-20T00:00:00Z",
+            "availability": "available",
+            "security": {
+              "status": "not_blocked",
+              "revision": 1,
+              "reason": null
+            },
+            "metadata": {
+              "revision": 1,
+              "state": "approved",
+              "testedGameBuild": "Other: example build",
+              "sourceRepository": null,
+              "releaseNotes": "Example release.",
+              "dependencies": [],
+              "dependencyProblems": [],
+              "installation": {
+                "schemaVersion": 1,
+                "kind": "code",
+                "loader": "lua",
+                "entryPath": "LJ/lua/Example/main.lua"
+              }
+            }
+          }
+        },
+        "signatures": [
+          {
+            "keyId": "dbc298251c51321b7266e78d1c151c2b62aff8cb95b293096d3463018544face",
+            "algorithm": "ed25519",
+            "signature": "NZqZcmpZM3eCkgNJduOPS1xfDDka/gLZbMAIiBE9ku6Zre6AqpYtv/sjHutPvLCWupd5ulv8EuxfgFVKnwxdAw=="
+          }
+        ]
+      },
+      "canonical": "{\"expiresAt\":\"2026-09-25T00:00:00.000Z\",\"issuedAt\":\"2026-09-24T00:00:00.000Z\",\"release\":{\"artifact\":{\"bytes\":2147483648,\"sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"availability\":\"available\",\"createdAt\":\"2026-09-20T00:00:00Z\",\"metadata\":{\"dependencies\":[],\"dependencyProblems\":[],\"installation\":{\"entryPath\":\"LJ/lua/Example/main.lua\",\"kind\":\"code\",\"loader\":\"lua\",\"schemaVersion\":1},\"releaseNotes\":\"Example release.\",\"revision\":1,\"sourceRepository\":null,\"state\":\"approved\",\"testedGameBuild\":\"Other: example build\"},\"modId\":1,\"publicationOrder\":4,\"publishedAt\":\"2026-09-20T00:00:00Z\",\"releaseId\":\"11111111-1111-4111-8111-111111111111\",\"security\":{\"reason\":null,\"revision\":1,\"status\":\"not_blocked\"},\"submissionState\":\"approved\",\"versionLabel\":\"1.0.0\"},\"revision\":1,\"schemaVersion\":2,\"securityRevision\":1,\"type\":\"starframe-release\"}"
+    },
+    {
+      "name": "code-bepinex-entry",
+      "envelope": {
+        "signed": {
+          "type": "starframe-release",
+          "schemaVersion": 2,
+          "revision": 1,
+          "issuedAt": "2026-09-24T00:00:00.000Z",
+          "expiresAt": "2026-09-25T00:00:00.000Z",
+          "securityRevision": 1,
+          "release": {
+            "modId": 1,
+            "releaseId": "11111111-1111-4111-8111-111111111111",
+            "versionLabel": "1.0.0",
+            "artifact": {
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "bytes": 2147483648
+            },
+            "submissionState": "approved",
+            "publicationOrder": 4,
+            "publishedAt": "2026-09-20T00:00:00Z",
+            "createdAt": "2026-09-20T00:00:00Z",
+            "availability": "available",
+            "security": {
+              "status": "not_blocked",
+              "revision": 1,
+              "reason": null
+            },
+            "metadata": {
+              "revision": 1,
+              "state": "approved",
+              "testedGameBuild": "Other: example build",
+              "sourceRepository": null,
+              "releaseNotes": "Example release.",
+              "dependencies": [],
+              "dependencyProblems": [],
+              "installation": {
+                "schemaVersion": 1,
+                "kind": "code",
+                "loader": "bepinex5",
+                "sourceRoot": "Package",
+                "entryAssembly": "Example.dll",
+                "entryType": "Example.Plugin"
+              }
+            }
+          }
+        },
+        "signatures": [
+          {
+            "keyId": "dbc298251c51321b7266e78d1c151c2b62aff8cb95b293096d3463018544face",
+            "algorithm": "ed25519",
+            "signature": "Npb9BM8fWPiIbFWpewxXK1qHCjlIiEhJnrXC3Uj7lb1W9RAFkgjTqoTJXg+lGvKg++E+Ipj2U8pCcw7aREaaCg=="
+          }
+        ]
+      },
+      "canonical": "{\"expiresAt\":\"2026-09-25T00:00:00.000Z\",\"issuedAt\":\"2026-09-24T00:00:00.000Z\",\"release\":{\"artifact\":{\"bytes\":2147483648,\"sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"availability\":\"available\",\"createdAt\":\"2026-09-20T00:00:00Z\",\"metadata\":{\"dependencies\":[],\"dependencyProblems\":[],\"installation\":{\"entryAssembly\":\"Example.dll\",\"entryType\":\"Example.Plugin\",\"kind\":\"code\",\"loader\":\"bepinex5\",\"schemaVersion\":1,\"sourceRoot\":\"Package\"},\"releaseNotes\":\"Example release.\",\"revision\":1,\"sourceRepository\":null,\"state\":\"approved\",\"testedGameBuild\":\"Other: example build\"},\"modId\":1,\"publicationOrder\":4,\"publishedAt\":\"2026-09-20T00:00:00Z\",\"releaseId\":\"11111111-1111-4111-8111-111111111111\",\"security\":{\"reason\":null,\"revision\":1,\"status\":\"not_blocked\"},\"submissionState\":\"approved\",\"versionLabel\":\"1.0.0\"},\"revision\":1,\"schemaVersion\":2,\"securityRevision\":1,\"type\":\"starframe-release\"}"
+    },
+    {
+      "name": "map-with-relative-assets",
+      "envelope": {
+        "signed": {
+          "type": "starframe-release",
+          "schemaVersion": 2,
+          "revision": 1,
+          "issuedAt": "2026-09-24T00:00:00.000Z",
+          "expiresAt": "2026-09-25T00:00:00.000Z",
+          "securityRevision": 1,
+          "release": {
+            "modId": 1,
+            "releaseId": "11111111-1111-4111-8111-111111111111",
+            "versionLabel": "1.0.0",
+            "artifact": {
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "bytes": 2147483648
+            },
+            "submissionState": "approved",
+            "publicationOrder": 4,
+            "publishedAt": "2026-09-20T00:00:00Z",
+            "createdAt": "2026-09-20T00:00:00Z",
+            "availability": "available",
+            "security": {
+              "status": "not_blocked",
+              "revision": 1,
+              "reason": null
+            },
+            "metadata": {
+              "revision": 1,
+              "state": "approved",
+              "testedGameBuild": "Other: example build",
+              "sourceRepository": null,
+              "releaseNotes": "Example release.",
+              "dependencies": [],
+              "dependencyProblems": [],
+              "installation": {
+                "schemaVersion": 1,
+                "kind": "map",
+                "sourceRoot": "Maps/Example",
+                "destination": "sanctuary_maps",
+                "folder": "Example"
+              }
+            }
+          }
+        },
+        "signatures": [
+          {
+            "keyId": "dbc298251c51321b7266e78d1c151c2b62aff8cb95b293096d3463018544face",
+            "algorithm": "ed25519",
+            "signature": "hMASsOUvnk4XcE9XGUTkNXKbftefw8SimB+UsWF/Q09dwWhb+wXuFkaTq5Bx05IE9JlVuGk74IGb9EJvMNKFBg=="
+          }
+        ]
+      },
+      "canonical": "{\"expiresAt\":\"2026-09-25T00:00:00.000Z\",\"issuedAt\":\"2026-09-24T00:00:00.000Z\",\"release\":{\"artifact\":{\"bytes\":2147483648,\"sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"availability\":\"available\",\"createdAt\":\"2026-09-20T00:00:00Z\",\"metadata\":{\"dependencies\":[],\"dependencyProblems\":[],\"installation\":{\"destination\":\"sanctuary_maps\",\"folder\":\"Example\",\"kind\":\"map\",\"schemaVersion\":1,\"sourceRoot\":\"Maps/Example\"},\"releaseNotes\":\"Example release.\",\"revision\":1,\"sourceRepository\":null,\"state\":\"approved\",\"testedGameBuild\":\"Other: example build\"},\"modId\":1,\"publicationOrder\":4,\"publishedAt\":\"2026-09-20T00:00:00Z\",\"releaseId\":\"11111111-1111-4111-8111-111111111111\",\"security\":{\"reason\":null,\"revision\":1,\"status\":\"not_blocked\"},\"submissionState\":\"approved\",\"versionLabel\":\"1.0.0\"},\"revision\":1,\"schemaVersion\":2,\"securityRevision\":1,\"type\":\"starframe-release\"}"
+    },
+    {
+      "name": "ai-lua-folder",
+      "envelope": {
+        "signed": {
+          "type": "starframe-release",
+          "schemaVersion": 2,
+          "revision": 1,
+          "issuedAt": "2026-09-24T00:00:00.000Z",
+          "expiresAt": "2026-09-25T00:00:00.000Z",
+          "securityRevision": 1,
+          "release": {
+            "modId": 1,
+            "releaseId": "11111111-1111-4111-8111-111111111111",
+            "versionLabel": "1.0.0",
+            "artifact": {
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "bytes": 2147483648
+            },
+            "submissionState": "approved",
+            "publicationOrder": 4,
+            "publishedAt": "2026-09-20T00:00:00Z",
+            "createdAt": "2026-09-20T00:00:00Z",
+            "availability": "available",
+            "security": {
+              "status": "not_blocked",
+              "revision": 1,
+              "reason": null
+            },
+            "metadata": {
+              "revision": 1,
+              "state": "approved",
+              "testedGameBuild": "Other: example build",
+              "sourceRepository": null,
+              "releaseNotes": "Example release.",
+              "dependencies": [],
+              "dependencyProblems": [],
+              "installation": {
+                "schemaVersion": 1,
+                "kind": "ai",
+                "sourceRoot": "AI/Example",
+                "destination": "sanctuary_ai_mods",
+                "folder": "Example"
+              }
+            }
+          }
+        },
+        "signatures": [
+          {
+            "keyId": "dbc298251c51321b7266e78d1c151c2b62aff8cb95b293096d3463018544face",
+            "algorithm": "ed25519",
+            "signature": "/GmIRVMVoj6Y6tmz5jrlOq5vjKmApfhItyipaVfVs0aJp7szEEJ+9gBTpepdu7bn6MtfojXMFxCzAaf0Lf37DQ=="
+          }
+        ]
+      },
+      "canonical": "{\"expiresAt\":\"2026-09-25T00:00:00.000Z\",\"issuedAt\":\"2026-09-24T00:00:00.000Z\",\"release\":{\"artifact\":{\"bytes\":2147483648,\"sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"availability\":\"available\",\"createdAt\":\"2026-09-20T00:00:00Z\",\"metadata\":{\"dependencies\":[],\"dependencyProblems\":[],\"installation\":{\"destination\":\"sanctuary_ai_mods\",\"folder\":\"Example\",\"kind\":\"ai\",\"schemaVersion\":1,\"sourceRoot\":\"AI/Example\"},\"releaseNotes\":\"Example release.\",\"revision\":1,\"sourceRepository\":null,\"state\":\"approved\",\"testedGameBuild\":\"Other: example build\"},\"modId\":1,\"publicationOrder\":4,\"publishedAt\":\"2026-09-20T00:00:00Z\",\"releaseId\":\"11111111-1111-4111-8111-111111111111\",\"security\":{\"reason\":null,\"revision\":1,\"status\":\"not_blocked\"},\"submissionState\":\"approved\",\"versionLabel\":\"1.0.0\"},\"revision\":1,\"schemaVersion\":2,\"securityRevision\":1,\"type\":\"starframe-release\"}"
+    }
+  ]
+}

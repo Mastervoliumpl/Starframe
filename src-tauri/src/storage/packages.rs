@@ -1,13 +1,19 @@
 use super::*;
-use crate::packages::{Operation, Prepared, Status};
+use crate::packages::{Kind, Operation, Prepared, Status};
+use crate::registry::{ReceiptClaim, VerifiedArchive};
 use rusqlite::OptionalExtension;
 
-fn operation_record(operation: &Operation) -> Result<String> {
+pub(super) fn operation_record(operation: &Operation) -> Result<String> {
     if Uuid::parse_str(&operation.id).is_err()
         || Uuid::parse_str(&operation.request_id).is_err()
         || operation.release_id.is_empty()
         || operation.release_id.len() > 128
         || operation.message.len() > 8000
+        || (operation.receipt_id.is_some()
+            && !matches!(
+                operation.kind,
+                Kind::RegistryArchive | Kind::RegistryInstall
+            ))
         || operation.received_bytes > operation.total_bytes
         || !(1..=2_147_483_648).contains(&operation.total_bytes)
     {
@@ -22,7 +28,7 @@ fn operation_record(operation: &Operation) -> Result<String> {
     serde_json::to_string(operation).map_err(|e| Error::Invalid(e.to_string()))
 }
 
-fn prepared_record(prepared: &Prepared) -> Result<String> {
+pub(super) fn prepared_record(prepared: &Prepared) -> Result<String> {
     validate_reference(&ModReference {
         mod_id: "artifact".into(),
         hash: prepared.hash.clone(),
@@ -90,6 +96,129 @@ impl Storage {
                 Ok(operation)
             })
             .collect()
+    }
+
+    pub(crate) fn package_receipt_operation(&self, receipt_id: Uuid) -> Result<Option<Operation>> {
+        let record: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT record FROM package_operations WHERE json_extract(record, '$.receiptId')=? LIMIT 1",
+                [receipt_id.to_string()],
+                |row| row.get(0),
+            )
+            .optional()?;
+        record
+            .map(|record| {
+                let operation: Operation = serde_json::from_str(&record)
+                    .map_err(|e| Error::Invalid(format!("Invalid package history: {e}")))?;
+                operation_record(&operation)?;
+                if operation.receipt_id != Some(receipt_id) {
+                    return Err(Error::Invalid("Package receipt identity changed.".into()));
+                }
+                Ok(operation)
+            })
+            .transpose()
+    }
+
+    pub(crate) fn record_registry_receipt_operation(
+        &mut self,
+        verified: &VerifiedArchive,
+        operation: &Operation,
+    ) -> Result<(ReceiptClaim, Operation)> {
+        let claim = verified.receipt_claim();
+        if !claim.valid()
+            || !matches!(
+                operation.kind,
+                Kind::RegistryArchive | Kind::RegistryInstall
+            )
+            || operation.receipt_id.is_some()
+            || operation.release_id != claim.release_id.0.to_string()
+            || operation.hash != claim.sha256.as_str()
+            || operation.total_bytes != claim.bytes
+        {
+            return Err(Error::Invalid("Package receipt identity changed.".into()));
+        }
+        let mut updated = operation.clone();
+        updated.receipt_id = Some(claim.download_id);
+        let operation_record = operation_record(&updated)?;
+        let claim_record = serde_json::to_string(&claim)
+            .map_err(|_| Error::Invalid("Invalid verified registry receipt.".into()))?;
+        let tx = self.conn.transaction()?;
+        tx.execute(
+            "INSERT OR IGNORE INTO registry_receipt_attempts(download_id,account_id,record) VALUES (?,?,?)",
+            rusqlite::params![claim.download_id.to_string(), claim.account_id.to_string(), claim_record],
+        )?;
+        let saved: (String, String) = tx.query_row(
+            "SELECT account_id,record FROM registry_receipt_attempts WHERE download_id=?",
+            [claim.download_id.to_string()],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        if saved != (claim.account_id.to_string(), claim_record) {
+            return Err(Error::Invalid("Registry receipt identity changed.".into()));
+        }
+        let changed = tx.execute(
+            "UPDATE package_operations SET record=? WHERE id=? AND request_id=?",
+            rusqlite::params![operation_record, updated.id, updated.request_id],
+        )?;
+        if changed != 1 {
+            return Err(Error::Invalid("Package receipt operation changed.".into()));
+        }
+        tx.commit()?;
+        Ok((claim, updated))
+    }
+
+    pub(crate) fn finish_registry_receipt(
+        &mut self,
+        claim: &ReceiptClaim,
+        operation: Option<&Operation>,
+    ) -> Result<Option<Operation>> {
+        if !claim.valid() {
+            return Err(Error::Invalid("Invalid registry receipt claim.".into()));
+        }
+        let updated = operation
+            .map(|operation| {
+                if !matches!(operation.kind, Kind::RegistryArchive | Kind::RegistryInstall)
+                    || operation.receipt_id != Some(claim.download_id)
+                    || operation.release_id != claim.release_id.0.to_string()
+                    || operation.hash != claim.sha256.as_str()
+                    || operation.total_bytes != claim.bytes
+                {
+                    return Err(Error::Invalid("Package receipt identity changed.".into()));
+                }
+                let mut updated = operation.clone();
+                updated.receipt_id = None;
+                if updated.status == Status::Completed {
+                    updated.message = if updated.kind == Kind::RegistryInstall {
+                        "Download receipt confirmed.".into()
+                    } else {
+                        "Verified registry archive saved. Download receipt confirmed. Installation remains pending.".into()
+                    };
+                }
+                let record = operation_record(&updated)?;
+                Ok((updated, record))
+            })
+            .transpose()?;
+        let claim_record = serde_json::to_string(claim)
+            .map_err(|_| Error::Invalid("Invalid registry receipt claim.".into()))?;
+        let tx = self.conn.transaction()?;
+        let removed = tx.execute(
+            "DELETE FROM registry_receipt_attempts WHERE download_id=? AND account_id=? AND record=?",
+            rusqlite::params![claim.download_id.to_string(), claim.account_id.to_string(), claim_record],
+        )?;
+        if removed != 1 {
+            return Err(Error::Invalid("Registry receipt claim changed.".into()));
+        }
+        if let Some((operation, record)) = &updated {
+            let changed = tx.execute(
+                "UPDATE package_operations SET record=? WHERE id=? AND request_id=?",
+                rusqlite::params![record, operation.id, operation.request_id],
+            )?;
+            if changed != 1 {
+                return Err(Error::Invalid("Package receipt operation changed.".into()));
+            }
+        }
+        tx.commit()?;
+        Ok(updated.map(|(operation, _)| operation))
     }
 
     pub fn prepared_artifact(&self, hash: &str) -> Result<Option<Prepared>> {
@@ -161,6 +290,7 @@ impl Storage {
         local: Option<&crate::local_import::LocalSource>,
         advance: Option<(&str, &ModReference)>,
     ) -> Result<()> {
+        self.require_registry_unblocked_hash(&prepared.hash)?;
         let record = operation_record(operation)?;
         let manifest = prepared_record(prepared)?;
         crate::packages::supported_files(&prepared.files).map_err(Error::Invalid)?;

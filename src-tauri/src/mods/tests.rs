@@ -4,6 +4,96 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use uuid::Uuid;
 
+#[test]
+fn signed_registry_block_gates_cached_download_enable_and_offline_launch() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    use ring::signature::Ed25519KeyPair;
+    use time::{OffsetDateTime, format_description::well_known::Rfc3339};
+
+    let (root, mut store, entries) = fixture();
+    enable(&mut store, &entries[0], true);
+    requested(&store).unwrap();
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/registry-keys-v1.json"
+    ))
+    .unwrap();
+    let root_public: [u8; 32] = STANDARD
+        .decode(fixture["rootPublicKey"].as_str().unwrap())
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let now = OffsetDateTime::parse("2026-09-24T12:00:00Z", &Rfc3339).unwrap();
+    store
+        .accept_registry_keys(
+            &serde_json::to_vec(&fixture["envelope"]).unwrap(),
+            &root_public,
+            now,
+        )
+        .unwrap();
+    let online = Ed25519KeyPair::from_seed_unchecked(&[9u8; 32]).unwrap();
+    let security = |revision: u64, status: &str| {
+        let signed = json!({
+            "type":"starframe-security","schemaVersion":1,"revision":revision,
+            "issuedAt":"2026-09-24T00:00:00.000Z","expiresAt":"2026-09-25T00:00:00.000Z",
+            "complete":true,"decisions":[{
+                "sha256":entries[0].reference.hash,"revision":revision,
+                "status":status,"reason":"Fixture decision"
+            }]
+        });
+        let canonical = serde_json::to_vec(&signed).unwrap();
+        serde_json::to_vec(&json!({"signed":signed,"signatures":[{
+            "keyId":fixture["envelope"]["signed"]["keys"][0]["keyId"],
+            "algorithm":"ed25519",
+            "signature":STANDARD.encode(online.sign(&canonical).as_ref())
+        }]}))
+        .unwrap()
+    };
+    store
+        .accept_registry_security(&security(1, "blocked"), &root_public, now)
+        .unwrap();
+    assert!(requested(&store).unwrap_err().contains("signed registry"));
+    let mut queue = packages::Packages::open(&mut store).unwrap();
+    assert!(
+        queue
+            .start(&mut store, &Uuid::new_v4().to_string(), "fixture.core.1")
+            .unwrap_err()
+            .contains("signed registry")
+    );
+    drop(queue);
+    enable(&mut store, &entries[0], false);
+    let revision = store.load().unwrap().revision.to_string();
+    assert!(
+        action(
+            &mut store,
+            Action::SetEnabled {
+                reference: entries[0].reference.clone(),
+                enabled: true,
+                expected_revision: revision,
+            }
+        )
+        .err()
+        .unwrap()
+        .contains("signed registry")
+    );
+    drop(store);
+    let mut store = Storage::open(root.path()).unwrap();
+    assert!(
+        store
+            .require_registry_unblocked_hash(&entries[0].reference.hash)
+            .is_err()
+    );
+    store
+        .accept_registry_security(&security(2, "cleared"), &root_public, now)
+        .unwrap();
+    assert!(
+        store
+            .require_registry_unblocked_hash(&entries[0].reference.hash)
+            .is_ok()
+    );
+    enable(&mut store, &entries[0], true);
+    requested(&store).unwrap();
+}
+
 #[tokio::test]
 async fn confirmed_findings_block_download_enable_and_existing_activation_until_corrected() {
     use crate::catalog::{advisories::*, authentication::tests::verified_catalog};
@@ -514,6 +604,8 @@ fn fixture_with_lua(lua: bool) -> (tempfile::TempDir, Storage, Vec<LibraryEntry>
             request_id: Uuid::new_v4().to_string(),
             release_id,
             hash: artifact_hash.clone(),
+            kind: crate::packages::Kind::Package,
+            receipt_id: None,
             status: Status::Completed,
             message: "Fixture prepared".into(),
             received_bytes: 10,
@@ -602,6 +694,8 @@ fn reapproved_bytes_preserve_both_release_references_and_satisfy_new_dependencie
         request_id: Uuid::new_v4().to_string(),
         release_id: "fixture.core.2".into(),
         hash: new.reference.hash.clone(),
+        kind: crate::packages::Kind::Package,
+        receipt_id: None,
         status: Status::Completed,
         message: "Reapproved".into(),
         received_bytes: 10,
@@ -785,6 +879,8 @@ fn runtime_file_boundaries_hold_from_commit_through_membership_and_activation() 
                     request_id: Uuid::new_v4().to_string(),
                     release_id: entry.reference.release_id.clone().unwrap(),
                     hash: entry.reference.hash.clone(),
+                    kind: crate::packages::Kind::Package,
+                    receipt_id: None,
                     status: Status::Completed,
                     message: "Fixture".into(),
                     received_bytes: 10,
@@ -843,6 +939,8 @@ fn logical_mods_share_verified_bytes_with_distinct_stable_deployment_roots() {
             request_id: Uuid::new_v4().to_string(),
             release_id: shared_entry.reference.release_id.clone().unwrap(),
             hash: prepared.hash.clone(),
+            kind: crate::packages::Kind::Package,
+            receipt_id: None,
             status: Status::Completed,
             message: "Shared archive".into(),
             received_bytes: 10,

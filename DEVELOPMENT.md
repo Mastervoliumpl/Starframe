@@ -1,6 +1,6 @@
 # Starframe development and checks
 
-Status: milestone 0.6.0 is complete on 17 September 2026 through PR #60 and the catalog renewal correction in PR #76. The signed `0.6.0-dev.2` development draft passed owner acceptance; catalog publication, renewal and native-client verification passed. No installer or app release is published, and no later milestone has started. See the [0.6.0 acceptance record](docs/verification/milestone-0.6.0.md); retain the earlier [0.5.0 exit evidence](docs/verification/milestone-0.5.0.md), [BepInEx acceptance](docs/verification/bepinex-plugins.md) and [verification on another Windows PC](docs/verification/pc-setup.md).
+Status: milestone 0.7.0 is active at `0.7.0-dev.1`. Milestone 0.6.0 is complete; its signed development draft remains unpublished. See the [0.6.0 acceptance record](docs/verification/milestone-0.6.0.md), [0.5.0 exit evidence](docs/verification/milestone-0.5.0.md), [BepInEx acceptance](docs/verification/bepinex-plugins.md) and [verification on another Windows PC](docs/verification/pc-setup.md).
 
 Issue #24 adds local DLL/folder imports through the package worker and SQLite schema 11. [Local import verification](docs/verification/local-imports.md) records the metadata format, source retention, recovery and native checks. Issue #25 adds source watching and schema 12; [watcher verification](docs/verification/local-watching.md) records debounce, recovery and game-exit checks.
 
@@ -91,7 +91,7 @@ Dependency auditing moves forward to 0.3.0 as a separate CI workflow for depende
 
 ## Versions and change history
 
-[VERSION](VERSION) is the source of the product version, currently `0.6.0-dev.2`. No installer has been published. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
+[VERSION](VERSION) is the source of the product version, currently `0.7.0-dev.1`. No installer has been published. The initial planning baseline was `0.0.0`. [CHANGELOG.md](CHANGELOG.md) records completed changes under `Unreleased` until a version is finalized. [The version command](scripts/versions.py) checks npm, Cargo and Tauri metadata, including the root package entries in both lockfiles. CI rejects missing fields, malformed files and version drift.
 
 Use three-part versions: `0.MINOR.PATCH` during initial development. A capability milestone advances the minor version; a corrective release advances the patch version. The planning handoff uses `0.0.1`. Published content is immutable; never replace a release with different bytes under the same version. The `0.x` series makes no stable public API promise, but format migrations and compatibility changes still need explicit notes. [Semantic Versioning](https://semver.org/)
 
@@ -112,6 +112,8 @@ The C# `InformationalVersion` in `runtime/Directory.Build.props` is synchronized
 For a release, finalize its changelog entry, validate version agreement, and create an immutable `vX.Y.Z` tag from the checked commit. Use `gh` to create or inspect the draft release and workflow results. Publish after its acceptance checks and maintainer authorization. Do not fabricate changelog entries for work that is only planned.
 
 ## Desktop development
+
+The internal headless command for #66 uses the same Rust operation functions as the Tauri worker. Build it with `cargo build --manifest-path src-tauri/Cargo.toml --locked --bin starframe_headless`, then pass an explicit absolute app-data directory and one command: `status`, `import <absolute source>`, `prepare-package <release ID>`, `collection-create <name>`, `collection-select <ID>`, `select-game <absolute game folder>`, `readiness <absolute game folder>`, `setup <absolute game folder> <absolute integration resources>` or `launch` with the same arguments. It emits a JSON result or structured error and package progress lines; it does not run as a service. The GUI and command cannot own the same SQLite data concurrently. Run the isolated fake-game check in [headless verification](docs/verification/backend-headless.md) with separately staged integration resources. This is an internal test surface, not a stable public CLI.
 
 Use Node.js **24.19.0** (see [.node-version](.node-version)) with npm, and Rust **1.98.1** with Rustfmt and Clippy (see [rust-toolchain.toml](rust-toolchain.toml)). On Windows, install the MSVC C++ build tools with the Windows SDK and the WebView2 runtime required by [Tauri's prerequisites](https://v2.tauri.app/start/prerequisites/). Target Windows x64. A Node-only machine can check and preview the frontend; Rust compilation needs the native build prerequisites too.
 

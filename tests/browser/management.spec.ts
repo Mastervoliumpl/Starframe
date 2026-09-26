@@ -1,5 +1,31 @@
 import { expect, test } from '@playwright/test';
 
+test('registry archive status does not claim installation or offer catalog retry', async ({
+  page,
+}) => {
+  await page.goto('/?fixture&registryArchive');
+  await page.getByRole('button', { name: 'Downloads', exact: true }).click();
+  const downloads = page.getByRole('region', {
+    name: 'Downloads',
+    exact: true,
+  });
+  const saved = downloads
+    .getByRole('listitem')
+    .filter({ hasText: '11111111-1111-4111-8111-111111111111' });
+  const failed = downloads
+    .getByRole('listitem')
+    .filter({ hasText: '22222222-2222-4222-8222-222222222222' });
+  await expect(saved.getByText('Archive saved', { exact: true })).toBeVisible();
+  await expect(saved.getByText('Installed in library')).toHaveCount(0);
+  await expect(
+    failed.getByRole('button', { name: 'Retry exact release' }),
+  ).toHaveCount(0);
+  await expect(failed.getByText(/Retry this release/)).toBeVisible();
+  await expect(
+    downloads.getByRole('button', { name: 'Retry pending receipts' }),
+  ).toBeEnabled();
+});
+
 test('selection, warnings, enable and confirmed uninstall remain separate', async ({
   page,
 }) => {

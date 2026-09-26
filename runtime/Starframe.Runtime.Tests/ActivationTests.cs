@@ -12,6 +12,74 @@ namespace Starframe.Runtime.Tests;
 public sealed class ActivationTests
 {
     [TestMethod]
+    public void RegistryIdentityKeepsManagedAndLuaActivationOnTheExistingAdapter()
+    {
+        if (Environment.GetEnvironmentVariable("STARFRAME_REGISTRY_FIXTURE_WORKER") != "1")
+        {
+            // Managed activation permits one assembly-loading session per process.
+            var start = new System.Diagnostics.ProcessStartInfo("dotnet") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+            start.ArgumentList.Add("vstest");
+            start.ArgumentList.Add(typeof(ActivationTests).Assembly.Location);
+            start.ArgumentList.Add("--TestCaseFilter:FullyQualifiedName=Starframe.Runtime.Tests.ActivationTests.RegistryIdentityKeepsManagedAndLuaActivationOnTheExistingAdapter");
+            start.Environment["STARFRAME_REGISTRY_FIXTURE_WORKER"] = "1";
+            using var worker = System.Diagnostics.Process.Start(start)!;
+            var output = worker.StandardOutput.ReadToEndAsync();
+            var error = worker.StandardError.ReadToEndAsync();
+            if (!worker.WaitForExit(30_000))
+            {
+                worker.Kill(entireProcessTree: true);
+                Assert.Fail("The isolated registry activation fixture timed out.");
+            }
+            Assert.AreEqual(0, worker.ExitCode, output.GetAwaiter().GetResult() + error.GetAwaiter().GetResult());
+            return;
+        }
+        string root = Path.Combine(Path.GetTempPath(), "starframe-registry-activation-" + Guid.NewGuid());
+        try
+        {
+            byte[] dll = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixture-binaries/Starframe.FixtureMods.dll"));
+            byte[] lua = System.Text.Encoding.UTF8.GetBytes("return 'fixture'");
+            string managedRoot = "mods/registry-1/11111111-1111-4111-8111-111111111111";
+            string luaRoot = "mods/registry-2/22222222-2222-4222-8222-222222222222";
+            Directory.CreateDirectory(Path.Combine(root, managedRoot));
+            Directory.CreateDirectory(Path.Combine(root, luaRoot, "LJ/lua"));
+            File.WriteAllBytes(Path.Combine(root, managedRoot, "Starframe.FixtureMods.dll"), dll);
+            File.WriteAllBytes(Path.Combine(root, luaRoot, "LJ/lua/main.lua"), lua);
+            byte[] manifest = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                schemaVersion = 4,
+                runtimeContractVersion = 1,
+                integrationId = "starframe.bepinex",
+                deploymentRevision = "1",
+                omittedDisabledMods = 0,
+                installedMods = new[] { "registry.1", "registry.2" }.Select(id => new { modId = id, name = id, version = "fixture" }),
+                mods = new[] {
+                    new {
+                        modId = "registry.1", source = new { kind = "registry", modId = 1UL, releaseId = "11111111-1111-4111-8111-111111111111", sha256 = new string('a', 64) },
+                        root = managedRoot, entryAssembly = (string?)"Starframe.FixtureMods.dll", entryType = (string?)"Starframe.FixtureMods.First",
+                        requires = System.Array.Empty<string>(), files = new[] { new { path = "Starframe.FixtureMods.dll", sha256 = Convert.ToHexStringLower(SHA256.HashData(dll)) } }
+                    },
+                    new {
+                        modId = "registry.2", source = new { kind = "registry", modId = 2UL, releaseId = "22222222-2222-4222-8222-222222222222", sha256 = new string('b', 64) },
+                        root = luaRoot, entryAssembly = (string?)null, entryType = (string?)null,
+                        requires = new[] { "registry.1" }, files = new[] { new { path = "LJ/lua/main.lua", sha256 = Convert.ToHexStringLower(SHA256.HashData(lua)) } }
+                    }
+                }
+            });
+            var applied = new List<string>();
+            using var session = new ActivationSession(_ => { }, new[] { "netstandard", "System.Runtime" }, applyLua: (id, files) =>
+            {
+                applied.Add(id);
+                CollectionAssert.AreEqual(lua, files["LJ/LUA/MAIN.LUA"]);
+            });
+            using var report = Contracts.Read(session.Activate(root, manifest), "report");
+            CollectionAssert.AreEqual(new[] { "loaded", "loaded" }, report.RootElement.GetProperty("mods").EnumerateArray().Select(mod => mod.GetProperty("outcome").GetString()).ToArray());
+            CollectionAssert.AreEqual(new[] { "registry.2" }, applied);
+            Assert.IsTrue(session.Settings.ContainsKey("registry.1"));
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [TestMethod]
     public void OrderedActivationFailurePropagationDisabledInventoryAndShutdown()
     {
         string root = Path.Combine(Path.GetTempPath(), "starframe-activation-" + Guid.NewGuid());

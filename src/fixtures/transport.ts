@@ -1,11 +1,12 @@
 import type { Snapshot } from '../lib/generated/model';
 import type { Transport } from '../lib/state';
+import type { AuthSession, AuthTransport } from '../lib/auth';
 import { version } from '../../package.json';
 import { fixtureManagement } from './management';
 import { emptyUpdates } from './updates';
 
 // Browser tests opt into this fixture with ?fixture; production builds omit it.
-export function fixtureTransport(): Transport {
+export function fixtureTransport(): Transport & AuthTransport {
   let snapshot: Snapshot = {
     sessionId: 'browser-fixture',
     revision: '0',
@@ -45,6 +46,8 @@ export function fixtureTransport(): Transport {
     },
   };
   const catalogCase = new URLSearchParams(location.search).get('catalog');
+  const authCase = new URLSearchParams(location.search).get('auth');
+  let authSession: AuthSession | null = null;
   if (new URLSearchParams(location.search).has('update')) {
     snapshot.updates.release = {
       version: '0.6.1',
@@ -67,6 +70,43 @@ export function fixtureTransport(): Transport {
   let work: ReturnType<typeof setInterval>;
   const publish = () => receiver?.(structuredClone(snapshot));
   return {
+    async authRestore() {
+      return null;
+    },
+    async authInspect() {
+      return authSession;
+    },
+    async authStart() {
+      if (authCase === 'confirmed')
+        return {
+          displayCode: 'A1B2C3D4',
+          verificationUri:
+            'https://starframemanager.com/sign-in?manager=11111111-1111-4111-8111-111111111111',
+          expiresAt: '2099-01-01T00:00:00Z',
+          intervalSeconds: 5,
+        };
+      throw new Error('Sign-in requires the desktop app.');
+    },
+    async authPoll() {
+      if (authCase === 'confirmed') {
+        authSession = {
+          accountId: '33333333-3333-4333-8333-333333333333',
+          profile: { displayName: 'Fixture user', avatarUrl: null },
+          context: 'manager',
+          authenticatedAt: '2026-09-24T00:00:00Z',
+          expiresAt: '2099-01-01T00:00:00Z',
+          capabilities: ['download_mod'],
+          isOwner: false,
+        };
+        return 'signed_in';
+      }
+      throw new Error('Sign-in requires the desktop app.');
+    },
+    async authSignOut() {
+      authSession = null;
+      return { serverRevoked: true };
+    },
+    async authCancel() {},
     async update(action) {
       const updates = snapshot.updates;
       if (action.kind === 'later') updates.dismissed = true;

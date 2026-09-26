@@ -6,9 +6,21 @@
 
 <h2 class="download-title">Downloads and imports</h2>
 <p>
-  Completed downloads and imports are verified in your library. Enable them in
-  My mods; game readiness is shown in the launch area.
+  Installed releases and local imports appear in My mods. A verified registry
+  archive needs an approved install plan before it can join your library.
 </p>
+{#if $manager.operations.some((op) => (op.kind === 'registry_archive' || op.kind === 'registry_install') && op.receiptId)}<div
+  >
+    <p>
+      A completed archive transfer still needs a download receipt. Sign in with
+      the account used for the download to retry it. No archive bytes are sent
+      again.
+    </p>
+    <button
+      disabled={unavailable || $manager.pending.includes('receipts')}
+      onclick={() => manager.retryReceipts()}>Retry pending receipts</button
+    >
+  </div>{/if}
 {#if !$manager.operations.length}<p class="result-count">
     No downloads or imports yet. Install a release from Catalog or import a
     local mod in My mods.
@@ -21,7 +33,9 @@
           </h3>
           <span
             >{op.status === 'completed'
-              ? 'Installed in library'
+              ? op.kind === 'registry_archive'
+                ? 'Archive saved'
+                : 'Installed in library'
               : op.status}</span
           >
         </div>
@@ -53,7 +67,7 @@
                 ? 'Cancel import'
                 : 'Cancel download'}</button
           >
-        {:else if (op.status === 'failed' || op.status === 'cancelled') && op.releaseId !== 'local-import' && op.releaseId !== 'local-verification'}<button
+        {:else if (op.status === 'failed' || op.status === 'cancelled') && op.kind !== 'registry_archive' && op.kind !== 'registry_install' && op.releaseId !== 'local-import' && op.releaseId !== 'local-verification'}<button
             disabled={unavailable ||
               $manager.pending.includes(`install:${op.releaseId}`)}
             onclick={() => manager.install(op.releaseId)}
@@ -62,6 +76,16 @@
         {#if (op.status === 'failed' || op.status === 'cancelled') && op.releaseId === 'local-import'}<p
           >
             Fix the source, then use Import local mod in My mods to retry.
+          </p>
+        {:else if (op.status === 'failed' || op.status === 'cancelled') && op.kind === 'registry_archive'}<p
+          >
+            The archive was not saved. Retry this release when registry
+            downloads are available.
+          </p>
+        {:else if (op.status === 'failed' || op.status === 'cancelled') && op.kind === 'registry_install'}<p
+          >
+            This release was not installed. Retry its exact registry release
+            after resolving the reported problem.
           </p>
         {:else if op.status === 'failed' && op.releaseId !== 'local-verification'}<p
           >

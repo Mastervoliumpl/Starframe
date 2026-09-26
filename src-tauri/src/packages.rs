@@ -22,15 +22,20 @@ use uuid::Uuid;
 
 mod archive;
 mod artifacts;
+mod declared;
 mod local;
+mod registry;
+pub use declared::prepare_registry_archive;
+#[cfg(test)]
+pub(crate) use declared::tests::managed_image;
 #[cfg(test)]
 mod tests;
 mod transfer;
 pub mod watch;
 use archive::*;
-pub(crate) use archive::{layout, supported_files};
+pub(crate) use archive::{layout, lua_path, supported_files};
 use artifacts::*;
-pub(crate) use artifacts::{Directory, remove_artifact, verify_artifact};
+pub(crate) use artifacts::{Directory, remove_artifact, verify_artifact, verify_registry_artifact};
 
 type Result<T> = std::result::Result<T, String>;
 const MAX_ENTRIES: usize = 4096;
@@ -48,6 +53,17 @@ pub enum Status {
     Cancelled,
     Completed,
     Failed,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(rename = "PackageKind"))]
+pub enum Kind {
+    #[default]
+    Package,
+    RegistryArchive,
+    RegistryInstall,
 }
 
 #[derive(Deserialize)]
@@ -81,6 +97,11 @@ pub struct Operation {
     pub request_id: String,
     pub release_id: String,
     pub hash: String,
+    #[serde(default)]
+    pub kind: Kind,
+    #[serde(default)]
+    #[cfg_attr(test, ts(type = "string | null"))]
+    pub receipt_id: Option<Uuid>,
     pub status: Status,
     pub message: String,
     #[cfg_attr(test, ts(type = "number"))]
@@ -145,6 +166,61 @@ struct Active {
     ready: Option<Result<PreparedImport>>,
 }
 
+struct RegistryActive {
+    operation: Operation,
+    identity: crate::registry::trust::DownloadIdentity,
+    root: [u8; 32],
+    client: crate::registry::Client,
+    bearer: String,
+    cancel: Cancel,
+    abort: cancellation::Receiver<bool>,
+    progress: Arc<AtomicU64>,
+    sender: mpsc::Sender<RegistryEvent>,
+    result: mpsc::Receiver<RegistryEvent>,
+    worker: tauri::async_runtime::JoinHandle<()>,
+    claim: Option<crate::registry::ReceiptClaim>,
+    install: Option<crate::storage::RegistryDisplay>,
+}
+
+struct RegistryReceiptRetry {
+    claim: crate::registry::ReceiptClaim,
+    result: mpsc::Receiver<Result<()>>,
+    worker: tauri::async_runtime::JoinHandle<()>,
+    cancel: Cancel,
+}
+
+pub struct RegistryRequest {
+    pub mod_id: crate::registry::ModId,
+    pub release_id: crate::registry::ReleaseId,
+    pub root_public: [u8; 32],
+    pub client: crate::registry::Client,
+    pub session: crate::registry::Session,
+    pub bearer: String,
+    pub auth_cancel: cancellation::Receiver<bool>,
+}
+
+pub struct ReceiptRequest {
+    pub client: crate::registry::Client,
+    pub session: crate::registry::Session,
+    pub bearer: String,
+    pub auth_cancel: cancellation::Receiver<bool>,
+}
+
+enum RegistryEvent {
+    Cached(Result<()>),
+    Transferred(
+        Box<
+            Result<(
+                crate::registry::VerifiedArchive,
+                Result<crate::registry::Session>,
+            )>,
+        >,
+    ),
+    Promoted(Result<crate::registry::Session>),
+    Receipt(Result<()>),
+    Installed(Result<Prepared>),
+}
+
 #[derive(Clone)]
 struct PreparedImport {
     prepared: Prepared,
@@ -156,19 +232,25 @@ struct PreparedImport {
 pub struct Packages {
     client: reqwest::Client,
     active: HashMap<String, Active>,
+    registry_active: HashMap<String, RegistryActive>,
+    registry_receipts: HashMap<Uuid, RegistryReceiptRetry>,
 }
 
 impl Packages {
     pub fn busy(&self) -> bool {
-        !self.active.is_empty()
+        !self.active.is_empty() || !self.registry_active.is_empty()
     }
     pub(crate) fn can_start(&self, hash: &str) -> bool {
-        self.active.len() < 3 && !self.busy_hash(hash)
+        self.active.len() + self.registry_active.len() < 3 && !self.busy_hash(hash)
     }
     pub fn busy_hash(&self, hash: &str) -> bool {
         self.active
             .values()
             .any(|active| active.source.is_some() || active.operation.hash == hash)
+            || self
+                .registry_active
+                .values()
+                .any(|active| active.operation.hash == hash)
     }
     pub fn open(storage: &mut Storage) -> Result<Self> {
         storage.recover_packages().map_err(|e| e.to_string())?;
@@ -176,6 +258,8 @@ impl Packages {
         Ok(Self {
             client: transfer::client()?,
             active: HashMap::new(),
+            registry_active: HashMap::new(),
+            registry_receipts: HashMap::new(),
         })
     }
 
@@ -201,6 +285,9 @@ impl Packages {
             .and_then(|cache| cache.catalog)
             .ok_or("No approved catalog is available. Wait for catalog refresh.")?;
         let (entry, artifact) = resolve(&catalog, release_id)?;
+        storage
+            .require_registry_unblocked_hash(&artifact.sha256)
+            .map_err(|e| e.to_string())?;
         if let Some(security) = storage.catalog_security().map_err(|e| e.to_string())? {
             let prepared = storage
                 .prepared_artifact(&artifact.sha256)
@@ -230,7 +317,7 @@ impl Packages {
                 active.operation.id
             ));
         }
-        if self.active.len() >= 3 {
+        if self.active.len() + self.registry_active.len() >= 3 {
             return Err(
                 "Three packages are being prepared. Wait for one to finish or cancel it.".into(),
             );
@@ -240,6 +327,8 @@ impl Packages {
             request_id: request_id.into(),
             release_id: release_id.into(),
             hash: artifact.sha256.clone(),
+            kind: Kind::Package,
+            receipt_id: None,
             status: Status::Preparing,
             message: "Downloading and verifying the approved package.".into(),
             received_bytes: 0,
@@ -308,6 +397,14 @@ impl Packages {
     }
 
     pub fn cancel(&mut self, storage: &mut Storage, operation_id: &str) -> Result<()> {
+        if let Some(active) = self.registry_active.get_mut(operation_id) {
+            active.cancel.cancel();
+            active.operation.status = Status::Cancelling;
+            active.operation.message = "Stopping the registry download.".into();
+            return storage
+                .save_package(&active.operation)
+                .map_err(|e| e.to_string());
+        }
         let active = self
             .active
             .get_mut(operation_id)
@@ -352,6 +449,8 @@ impl Packages {
             request_id: Uuid::new_v4().to_string(),
             release_id: "local-verification".into(),
             hash: reference.hash.clone(),
+            kind: Kind::Package,
+            receipt_id: None,
             status: Status::Preparing,
             message: "Verifying matching local content. No download is needed.".into(),
             received_bytes: 0,
@@ -443,6 +542,9 @@ impl Packages {
                 {
                     return Err("Release identity changed during package preparation.".into());
                 }
+                storage
+                    .require_registry_unblocked_hash(&result.prepared.hash)
+                    .map_err(|e| e.to_string())?;
                 if storage
                     .prepared_artifact(&result.prepared.hash)
                     .map_err(|e| e.to_string())?
@@ -517,7 +619,8 @@ impl Packages {
             self.active.remove(&id);
             changed = true;
         }
-        Ok(changed)
+        self.poll_registry(storage)
+            .map(|registry_changed| changed || registry_changed)
     }
 
     pub fn operations(&self, storage: &Storage) -> Result<Vec<Operation>> {
@@ -534,6 +637,18 @@ impl Packages {
                 operations.push(operation);
             }
         }
+        for active in self.registry_active.values() {
+            if let Some(operation) = operations
+                .iter_mut()
+                .find(|op| op.id == active.operation.id)
+            {
+                operation.received_bytes = active.progress.load(Ordering::Relaxed);
+            } else {
+                let mut operation = active.operation.clone();
+                operation.received_bytes = active.progress.load(Ordering::Relaxed);
+                operations.push(operation);
+            }
+        }
         Ok(operations)
     }
 }
@@ -541,6 +656,12 @@ impl Drop for Packages {
     fn drop(&mut self) {
         for active in self.active.values() {
             active.cancel.cancel();
+        }
+        for active in self.registry_active.values() {
+            active.cancel.cancel();
+        }
+        for retry in self.registry_receipts.values() {
+            retry.cancel.cancel();
         }
     }
 }

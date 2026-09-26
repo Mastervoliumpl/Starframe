@@ -30,6 +30,7 @@ fn generated_management_contract_matches_rust() {
         crate::local_import::WatchState::decl(&config),
         crate::packages::Action::decl(&config),
         crate::packages::Operation::decl(&config),
+        crate::packages::Kind::decl(&config),
         crate::packages::Status::decl(&config),
         crate::sharing::Action::decl(&config),
         crate::sharing::Reply::decl(&config),

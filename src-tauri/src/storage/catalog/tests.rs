@@ -34,7 +34,7 @@ async fn migration_restart_and_expiry_retain_confirmed_findings() {
     store
         .conn
         .execute_batch(
-            "DROP TABLE app_updates; DROP TABLE catalog_security; PRAGMA user_version=12;",
+            "DROP TABLE registry_receipt_attempts; DROP TABLE registry_trust_streams; DROP TABLE registry_decisions; DROP TABLE registry_library; DROP TABLE app_updates; DROP TABLE catalog_security; PRAGMA user_version=12;",
         )
         .unwrap();
     drop(store);

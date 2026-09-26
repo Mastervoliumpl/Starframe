@@ -3687,15 +3687,18 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "starframe"
-version = "0.6.0-dev.2"
+version = "0.7.0-dev.1"
 dependencies = [
  "aws-lc-rs",
+ "base64 0.22.1",
  "flate2",
  "futures-util",
+ "getrandom 0.4.3",
  "httpdate",
  "keyvalues-parser",
  "minisign-verify",
  "reqwest",
+ "ring",
  "rusqlite",
  "semver",
  "serde",
@@ -3708,6 +3711,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "tempfile",
+ "time",
  "tokio",
  "tough",
  "ts-rs",
