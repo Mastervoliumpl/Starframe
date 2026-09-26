@@ -27,7 +27,7 @@ internal sealed class ModsMenu : IDisposable
     private readonly List<GameObject> focus = new();
     private readonly List<Action<bool>> settingControls = new();
     private static ModsMenu? current;
-    private MainMenuInterface? main;
+    private readonly MenuLifecycle lifecycle = new();
     private GameObject? page;
     private PanelButton? entry;
     private Transform list = null!;
@@ -44,23 +44,36 @@ internal sealed class ModsMenu : IDisposable
         this.session = session;
         using var document = Contracts.Read(report, "report");
         outcomes = document.RootElement.GetProperty("mods").EnumerateArray().ToDictionary(m => m.GetProperty("modId").GetString()!, m => m.Clone());
-        current = this;
-        harmony.Patch(AccessTools.Method(typeof(InterfaceManager), nameof(InterfaceManager.TransitionTo)),
-            prefix: new HarmonyMethod(typeof(ModsMenu), nameof(HideForTransition)));
+        try
+        {
+            harmony.Patch(AccessTools.Method(typeof(InterfaceManager), nameof(InterfaceManager.TransitionTo)),
+                prefix: new HarmonyMethod(typeof(ModsMenu), nameof(HideForTransition)));
+            harmony.Patch(AccessTools.Method(typeof(InterfaceManager), nameof(InterfaceManager.ToggleInGameMenu)),
+                prefix: new HarmonyMethod(typeof(ModsMenu), nameof(HandleGameEscape)));
+            current = this;
+        }
+        catch { harmony.UnpatchSelf(); throw; }
     }
 
     private static void HideForTransition() { if (current?.page != null) current.page.SetActive(false); }
 
+    private static bool HandleGameEscape()
+    {
+        if (current == null) return true;
+        if (current.lifecycle.HandledEscape(Time.frameCount)) return false;
+        if (current.page == null || !current.page.activeInHierarchy) return true;
+        current.lifecycle.Escape(Time.frameCount, current.Back);
+        return false;
+    }
+
     public void Tick()
     {
-        var found = MainMenuInterface.Instance;
-        if (found != null && found != main)
-        {
-            main = found;
-            Build(found);
-        }
+        var sidebar = SideBarInterface.Instance;
+        var settings = SanctuaryUI.SettingsInterface.Instance;
+        if (sidebar != null && settings != null && InterfaceManager.Instance != null)
+            lifecycle.Build(sidebar, settings, () => Build(sidebar, settings), ClearPage);
         if (page == null || !page.activeSelf) return;
-        if (Input.GetKeyDown(KeyCode.Escape)) { Back(); return; }
+        if (Input.GetKeyDown(KeyCode.Escape)) { lifecycle.Escape(Time.frameCount, Back); return; }
         if (Input.GetKeyDown(KeyCode.Tab))
         {
             var available = focus.Where(g => g != null && g.activeInHierarchy && (g.GetComponent<Selectable>()?.IsInteractable() ?? true)).ToList();
@@ -71,15 +84,27 @@ internal sealed class ModsMenu : IDisposable
         }
     }
 
-    private void Build(MainMenuInterface menu)
+    private void Build(SideBarInterface sidebar, SanctuaryUI.SettingsInterface settings)
     {
-        if (page != null) Object.Destroy(page);
-        if (entry != null) Object.Destroy(entry.gameObject);
-        var original = menu.transform.parent.Find("SettingsInterface");
-        page = Object.Instantiate(original.gameObject, original.parent);
+        var original = settings.transform;
+        RequireTemplates(original);
+        var template = sidebar.settingsButton;
+        if (template == null) throw new InvalidOperationException("The game's Settings sidebar button is unavailable.");
+        var staging = new GameObject("StarframeMenuTemplates");
+        staging.SetActive(false);
+        try
+        {
+            // An inactive parent prevents the clone's native Awake from replacing SettingsInterface.Instance.
+            page = Object.Instantiate(original.gameObject, staging.transform);
+            page.SetActive(false);
+            Object.DestroyImmediate(page.GetComponent<SanctuaryUI.SettingsInterface>());
+            page.transform.SetParent(original.parent, false);
+            entry = Object.Instantiate(template.gameObject, staging.transform).GetComponent<PanelButton>();
+            entry.gameObject.SetActive(false);
+            entry.transform.SetParent(template.transform.parent, false);
+        }
+        finally { Object.Destroy(staging); }
         page.name = "StarframeMods";
-        page.SetActive(false);
-        Object.DestroyImmediate(page.GetComponent<SanctuaryUI.SettingsInterface>());
         var graphics = page.transform.Find("Content/Panels/Graphics");
         list = graphics.Find("Content/List/Layout Group");
         var layout = list.GetComponent<VerticalLayoutGroup>();
@@ -116,17 +141,43 @@ internal sealed class ModsMenu : IDisposable
         Configure(back, "Back", Back);
         reset = page.transform.Find("Content/Buttons/Reset Settings Button").GetComponent<ButtonManager>();
         Configure(reset, "Reset this mod", Reset);
-        var settings = menu.transform.Find("Left Sidebar/Content/Button List/Settings");
-        entry = Object.Instantiate(settings.gameObject, settings.parent).GetComponent<PanelButton>();
         entry.name = "StarframeModsButton";
-        entry.transform.SetSiblingIndex(settings.GetSiblingIndex() + 1);
+        entry.transform.SetSiblingIndex(template.transform.GetSiblingIndex() + 1);
         Configure(entry, "Mods");
         entry.buttonIcon = entry.selectedIcon = icon;
         entry.onClick.AddListener(Open);
+        entry.gameObject.SetActive(true);
         entry.UpdateUI();
         entry.AddUINavigation();
         entry.GetComponentInParent<PanelButtonDimmer>()?.FetchButtons();
         Clear();
+    }
+
+    private static void RequireTemplates(Transform original)
+    {
+        foreach (string path in new[]
+        {
+            "Content/Panels/Graphics/Content/List/Layout Group/Display Header",
+            "Content/Panels/Graphics/Content/List/Layout Group/ApplyButton",
+            "Content/Panels/Graphics/Content/List/Layout Group/UI Scale/Slider/Text Input",
+            "Content/Panels/Controls/Content/List/Layout Group/EdgePanToggle/Switch",
+            "Content/Categories/Graphics", "Content/Description Area/Description",
+            "Content/Buttons/BackButton", "Content/Buttons/Reset Settings Button"
+        })
+            if (original.Find(path) == null) throw new InvalidOperationException("The game's Settings menu is missing " + path + ".");
+        if (original.GetComponent<PanelManager>() == null) throw new InvalidOperationException("The game's Settings panel manager is unavailable.");
+    }
+
+    private void ClearPage()
+    {
+        if (page != null) { page.SetActive(false); Object.Destroy(page); }
+        if (entry != null) { entry.gameObject.SetActive(false); Object.Destroy(entry.gameObject); }
+        page = null;
+        entry = null;
+        focus.Clear();
+        settingControls.Clear();
+        selected = null;
+        listScroll = 1;
     }
 
     private static GameObject Keep(Transform source, Transform parent)
@@ -177,7 +228,7 @@ internal sealed class ModsMenu : IDisposable
     {
         if (selected != null) { ShowList(); return; }
         page!.SetActive(false);
-        InterfaceManager.Instance.TransitionTo(InterfaceManager.Window.Main);
+        InterfaceManager.Instance.TransitionTo(InterfaceManager.Window.Home);
         if (entry != null) Select(entry.gameObject);
     }
 
@@ -442,8 +493,7 @@ internal sealed class ModsMenu : IDisposable
 
     public void Dispose()
     {
-        if (page != null) Object.Destroy(page);
-        if (entry != null) Object.Destroy(entry.gameObject);
+        ClearPage();
         if (icon != null) { Object.Destroy(icon.texture); Object.Destroy(icon); }
         harmony.UnpatchSelf();
         if (current == this) current = null;
