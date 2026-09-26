@@ -30,6 +30,11 @@ pub(crate) fn remove_artifact(store: &Storage, hash: &str) -> Result<()> {
         .library
         .iter()
         .any(|entry| entry.reference.hash == hash)
+        || store
+            .installed_registry_releases()
+            .map_err(|error| error.to_string())?
+            .iter()
+            .any(|entry| entry.reference.sha256.as_str() == hash)
     {
         return Err("This artifact is still in the library. Cleanup retained it.".into());
     }

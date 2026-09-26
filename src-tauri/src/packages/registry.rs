@@ -257,6 +257,29 @@ impl Packages {
         request_id: &str,
         request: RegistryRequest,
     ) -> Result<Operation> {
+        self.start_registry_inner(storage, request_id, request, None)
+    }
+
+    pub fn start_registry_install(
+        &mut self,
+        storage: &mut Storage,
+        request_id: &str,
+        request: RegistryRequest,
+        display: crate::storage::RegistryDisplay,
+    ) -> Result<Operation> {
+        if !display.valid() {
+            return Err("The registry display metadata is invalid.".into());
+        }
+        self.start_registry_inner(storage, request_id, request, Some(display))
+    }
+
+    fn start_registry_inner(
+        &mut self,
+        storage: &mut Storage,
+        request_id: &str,
+        request: RegistryRequest,
+        install: Option<crate::storage::RegistryDisplay>,
+    ) -> Result<Operation> {
         let RegistryRequest {
             mod_id,
             release_id,
@@ -280,12 +303,39 @@ impl Packages {
         let identity = storage
             .ready_registry_download(&root_public, mod_id, release_id, OffsetDateTime::now_utc())
             .map_err(|e| e.to_string())?;
+        if install.is_some() && identity.installation.is_none() {
+            return Err("This release has no approved installation declaration. Ask the author for a new declared release.".into());
+        }
+        if storage
+            .pending_removals()
+            .map_err(|error| error.to_string())?
+            .iter()
+            .any(|(hash, _)| hash == identity.reference.sha256.as_str())
+        {
+            return Err("Finish pending artifact cleanup before installing this release.".into());
+        }
         if !self.can_start(identity.reference.sha256.as_str()) {
             return Err(
                 "Three downloads are already active, or this archive is being prepared.".into(),
             );
         }
         let root = storage.package_root().to_owned();
+        let reserved = self
+            .active
+            .values()
+            .map(|active| active.operation.total_bytes + super::MAX_EXPANDED_BYTES)
+            .chain(self.registry_active.values().map(|active| {
+                active.operation.total_bytes
+                    + if active.install.is_some() {
+                        super::MAX_EXPANDED_BYTES
+                    } else {
+                        0
+                    }
+            }))
+            .sum::<u64>();
+        if install.is_some() {
+            space::require(&root, reserved + identity.bytes + super::MAX_EXPANDED_BYTES)?;
+        }
         let active_ids = self
             .registry_active
             .keys()
@@ -298,7 +348,11 @@ impl Packages {
             request_id: request_id.into(),
             release_id: release_id.0.to_string(),
             hash: identity.reference.sha256.as_str().into(),
-            kind: Kind::RegistryArchive,
+            kind: if install.is_some() {
+                Kind::RegistryInstall
+            } else {
+                Kind::RegistryArchive
+            },
             receipt_id: None,
             status: Status::Preparing,
             message: "Downloading the exact signed registry archive.".into(),
@@ -349,20 +403,11 @@ impl Packages {
                     result,
                     worker,
                     claim: None,
+                    install,
                 },
             );
             return Ok(operation);
         }
-        let reserved = self
-            .active
-            .values()
-            .map(|active| active.operation.total_bytes + super::MAX_EXPANDED_BYTES)
-            .chain(
-                self.registry_active
-                    .values()
-                    .map(|active| active.operation.total_bytes),
-            )
-            .sum::<u64>();
         space::require(&root, reserved + identity.bytes)?;
         let (stage, file, directory_pin) = begin(&root, operation_id)?;
         if let Err(error) = storage.save_package(&operation) {
@@ -428,6 +473,7 @@ impl Packages {
                 result,
                 worker,
                 claim: None,
+                install,
             },
         );
         Ok(operation)
@@ -469,6 +515,7 @@ impl Packages {
                 ))),
             };
             changed = true;
+            let installation_event = matches!(&event, RegistryEvent::Installed(_));
             match event {
                 RegistryEvent::Cached(outcome) => match outcome {
                     Ok(()) => {
@@ -645,6 +692,47 @@ impl Packages {
                         }
                     }
                 }
+                RegistryEvent::Installed(result) => {
+                    let outcome = result.and_then(|prepared| {
+                        active.cancel.check()?;
+                        if *active.abort.borrow() { return Err("Sign-in changed before the registry installation was committed.".into()); }
+                        let display = active.install.as_ref().ok_or("Registry installation intent is missing.")?;
+                        let mut complete = active.operation.clone();
+                        complete.status = Status::Completed;
+                        complete.received_bytes = complete.total_bytes;
+                        complete.message = "Exact registry release installed. Enable it in My Mods or a collection.".into();
+                        storage.complete_registry_install(&active.root, &active.identity, display, &prepared, &complete, OffsetDateTime::now_utc()).map_err(|error| error.to_string())?;
+                        active.operation = complete;
+                        Ok(())
+                    });
+                    if let Err(message) = outcome {
+                        active.operation.status = if message == super::CANCELLED {
+                            Status::Cancelled
+                        } else {
+                            Status::Failed
+                        };
+                        active.operation.message = message;
+                    }
+                }
+            }
+            if !installation_event
+                && active.operation.status == Status::Completed
+                && active.install.is_some()
+            {
+                match begin_installation(storage, &mut active) {
+                    Ok(()) => {
+                        self.registry_active.insert(id, active);
+                        continue;
+                    }
+                    Err(message) => {
+                        active.operation.status = if message == super::CANCELLED {
+                            Status::Cancelled
+                        } else {
+                            Status::Failed
+                        };
+                        active.operation.message = message;
+                    }
+                }
             }
             storage
                 .save_package(&active.operation)
@@ -676,9 +764,7 @@ impl Packages {
                         .map_err(|e| e.to_string())?
                         && operation.status == Status::Completed
                     {
-                        operation.message = format!(
-                            "Verified registry archive saved. Download receipt is pending: {error}"
-                        );
+                        operation.message = format!("Download receipt is pending: {error}");
                         storage
                             .save_package(&operation)
                             .map_err(|e| e.to_string())?;
@@ -694,6 +780,41 @@ impl Packages {
         }
         Ok(changed)
     }
+}
+
+fn begin_installation(storage: &mut Storage, active: &mut RegistryActive) -> Result<()> {
+    active.cancel.check()?;
+    if *active.abort.borrow() {
+        return Err("Sign-in changed before the registry archive was prepared.".into());
+    }
+    let release = storage
+        .ready_registry_release(
+            &active.root,
+            active.identity.reference.mod_id,
+            active.identity.reference.release_id,
+            OffsetDateTime::now_utc(),
+        )
+        .map_err(|error| error.to_string())?;
+    if release.download_identity().as_ref() != Some(&active.identity) {
+        return Err("The signed registry installation changed. Refresh the exact release.".into());
+    }
+    let root = storage.package_root().to_owned();
+    let reserved = active.identity.bytes + super::MAX_EXPANDED_BYTES;
+    space::require(&root, reserved)?;
+    let operation_id = Uuid::parse_str(&active.operation.id)
+        .map_err(|_| "Invalid registry installation operation.")?;
+    let cancelled = active.cancel.flag.clone();
+    let sender = active.sender.clone();
+    active.operation.status = Status::Preparing;
+    active.operation.message = "Preparing the approved installation declaration.".into();
+    storage
+        .save_package(&active.operation)
+        .map_err(|error| error.to_string())?;
+    active.worker = tauri::async_runtime::spawn_blocking(move || {
+        let outcome = super::prepare_registry_archive(&root, operation_id, &release, cancelled);
+        let _ = sender.send(RegistryEvent::Installed(outcome));
+    });
+    Ok(())
 }
 
 #[cfg(test)]
@@ -787,6 +908,173 @@ mod tests {
             .ready_registry_download(&root_public, mod_id, release_id, now)
             .unwrap();
         (root_public, mod_id, release_id, identity)
+    }
+
+    fn declared_store(
+        store: &mut Storage,
+        archive: &[u8],
+    ) -> ([u8; 32], ModId, ReleaseId, DownloadIdentity) {
+        let (root, mod_id, release_id, _) = signed_store(store, archive);
+        let mut envelope: serde_json::Value = serde_json::from_slice(
+            &store
+                .registry_document(&format!("release:{}", release_id.0))
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
+        let plan: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/registry-installation-v1.json"
+        ))
+        .unwrap();
+        envelope["signed"]["schemaVersion"] = 2.into();
+        envelope["signed"]["revision"] = 2.into();
+        envelope["signed"]["release"]["metadata"]["installation"] =
+            plan["cases"]["valid"][2]["plan"].clone();
+        let online = Ed25519KeyPair::from_seed_unchecked(&[9u8; 32]).unwrap();
+        let now = OffsetDateTime::now_utc();
+        let manifest = sign(
+            envelope["signed"].clone(),
+            &online,
+            &envelope["signatures"][0]["keyId"],
+            now,
+            12,
+        );
+        store
+            .accept_registry_release(&manifest, &root, mod_id, release_id, now)
+            .unwrap();
+        let identity = store
+            .ready_registry_download(&root, mod_id, release_id, now)
+            .unwrap();
+        (root, mod_id, release_id, identity)
+    }
+
+    #[tokio::test]
+    async fn shared_queue_installs_declared_map_atomically_and_reuses_cache_after_restart() {
+        let root = tempfile::tempdir().unwrap();
+        let mut store = Storage::open(root.path()).unwrap();
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        for (path, bytes) in [
+            ("Maps/Example/Example.sanmap", b"inert map".as_slice()),
+            ("Maps/Example/Textures/height.png", b"inert asset"),
+        ] {
+            zip.start_file(path, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(bytes).unwrap();
+        }
+        let archive = zip.finish().unwrap().into_inner();
+        let (root_public, mod_id, release_id, identity) = declared_store(&mut store, &archive);
+        let session_fixtures: serde_json::Value =
+            serde_json::from_str(include_str!("../../../tests/fixtures/registry-v1.json")).unwrap();
+        let mut session = session_fixtures
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|value| value["name"] == "session")
+            .unwrap()["body"]["data"]
+            .clone();
+        session["expiresAt"] = (OffsetDateTime::now_utc() + time::Duration::hours(1))
+            .format(&Rfc3339)
+            .unwrap()
+            .into();
+        let session: Session = serde_json::from_value(session).unwrap();
+        let (origin, thread) = serve_download(&identity, &archive, &session, Some(true));
+        let client = Client::new(
+            crate::registry::Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true)
+                .unwrap(),
+        )
+        .unwrap();
+        let (_auth_sender, auth_cancel) = watch::channel(false);
+        let display = crate::storage::RegistryDisplay {
+            name: "Fixture map".into(),
+            author: "Fixture author".into(),
+        };
+        let mut queue = Packages::open(&mut store).unwrap();
+        let started = crate::backend::registry_install_action(
+            &mut store,
+            &mut queue,
+            &Uuid::new_v4().to_string(),
+            RegistryRequest {
+                mod_id,
+                release_id,
+                root_public,
+                client: client.clone(),
+                session: session.clone(),
+                bearer: "fixture-token".into(),
+                auth_cancel: auth_cancel.clone(),
+            },
+            display.clone(),
+        )
+        .unwrap();
+        let operation_id = started[0].id.clone();
+        for _ in 0..150 {
+            crate::backend::poll_packages(&mut store, &mut queue).unwrap();
+            if !queue.busy() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert!(!queue.busy());
+        let complete = store
+            .package_operations()
+            .unwrap()
+            .into_iter()
+            .find(|operation| operation.id == operation_id)
+            .unwrap();
+        assert_eq!(complete.status, Status::Completed, "{}", complete.message);
+        assert_eq!(complete.kind, Kind::RegistryInstall);
+        assert!(complete.message.contains("installed"));
+        assert!(
+            store
+                .pending_registry_receipts(session.account_id)
+                .unwrap()
+                .is_empty()
+        );
+        let entries = store.installed_registry_releases().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].reference, *identity.reference());
+        assert_eq!(entries[0].display, display);
+        assert!(
+            store
+                .prepared_artifact(identity.reference.sha256.as_str())
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(thread.join().unwrap().len(), 4);
+        assert!(super::super::remove_artifact(&store, identity.reference.sha256.as_str()).is_err());
+        drop(queue);
+        drop(store);
+        let mut store = Storage::open(root.path()).unwrap();
+        assert_eq!(store.installed_registry_releases().unwrap(), entries);
+        let mut queue = Packages::open(&mut store).unwrap();
+        queue
+            .start_registry_install(
+                &mut store,
+                &Uuid::new_v4().to_string(),
+                RegistryRequest {
+                    mod_id,
+                    release_id,
+                    root_public,
+                    client,
+                    session,
+                    bearer: "fixture-token".into(),
+                    auth_cancel,
+                },
+                display,
+            )
+            .unwrap();
+        for _ in 0..150 {
+            queue.poll(&mut store).unwrap();
+            if !queue.busy() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert!(!queue.busy());
+        assert_eq!(
+            store.package_operations().unwrap()[0].status,
+            Status::Completed
+        );
+        assert_eq!(store.installed_registry_releases().unwrap(), entries);
     }
 
     fn request(stream: &mut TcpStream) -> String {

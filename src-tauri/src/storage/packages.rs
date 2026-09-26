@@ -3,13 +3,17 @@ use crate::packages::{Kind, Operation, Prepared, Status};
 use crate::registry::{ReceiptClaim, VerifiedArchive};
 use rusqlite::OptionalExtension;
 
-fn operation_record(operation: &Operation) -> Result<String> {
+pub(super) fn operation_record(operation: &Operation) -> Result<String> {
     if Uuid::parse_str(&operation.id).is_err()
         || Uuid::parse_str(&operation.request_id).is_err()
         || operation.release_id.is_empty()
         || operation.release_id.len() > 128
         || operation.message.len() > 8000
-        || (operation.receipt_id.is_some() && operation.kind != Kind::RegistryArchive)
+        || (operation.receipt_id.is_some()
+            && !matches!(
+                operation.kind,
+                Kind::RegistryArchive | Kind::RegistryInstall
+            ))
         || operation.received_bytes > operation.total_bytes
         || !(1..=2_147_483_648).contains(&operation.total_bytes)
     {
@@ -24,7 +28,7 @@ fn operation_record(operation: &Operation) -> Result<String> {
     serde_json::to_string(operation).map_err(|e| Error::Invalid(e.to_string()))
 }
 
-fn prepared_record(prepared: &Prepared) -> Result<String> {
+pub(super) fn prepared_record(prepared: &Prepared) -> Result<String> {
     validate_reference(&ModReference {
         mod_id: "artifact".into(),
         hash: prepared.hash.clone(),
@@ -123,7 +127,10 @@ impl Storage {
     ) -> Result<(ReceiptClaim, Operation)> {
         let claim = verified.receipt_claim();
         if !claim.valid()
-            || operation.kind != Kind::RegistryArchive
+            || !matches!(
+                operation.kind,
+                Kind::RegistryArchive | Kind::RegistryInstall
+            )
             || operation.receipt_id.is_some()
             || operation.release_id != claim.release_id.0.to_string()
             || operation.hash != claim.sha256.as_str()
@@ -170,7 +177,7 @@ impl Storage {
         }
         let updated = operation
             .map(|operation| {
-                if operation.kind != Kind::RegistryArchive
+                if !matches!(operation.kind, Kind::RegistryArchive | Kind::RegistryInstall)
                     || operation.receipt_id != Some(claim.download_id)
                     || operation.release_id != claim.release_id.0.to_string()
                     || operation.hash != claim.sha256.as_str()
@@ -181,7 +188,11 @@ impl Storage {
                 let mut updated = operation.clone();
                 updated.receipt_id = None;
                 if updated.status == Status::Completed {
-                    updated.message = "Verified registry archive saved. Download receipt confirmed. Installation remains pending.".into();
+                    updated.message = if updated.kind == Kind::RegistryInstall {
+                        "Download receipt confirmed.".into()
+                    } else {
+                        "Verified registry archive saved. Download receipt confirmed. Installation remains pending.".into()
+                    };
                 }
                 let record = operation_record(&updated)?;
                 Ok((updated, record))

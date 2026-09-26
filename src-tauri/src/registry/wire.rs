@@ -346,7 +346,7 @@ pub struct Metadata {
     pub installation: Option<super::installation::Installation>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Dependency {
     Exact {

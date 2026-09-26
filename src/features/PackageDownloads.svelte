@@ -9,7 +9,7 @@
   Installed releases and local imports appear in My mods. A verified registry
   archive needs an approved install plan before it can join your library.
 </p>
-{#if $manager.operations.some((op) => op.kind === 'registry_archive' && op.receiptId)}<div
+{#if $manager.operations.some((op) => (op.kind === 'registry_archive' || op.kind === 'registry_install') && op.receiptId)}<div
   >
     <p>
       A completed archive transfer still needs a download receipt. Sign in with
@@ -67,7 +67,7 @@
                 ? 'Cancel import'
                 : 'Cancel download'}</button
           >
-        {:else if (op.status === 'failed' || op.status === 'cancelled') && op.kind !== 'registry_archive' && op.releaseId !== 'local-import' && op.releaseId !== 'local-verification'}<button
+        {:else if (op.status === 'failed' || op.status === 'cancelled') && op.kind !== 'registry_archive' && op.kind !== 'registry_install' && op.releaseId !== 'local-import' && op.releaseId !== 'local-verification'}<button
             disabled={unavailable ||
               $manager.pending.includes(`install:${op.releaseId}`)}
             onclick={() => manager.install(op.releaseId)}
@@ -81,6 +81,11 @@
           >
             The archive was not saved. Retry this release when registry
             downloads are available.
+          </p>
+        {:else if (op.status === 'failed' || op.status === 'cancelled') && op.kind === 'registry_install'}<p
+          >
+            This release was not installed. Retry its exact registry release
+            after resolving the reported problem.
           </p>
         {:else if op.status === 'failed' && op.releaseId !== 'local-verification'}<p
           >

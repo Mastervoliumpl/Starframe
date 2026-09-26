@@ -61,6 +61,7 @@ pub enum Kind {
     #[default]
     Package,
     RegistryArchive,
+    RegistryInstall,
 }
 
 #[derive(Deserialize)]
@@ -176,6 +177,7 @@ struct RegistryActive {
     result: mpsc::Receiver<RegistryEvent>,
     worker: tauri::async_runtime::JoinHandle<()>,
     claim: Option<crate::registry::ReceiptClaim>,
+    install: Option<crate::storage::RegistryDisplay>,
 }
 
 struct RegistryReceiptRetry {
@@ -214,6 +216,7 @@ enum RegistryEvent {
     ),
     Promoted(Result<crate::registry::Session>),
     Receipt(Result<()>),
+    Installed(Result<Prepared>),
 }
 
 #[derive(Clone)]

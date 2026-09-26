@@ -125,7 +125,7 @@ impl Storage {
                 ],
             )?;
             if tx.query_row(
-                "SELECT count(*) FROM library WHERE hash=?",
+                "SELECT (SELECT count(*) FROM library WHERE hash=?1) + (SELECT count(*) FROM registry_library WHERE sha256=?1 AND installation_record IS NOT NULL)",
                 [&reference.hash],
                 |r| r.get::<_, i64>(0),
             )? == 0

@@ -990,6 +990,7 @@ mod tests {
             bytes: 2_147_483_648,
             metadata_revision: 1,
             security_revision: 1,
+            installation: None,
         };
         let download_id = uuid::Uuid::parse_str("33333333-3333-4333-8333-333333333333").unwrap();
         let expires = (OffsetDateTime::now_utc() + time::Duration::minutes(5))
@@ -1354,6 +1355,7 @@ mod tests {
             bytes: archive.len() as u64,
             metadata_revision: 1,
             security_revision: 1,
+            installation: None,
         };
         let ids = [
             uuid::Uuid::parse_str("33333333-3333-4333-8333-333333333333").unwrap(),
@@ -1451,6 +1453,7 @@ mod tests {
             bytes: archive.len() as u64,
             metadata_revision: 1,
             security_revision: 1,
+            installation: None,
         };
         let ids = [
             uuid::Uuid::parse_str("33333333-3333-4333-8333-333333333333").unwrap(),

@@ -109,6 +109,7 @@ pub struct DownloadIdentity {
     pub(crate) bytes: u64,
     pub(crate) metadata_revision: u64,
     pub(crate) security_revision: u64,
+    pub(crate) installation: Option<super::installation::Installation>,
 }
 
 impl DownloadIdentity {
@@ -148,6 +149,7 @@ impl VerifiedRelease {
             bytes: release.artifact.bytes,
             metadata_revision: release.metadata.revision,
             security_revision: self.security_revision,
+            installation: release.metadata.installation.clone(),
         })
     }
 }

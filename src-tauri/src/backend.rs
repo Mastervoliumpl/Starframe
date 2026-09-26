@@ -76,6 +76,17 @@ pub fn registry_receipts_action(
     )
 }
 
+pub fn registry_install_action(
+    store: &mut Storage,
+    queue: &mut Packages,
+    request_id: &str,
+    request: packages::RegistryRequest,
+    display: crate::storage::RegistryDisplay,
+) -> Result<Vec<packages::Operation>, String> {
+    queue.start_registry_install(store, request_id, request, display)?;
+    queue.operations(store)
+}
+
 pub fn poll_packages(store: &mut Storage, queue: &mut Packages) -> Result<bool, String> {
     queue.poll(store).and_then(|changed| {
         sharing::poll(store, queue).map(|imports_changed| changed || imports_changed)
