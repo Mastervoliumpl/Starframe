@@ -38,6 +38,7 @@ internal sealed class ModsMenu : IDisposable
     private ButtonManager back = null!, reset = null!;
     private Sprite? icon;
     private Coroutine? reveal;
+    private bool opening;
     private string? selected;
     private int saves;
     private float listScroll = 1;
@@ -54,6 +55,8 @@ internal sealed class ModsMenu : IDisposable
                 prefix: new HarmonyMethod(typeof(ModsMenu), nameof(HideForTransition)));
             harmony.Patch(AccessTools.Method(typeof(InterfaceManager), nameof(InterfaceManager.ToggleInGameMenu)),
                 prefix: new HarmonyMethod(typeof(ModsMenu), nameof(HandleGameEscape)));
+            harmony.Patch(AccessTools.Method(typeof(SidebarReveal), nameof(SidebarReveal.Hide)),
+                prefix: new HarmonyMethod(typeof(ModsMenu), nameof(AllowSidebarHide)));
             current = this;
         }
         catch { harmony.UnpatchSelf(); throw; }
@@ -74,6 +77,9 @@ internal sealed class ModsMenu : IDisposable
         current.lifecycle.Escape(Time.frameCount, current.Back);
         return false;
     }
+
+    private static bool AllowSidebarHide(SidebarReveal __instance) =>
+        current == null || !current.opening || __instance != current.sidebarReveal;
 
     public void Tick()
     {
@@ -239,8 +245,10 @@ internal sealed class ModsMenu : IDisposable
 
     private void Open()
     {
-        InterfaceManager.Instance.TransitionTo(InterfaceManager.Window.Background);
-        sidebarReveal.Show();
+        // The Background transition queues Hide; a same-frame Show does not cancel that native animation.
+        opening = true;
+        try { InterfaceManager.Instance.TransitionTo(InterfaceManager.Window.Background); }
+        finally { opening = false; }
         entry!.SetSelected(true);
         page!.SetActive(true);
         var animator = page.GetComponent<Animator>();
