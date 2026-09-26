@@ -34,6 +34,7 @@ internal sealed class ModsMenu : IDisposable
     private GameObject header = null!, body = null!, button = null!, toggle = null!, input = null!;
     private ButtonManager back = null!, reset = null!;
     private Sprite? icon;
+    private Coroutine? reveal;
     private string? selected;
     private int saves;
     private float listScroll = 1;
@@ -166,10 +167,13 @@ internal sealed class ModsMenu : IDisposable
         })
             if (original.Find(path) == null) throw new InvalidOperationException("The game's Settings menu is missing " + path + ".");
         if (original.GetComponent<PanelManager>() == null) throw new InvalidOperationException("The game's Settings panel manager is unavailable.");
+        if (original.GetComponent<Animator>()?.runtimeAnimatorController == null)
+            throw new InvalidOperationException("The game's Settings window animator is unavailable.");
     }
 
     private void ClearPage()
     {
+        if (reveal != null) { host.StopCoroutine(reveal); reveal = null; }
         if (page != null) { page.SetActive(false); Object.Destroy(page); }
         if (entry != null) { entry.gameObject.SetActive(false); Object.Destroy(entry.gameObject); }
         page = null;
@@ -221,7 +225,20 @@ internal sealed class ModsMenu : IDisposable
     {
         InterfaceManager.Instance.TransitionTo(InterfaceManager.Window.Background);
         page!.SetActive(true);
+        var animator = page.GetComponent<Animator>();
+        if (reveal != null) host.StopCoroutine(reveal);
+        animator.enabled = true;
+        animator.SetFloat("AnimSpeed", 1);
+        animator.Play("In Bottom", 0, 0);
+        reveal = host.StartCoroutine(FinishReveal(animator));
         ShowList();
+    }
+
+    private IEnumerator FinishReveal(Animator animator)
+    {
+        yield return new WaitForSecondsRealtime(BeamUIInternalTools.GetAnimatorClipLength(animator, "MainPanel_InBottom"));
+        if (animator != null) animator.enabled = false;
+        reveal = null;
     }
 
     private void Back()
