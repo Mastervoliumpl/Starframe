@@ -8,7 +8,7 @@
     type Registry,
   } from '../lib/registry';
   import { bytes, key, transferring, type Management } from '../lib/management';
-  import type { Release } from '../lib/generated/registry';
+  import type { Dependency, Release } from '../lib/generated/registry';
   let {
     registry,
     manager,
@@ -82,13 +82,18 @@
     if (active && account) void registry.browse();
   });
 
-  async function open(modId: number, event?: MouseEvent) {
+  async function open(
+    modId: number,
+    event?: MouseEvent,
+    constraint: Dependency | null = null,
+  ) {
     trigger =
       event?.currentTarget instanceof HTMLButtonElement
         ? event.currentTarget
         : trigger;
-    savedScroll = list?.closest('.page')?.scrollTop ?? 0;
-    void registry.detail(modId);
+    if ($registry.selected === null)
+      savedScroll = list?.closest('.page')?.scrollTop ?? 0;
+    void registry.detail(modId, 1, constraint);
     await tick();
     detailHeading?.focus();
   }
@@ -429,8 +434,13 @@
         {#if $registry.detailError}<p class="error" role="alert">
             {$registry.detailError}
           </p>
-          <button onclick={() => registry.detail($registry.selected!)}
-            >Retry details</button
+          <button
+            onclick={() =>
+              registry.detail(
+                $registry.selected!,
+                $registry.history?.pagination.page ?? 1,
+                $registry.constraint,
+              )}>Retry details</button
           >{/if}
         {#if listing}
           <p>
@@ -470,6 +480,27 @@
                     />{/if}</button
                 >{/each}
             </div>{/if}
+        {/if}
+        {#if $registry.constraint}
+          <p>
+            Dependency: {$registry.constraint.kind === 'exact'
+              ? 'one exact approved release'
+              : `${$registry.constraint.minimum ? `from ${$registry.constraint.minimum}` : 'any version'}${$registry.constraint.before ? `, before ${$registry.constraint.before}` : ''}${$registry.constraint.includePrerelease ? ', prereleases allowed' : ', stable releases only'}`}.
+            Release history shows matching versions and unavailable records
+            whose labels cannot be checked.
+          </p>
+          {#if !$registry.detailLoading && !$registry.detailError && !$registry.release}<p
+              role="status"
+            >
+              No available matching release with installation information on
+              this history page. Check older pages or show all releases.
+            </p>{:else if $registry.constraint.kind === 'range' && release}<p>
+              Suggested: newest matching available release on this history page.
+              Installation and collection selection require your choice.
+            </p>{/if}
+          <button onclick={() => registry.detail($registry.selected!)}
+            >Show all releases</button
+          >
         {/if}
         {#if release}
           <h3>Release {release.versionLabel}</h3>
@@ -538,8 +569,10 @@
             <ul class="dependencies">
               {#each release.metadata.dependencies as dependency (dependency.modId)}<li
                 >
-                  <button onclick={() => open(dependency.modId)}
-                    >Mod {dependency.modId}</button
+                  <button
+                    onclick={() =>
+                      open(dependency.modId, undefined, dependency)}
+                    >Find releases for dependency {dependency.modId}</button
                   >
                   <p>
                     {dependency.kind === 'exact'
@@ -589,6 +622,7 @@
                 registry.detail(
                   $registry.selected!,
                   $registry.history!.pagination.page - 1,
+                  $registry.constraint,
                 )}>Previous releases</button
             ><span
               >Page {$registry.history.pagination.page} of {Math.max(
@@ -603,6 +637,7 @@
                 registry.detail(
                   $registry.selected!,
                   $registry.history!.pagination.page + 1,
+                  $registry.constraint,
                 )}>Next releases</button
             >
           </div>

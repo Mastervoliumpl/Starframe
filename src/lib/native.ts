@@ -11,6 +11,8 @@ const native: Transport & AuthTransport & RegistryTransport = {
   registryHistory: (modId, page) =>
     invoke('registry_history', { modId, page, pageSize: 12 }),
   registryRelease: (releaseId) => invoke('registry_release', { releaseId }),
+  registryCandidates: (dependency, page) =>
+    invoke('registry_candidates', { dependency, page }),
   registryInstall: (requestId, reference) =>
     invoke('registry_install', { requestId, reference }),
   authRestore: () => invoke('auth_restore'),

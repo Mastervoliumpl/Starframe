@@ -32,4 +32,4 @@ For this increment, frontend formatting/lint/types, 17 Vitest tests, production 
 
 ## Remaining acceptance
 
-Explicit dependency candidate/update choices remain under #87. Legacy catalog client/publication removal remains under #89. Production registry trust provisioning and real AI/map gameplay are separate limits. No public app release, website deployment, live credential or real-game mutation occurred.
+Explicit dependency candidate/update choices are implemented and verified in [dependency verification](registry-dependencies.md#explicit-dependency-and-update-choices). Legacy catalog client/publication removal remains under #89. Production registry trust provisioning and real AI/map gameplay are separate limits. No public app release, website deployment, live credential or real-game mutation occurred.

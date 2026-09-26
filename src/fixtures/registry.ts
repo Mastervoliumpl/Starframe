@@ -1,5 +1,11 @@
 import type { RegistryTransport } from '../lib/registry';
-import type { ModSummary, Release, ModDetail } from '../lib/generated/registry';
+import type {
+  ModSummary,
+  Release,
+  ModDetail,
+  Dependency,
+  Candidates,
+} from '../lib/generated/registry';
 
 const date = '2026-09-24T00:00:00Z';
 export const fixtureReleaseId = (id: number, order = 2) =>
@@ -29,7 +35,18 @@ export function fixtureRelease(id: number, order = 2): Release {
         order === 2
           ? 'Updated fixture release. <script>Plain text only.</script>'
           : 'Earlier fixture release.',
-      dependencies: [],
+      dependencies:
+        id === 1
+          ? [
+              {
+                kind: 'range',
+                modId: 2,
+                minimum: '1.0.0',
+                before: '2.0.0',
+                includePrerelease: false,
+              },
+            ]
+          : [],
       dependencyProblems: [],
       installation: {
         schemaVersion: 1,
@@ -73,6 +90,37 @@ export function fixtureDetail(id: number): ModDetail {
     latestRelease: fixtureRelease(id),
   };
 }
+export function fixtureCandidates(
+  dependency: Dependency,
+  page = 1,
+): Candidates {
+  const order =
+    dependency.kind === 'exact'
+      ? Number(dependency.releaseId.split('-')[4])
+      : 1;
+  const release = fixtureRelease(dependency.modId, order);
+  const { metadata, ...summary } = release;
+  return {
+    history: {
+      apiVersion: 1,
+      items: [
+        {
+          ...summary,
+          metadataRevision: metadata.revision,
+          testedGameBuild: metadata.testedGameBuild,
+        },
+      ],
+      pagination: {
+        page,
+        pageSize: 12,
+        totalItems: 2,
+        totalPages: 1,
+        asOf: date,
+      },
+    },
+    suggested: release,
+  };
+}
 export function fixtureRegistry(): RegistryTransport {
   const params = new URLSearchParams(location.search);
   const mode = params.get('registry');
@@ -88,6 +136,9 @@ export function fixtureRegistry(): RegistryTransport {
     asOf: date,
   });
   return {
+    async registryCandidates(dependency, page) {
+      return fixtureCandidates(dependency, page);
+    },
     async registryOptions() {
       return {
         tags: [

@@ -11,6 +11,7 @@ import {
   fixtureDetail,
   fixtureRelease,
   fixtureReleaseId,
+  fixtureCandidates,
 } from '../fixtures/registry';
 
 function deferred<T>() {
@@ -47,9 +48,61 @@ function transport(): RegistryTransport {
     })),
     registryRelease: vi.fn(async () => fixtureRelease(1)),
     registryInstall: vi.fn(async () => []),
+    registryCandidates: vi.fn(async () => ({
+      history: {
+        apiVersion: 1 as const,
+        items: [],
+        pagination: {
+          page: 1,
+          pageSize: 12,
+          totalItems: 0,
+          totalPages: 0,
+          asOf: '2026-09-24T00:00:00Z',
+        },
+      },
+      suggested: null,
+    })),
   };
 }
 describe('native registry browser', () => {
+  it('uses backend dependency candidates without installing or changing collection references', async () => {
+    const api = transport();
+    api.registryCandidates = vi.fn(async (dependency, page) =>
+      fixtureCandidates(dependency, page),
+    );
+    const registry = createRegistry(api);
+    registry.account('fixture');
+    const dependency = {
+      kind: 'range' as const,
+      modId: 2,
+      minimum: '1.0.0',
+      before: '2.0.0',
+      includePrerelease: false,
+    };
+    await registry.detail(2, 1, dependency);
+    expect(get(registry).release).toEqual(fixtureRelease(2, 1));
+    expect(get(registry).constraint).toEqual(dependency);
+    expect(api.registryInstall).not.toHaveBeenCalled();
+    expect(api.registryHistory).not.toHaveBeenCalled();
+    await registry.detail(2);
+    expect(get(registry).constraint).toBeNull();
+    expect(get(registry).release).toEqual(fixtureRelease(2));
+  });
+  it('keeps a dependency constraint across history pages and exposes an empty matching page', async () => {
+    const api = transport();
+    const registry = createRegistry(api);
+    registry.account('fixture');
+    const dependency = {
+      kind: 'exact' as const,
+      modId: 2,
+      releaseId: fixtureReleaseId(2, 1),
+    };
+    await registry.detail(2, 2, dependency);
+    expect(api.registryCandidates).toHaveBeenCalledWith(dependency, 2);
+    expect(get(registry).release).toBeNull();
+    expect(get(registry).constraint).toEqual(dependency);
+    expect(api.registryInstall).not.toHaveBeenCalled();
+  });
   it('ignores stale filter responses and does not overlap identical reads', async () => {
     const first = deferred<ModList>();
     const second = deferred<ModList>();

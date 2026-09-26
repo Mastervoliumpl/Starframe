@@ -12,6 +12,8 @@ import type {
   Release,
   ReleaseHistory,
   ReleaseResult,
+  Candidates,
+  Dependency,
 } from './generated/registry';
 
 export interface RegistryTransport {
@@ -19,6 +21,7 @@ export interface RegistryTransport {
   registryOptions(): Promise<Options>;
   registryDetail(modId: number): Promise<ModResult>;
   registryHistory(modId: number, page: number): Promise<ReleaseHistory>;
+  registryCandidates(dependency: Dependency, page: number): Promise<Candidates>;
   registryRelease(releaseId: string): Promise<ReleaseResult>;
   registryInstall(
     requestId: string,
@@ -79,6 +82,7 @@ type View = {
   detailError: string;
   installing: string[];
   installError: string;
+  constraint: Dependency | null;
 };
 
 export function createRegistry(transport: RegistryTransport | null) {
@@ -98,6 +102,7 @@ export function createRegistry(transport: RegistryTransport | null) {
     detailError: '',
     installing: [],
     installError: '',
+    constraint: null,
   };
   const store = writable(view);
   const update = (patch: Partial<View>) => {
@@ -141,12 +146,19 @@ export function createRegistry(transport: RegistryTransport | null) {
     }
   }
 
-  async function detail(modId: number, page = 1) {
+  async function detail(
+    modId: number,
+    page = 1,
+    constraint: Dependency | null = null,
+  ) {
     if (!transport || !view.account || stopped) return;
     const current = ++detailGeneration;
-    const changed = view.selected !== modId;
+    const changed =
+      view.selected !== modId ||
+      JSON.stringify(view.constraint) !== JSON.stringify(constraint);
     update({
       selected: modId,
+      constraint,
       detailLoading: true,
       detailError: '',
       ...(changed
@@ -154,16 +166,21 @@ export function createRegistry(transport: RegistryTransport | null) {
         : {}),
     });
     try {
-      const [detail, history] = await Promise.all([
+      const [detail, candidatePage] = await Promise.all([
         transport.registryDetail(modId),
-        transport.registryHistory(modId, page),
+        constraint
+          ? transport.registryCandidates(constraint, page)
+          : transport
+              .registryHistory(modId, page)
+              .then((history) => ({ history, suggested: null })),
       ]);
       if (stopped || current !== detailGeneration) return;
       update({
         detail,
-        history,
-        release:
-          changed || !view.release
+        history: candidatePage.history,
+        release: constraint
+          ? candidatePage.suggested
+          : changed || !view.release
             ? 'listing' in detail
               ? detail.latestRelease
               : detail
@@ -201,6 +218,7 @@ export function createRegistry(transport: RegistryTransport | null) {
         error: '',
         detailError: '',
         installError: '',
+        constraint: null,
       });
       return true;
     },

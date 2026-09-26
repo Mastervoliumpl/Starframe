@@ -93,9 +93,10 @@ impl Dependency {
     }
 
     pub fn valid(&self, source: ModId) -> bool {
-        if self.mod_id() == source {
-            return false;
-        }
+        self.mod_id() != source && self.valid_constraint()
+    }
+
+    pub fn valid_constraint(&self) -> bool {
         match self {
             Self::Exact { release_id, .. } => {
                 release_id.0.get_version_num() == 4

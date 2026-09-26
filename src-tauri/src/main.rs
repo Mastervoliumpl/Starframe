@@ -128,6 +128,7 @@ fn main() {
             commands::registry_release,
             commands::registry_history,
             commands::registry_install,
+            commands::registry_candidates,
             commands::registry_retry_receipts,
             commands::pick_local_source,
             commands::sharing_action,

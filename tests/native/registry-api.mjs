@@ -132,6 +132,23 @@ export async function registryApi() {
     publishedAt: issuedAt,
     latestAvailability: 'available',
   };
+  const dependencyRelease = {
+    zip: releases[1].zip,
+    release: {
+      ...structuredClone(releases[1].release),
+      modId: 2,
+      releaseId: randomUUID(),
+    },
+  };
+  releases[0].release.metadata.dependencies = [
+    {
+      kind: 'range',
+      modId: 2,
+      minimum: '1.0.0',
+      before: '2.0.0',
+      includePrerelease: false,
+    },
+  ];
   const keys = envelope(
     {
       type: 'starframe-registry-keys',
@@ -255,29 +272,49 @@ export async function registryApi() {
       });
       return;
     }
-    if (url.pathname === '/v1/registry/mods/1') {
+    if (['/v1/registry/mods/1', '/v1/registry/mods/2'].includes(url.pathname)) {
+      const dependency = url.pathname.endsWith('/2');
       json({
         apiVersion: 1,
         data: {
-          listing,
+          listing: dependency
+            ? {
+                ...listing,
+                modId: 2,
+                name: 'Fixture dependency',
+                latestReleaseId: dependencyRelease.release.releaseId,
+              }
+            : listing,
           description:
             'Native fixture description. <script>Safe text.</script>',
           sourceRepository: null,
           media: { iconId: null, screenshotIds: [] },
-          latestRelease: releases[0].release,
+          latestRelease: dependency
+            ? dependencyRelease.release
+            : releases[0].release,
         },
       });
       return;
     }
-    if (url.pathname === '/v1/registry/mods/1/releases') {
+    if (
+      ['/v1/registry/mods/1/releases', '/v1/registry/mods/2/releases'].includes(
+        url.pathname,
+      )
+    ) {
+      const history = url.pathname.includes('/2/')
+        ? [dependencyRelease]
+        : releases;
       json({
         apiVersion: 1,
-        items: releases.map(({ release: { metadata, ...release } }) => ({
+        items: history.map(({ release: { metadata, ...release } }) => ({
           ...release,
           metadataRevision: metadata.revision,
           testedGameBuild: metadata.testedGameBuild,
         })),
-        pagination: pagination(Number(url.searchParams.get('pageSize')), 2),
+        pagination: pagination(
+          Number(url.searchParams.get('pageSize')),
+          history.length,
+        ),
       });
       return;
     }
@@ -289,7 +326,7 @@ export async function registryApi() {
       json(security);
       return;
     }
-    const selected = releases.find(({ release }) =>
+    const selected = [...releases, dependencyRelease].find(({ release }) =>
       url.pathname.startsWith(`/v1/registry/releases/${release.releaseId}`),
     );
     if (selected) {

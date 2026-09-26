@@ -18,6 +18,7 @@ fn main() {
             "registry_release",
             "registry_history",
             "registry_install",
+            "registry_candidates",
             "registry_download",
             "registry_retry_receipts",
             "auth_restore",

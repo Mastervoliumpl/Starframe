@@ -42,6 +42,7 @@ try {
   await withDesktop(
     root,
     async (page) => {
+      await page.setViewportSize({ width: 1024, height: 720 });
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
       await expect(page.getByText('Signed in as Fixture user.')).toBeVisible({
         timeout: 30000,
@@ -92,6 +93,21 @@ try {
           { exact: true },
         ),
       ).toBeVisible();
+      const candidates = await invoke(page, 'registry_candidates', {
+        dependency: {
+          kind: 'range',
+          modId: 1,
+          minimum: '1.0.0',
+          before: '2.0.0',
+          includePrerelease: false,
+        },
+        page: 1,
+      });
+      expect(candidates.suggested.releaseId).toBe(api.releases[1].releaseId);
+      expect(candidates.history.items.map((item) => item.releaseId)).toEqual([
+        api.releases[1].releaseId,
+      ]);
+      expect(await operations(page)).toEqual([]);
       await details.getByRole('button', { name: '1.0.0', exact: true }).click();
       await expect(
         details.getByRole('heading', { name: 'Release 1.0.0', exact: true }),
@@ -168,12 +184,44 @@ try {
         path: resolve('test-results/native/registry-online.png'),
       });
       api.mode('restricted');
+      await details
+        .getByRole('button', { name: 'Back to mods', exact: true })
+        .click();
       await browser
         .getByRole('button', { name: 'Refresh mods', exact: true })
         .click();
       await expect(browser.getByRole('alert')).toContainText(
         /permission|account/i,
       );
+      api.mode('online');
+      await browser
+        .getByRole('button', {
+          name: 'Details for Native registry mod',
+          exact: true,
+        })
+        .click();
+      await details
+        .getByRole('button', {
+          name: 'Find releases for dependency 2',
+          exact: true,
+        })
+        .click();
+      await expect(
+        details.getByRole('heading', {
+          name: 'Fixture dependency',
+          exact: true,
+        }),
+      ).toBeFocused();
+      await expect(
+        details.getByRole('heading', { name: 'Release 1.0.0', exact: true }),
+      ).toBeVisible();
+      await expect(
+        details.getByText(
+          /newest matching available release on this history page/,
+        ),
+      ).toBeVisible();
+      expect((await library(page)).library.length).toBe(2);
+      expect((await operations(page)).length).toBe(2);
       await page
         .getByRole('button', { name: 'Collections', exact: true })
         .click();

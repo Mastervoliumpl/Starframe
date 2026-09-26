@@ -36,3 +36,4 @@ export type Options = { tags: Array<Tag>, gameBuilds: Array<string>, };
 export type ReleaseSummary = { modId: ModId, releaseId: ReleaseId, versionLabel: string, artifact: Artifact, submissionState: 'approved', publicationOrder: PublicationOrder, publishedAt: string, createdAt: string, availability: Availability, security: Security, metadataRevision: number, testedGameBuild: string, };
 export type HistoryEntry = ReleaseSummary | Tombstone;
 export type ReleaseHistory = { apiVersion: 1, items: Array<HistoryEntry>, pagination: Pagination, };
+export type Candidates = { history: ReleaseHistory, suggested: ReleaseResult | null, };

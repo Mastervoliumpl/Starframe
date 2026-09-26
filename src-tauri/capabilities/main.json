@@ -20,6 +20,7 @@
     "allow-registry-release",
     "allow-registry-history",
     "allow-registry-install",
+    "allow-registry-candidates",
     "allow-registry-download",
     "allow-registry-retry-receipts",
     "allow-auth-restore",

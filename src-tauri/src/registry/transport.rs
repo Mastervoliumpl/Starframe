@@ -1650,6 +1650,109 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn dependency_browse_uses_bounded_history_and_checks_full_candidate_plans() {
+        let fixtures: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/registry-installation-v1.json"
+        ))
+        .unwrap();
+        let template = fixtures["releases"][0]["envelope"]["signed"]["release"].clone();
+        let mut releases = Vec::new();
+        for (order, version) in [(4, "2.5.0"), (3, "1.5.0"), (2, "1.2.0"), (1, "1.9.0")] {
+            let mut release = template.clone();
+            release["modId"] = 2.into();
+            release["releaseId"] = uuid::Uuid::new_v4().to_string().into();
+            release["publicationOrder"] = order.into();
+            release["versionLabel"] = version.into();
+            release["metadata"]["dependencies"] = serde_json::json!([]);
+            if order == 3 {
+                release["metadata"]["installation"] = serde_json::Value::Null;
+            }
+            releases.push(release);
+        }
+        let summaries: Vec<_> = releases
+            .iter()
+            .map(|release| {
+                let mut summary = release.clone();
+                summary.as_object_mut().unwrap().remove("metadata");
+                summary["metadataRevision"] = release["metadata"]["revision"].clone();
+                summary["testedGameBuild"] = release["metadata"]["testedGameBuild"].clone();
+                summary
+            })
+            .collect();
+        let history = serde_json::json!({"apiVersion":1,"items":summaries,"pagination":{"page":1,"pageSize":12,"totalItems":4,"totalPages":1,"asOf":"2026-09-24T00:00:00Z"}});
+        for case in 0..3 {
+            let exact = case != 0;
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let origin = format!("http://{}", listener.local_addr().unwrap());
+            let replies: Vec<_> = if exact {
+                vec![
+                    history.clone(),
+                    serde_json::json!({"apiVersion":1,"data":if case == 2 {
+                        serde_json::json!({"modId":2,"releaseId":releases[3]["releaseId"],"sha256":releases[3]["artifact"]["sha256"],"availability":"pruned","securityRevision":1,"updatedAt":"2026-09-24T00:00:00Z"})
+                    } else { releases[3].clone() }}),
+                ]
+            } else {
+                vec![
+                    history.clone(),
+                    serde_json::json!({"apiVersion":1,"data":releases[1]}),
+                    serde_json::json!({"apiVersion":1,"data":releases[2]}),
+                ]
+            };
+            let thread = std::thread::spawn(move || {
+                replies
+                    .into_iter()
+                    .map(|body| {
+                        let (mut stream, _) = listener.accept().unwrap();
+                        let request = read_request(&mut stream);
+                        let body = body.to_string();
+                        write!(
+                            stream,
+                            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                            body.len(),
+                            body
+                        )
+                        .unwrap();
+                        request
+                    })
+                    .collect::<Vec<_>>()
+            });
+            let client = Client::new(
+                Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap(),
+            )
+            .unwrap();
+            let dependency: super::super::Dependency = if exact {
+                serde_json::from_value(serde_json::json!({"kind":"exact","modId":2,"releaseId":releases[3]["releaseId"]})).unwrap()
+            } else {
+                serde_json::from_value(serde_json::json!({"kind":"range","modId":2,"minimum":"1.0.0","before":"2.0.0","includePrerelease":false})).unwrap()
+            };
+            let (_sender, cancel) = watch::channel(false);
+            let result = client
+                .dependency_candidates(&dependency, 1, "fixture-token", cancel)
+                .await
+                .unwrap();
+            let selected = serde_json::to_value(result.suggested.unwrap()).unwrap();
+            assert_eq!(
+                selected["releaseId"],
+                releases[if exact { 3 } else { 2 }]["releaseId"]
+            );
+            assert_eq!(result.history.items.len(), if exact { 1 } else { 3 });
+            if case == 2 {
+                assert_eq!(selected["availability"], "pruned");
+            }
+            let requests = thread.join().unwrap();
+            assert!(
+                requests[0].starts_with("GET /v1/registry/mods/2/releases?page=1&pageSize=12 ")
+            );
+            assert!(
+                requests
+                    .iter()
+                    .all(|request| request.contains("fixture-token"))
+            );
+            assert_eq!(requests.len(), if exact { 2 } else { 3 });
+        }
+    }
+
+    #[tokio::test]
     async fn discovery_options_and_history_validate_bounds_identity_and_order() {
         let good_options = serde_json::json!({"apiVersion":1,"data":{"tags":[{"id":"lua","label":"Lua","groupName":"Format"}],"gameBuilds":["Steam:123"]}});
         for case in 0..5 {

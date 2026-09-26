@@ -319,6 +319,25 @@ pub async fn registry_history(
 }
 
 #[tauri::command]
+pub async fn registry_candidates(
+    auth: State<'_, crate::auth_service::AuthService>,
+    dependency: starframe::registry::Dependency,
+    page: u64,
+) -> Result<starframe::registry::Candidates, CommandError> {
+    let connection = auth.receipt_request().await?;
+    connection
+        .client
+        .dependency_candidates(
+            &dependency,
+            page,
+            &connection.bearer,
+            connection.auth_cancel,
+        )
+        .await
+        .map_err(registry_failure)
+}
+
+#[tauri::command]
 pub async fn registry_install(
     service: State<'_, crate::game_service::GameService>,
     auth: State<'_, crate::auth_service::AuthService>,

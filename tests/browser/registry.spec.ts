@@ -1,5 +1,55 @@
 import { expect, test } from '@playwright/test';
 
+test('dependency browsing suggests a matching exact choice and preserves explicit install and Back focus', async ({
+  page,
+}) => {
+  await page.goto('/?fixture&mods&registry');
+  await page.getByRole('button', { name: 'Mods', exact: true }).click();
+  const browser = page.getByRole('region', { name: 'Mods', exact: true });
+  const trigger = browser.getByRole('button', {
+    name: 'Details for Mod fixture 1',
+    exact: true,
+  });
+  await trigger.click();
+  const details = browser.getByRole('region', {
+    name: 'Mod details',
+    exact: true,
+  });
+  await details
+    .getByRole('button', {
+      name: 'Find releases for dependency 2',
+      exact: true,
+    })
+    .click();
+  await expect(
+    details.getByRole('heading', { name: 'Mod fixture 2', exact: true }),
+  ).toBeFocused();
+  await expect(
+    details.getByRole('heading', { name: 'Release 1.0.0', exact: true }),
+  ).toBeVisible();
+  await expect(
+    details.getByText(/newest matching available release on this history page/),
+  ).toBeVisible();
+  await expect(
+    details.getByRole('button', { name: '2.0.0', exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    details.getByRole('button', { name: 'Install this release', exact: true }),
+  ).toBeEnabled();
+  await details
+    .getByRole('button', { name: 'Show all releases', exact: true })
+    .click();
+  await expect(
+    details.getByRole('heading', { name: 'Release 2.0.0', exact: true }),
+  ).toBeVisible();
+  await details
+    .getByRole('button', { name: 'Back to mods', exact: true })
+    .click();
+  await expect(trigger).toBeFocused();
+  await page.getByRole('button', { name: 'Downloads', exact: true }).click();
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
+});
+
 test('sign-out and registry failures preserve installed and local management', async ({
   page,
 }) => {
