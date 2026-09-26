@@ -1,6 +1,7 @@
 mod auth;
 #[cfg(windows)]
 mod credential;
+pub mod installation;
 mod transport;
 pub mod trust;
 mod wire;

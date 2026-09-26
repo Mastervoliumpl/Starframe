@@ -342,6 +342,8 @@ pub struct Metadata {
     pub release_notes: String,
     pub dependencies: Vec<Dependency>,
     pub dependency_problems: Vec<DependencyProblem>,
+    #[serde(default)]
+    pub installation: Option<super::installation::Installation>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -408,6 +410,11 @@ impl ReleaseResult {
                     && release.metadata.release_notes.len() <= 20_000
                     && release.metadata.dependencies.len() <= 100
                     && release.metadata.dependency_problems.len() <= 100
+                    && release
+                        .metadata
+                        .installation
+                        .as_ref()
+                        .is_none_or(|plan| plan.valid())
                     && release
                         .security
                         .reason

@@ -460,7 +460,7 @@ pub fn verify_release(
     let payload: ReleasePayload =
         serde_json::from_value(signed.clone()).map_err(|_| "Invalid release manifest")?;
     if payload.kind != "starframe-release"
-        || payload.schema_version != 1
+        || ![1, 2].contains(&payload.schema_version)
         || !(1..=MAX_SAFE_INTEGER).contains(&payload.revision)
         || payload.security_revision != security.revision
         || !payload.release.valid()
@@ -475,6 +475,9 @@ pub fn verify_release(
     )?;
     let (mod_id, release_id, reported_block) = match &payload.release {
         super::ReleaseResult::Release(release) => {
+            if (payload.schema_version == 2) != release.metadata.installation.is_some() {
+                return Err("Release schema and installation declaration do not match");
+            }
             if release.security.revision > security.revision {
                 return Err("Invalid manifest security revision");
             }
@@ -685,6 +688,93 @@ mod tests {
             blocked.reported_block.unwrap().sha256.as_str(),
             "c".repeat(64)
         );
+    }
+
+    #[test]
+    fn website_schema_two_signs_each_installation_and_rejects_missing_or_changed_plans() {
+        let fixtures: Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/registry-installation-v1.json"
+        ))
+        .unwrap();
+        let old: Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/registry-keys-v1.json"
+        ))
+        .unwrap();
+        let root: [u8; 32] = decode64(old["rootPublicKey"].as_str().unwrap(), 32)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let now = OffsetDateTime::parse("2026-09-24T12:00:00Z", &Rfc3339).unwrap();
+        let keys = verify_keys(&serde_json::to_vec(&old["envelope"]).unwrap(), &root, now).unwrap();
+        let security = verify_security(
+            &serde_json::to_vec(&old["securityEnvelope"]).unwrap(),
+            &keys,
+            now,
+        )
+        .unwrap();
+        let online = Ed25519KeyPair::from_seed_unchecked(&[9u8; 32]).unwrap();
+        let mod_id = super::super::ModId::try_from(1).unwrap();
+        let release_id = super::super::ReleaseId(
+            uuid::Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap(),
+        );
+        let check = |envelope: &Value| {
+            verify_release(
+                &serde_json::to_vec(envelope).unwrap(),
+                &keys,
+                &security,
+                mod_id,
+                release_id,
+                now,
+            )
+        };
+        let sign = |envelope: &mut Value| {
+            envelope["signatures"][0]["signature"] = STANDARD
+                .encode(
+                    online
+                        .sign(canonical_text(&envelope["signed"]).unwrap().as_bytes())
+                        .as_ref(),
+                )
+                .into();
+        };
+        for example in fixtures["releases"].as_array().unwrap() {
+            let envelope = &example["envelope"];
+            let verified = check(envelope).unwrap();
+            assert_eq!(verified.canonical, example["canonical"].as_str().unwrap());
+            let super::super::ReleaseResult::Release(release) = verified.release else {
+                panic!("full fixture")
+            };
+            assert!(release.metadata.installation.unwrap().valid());
+
+            let mut changed = envelope.clone();
+            changed["signed"]["release"]["metadata"]["installation"]["schemaVersion"] = 2.into();
+            sign(&mut changed);
+            assert!(check(&changed).is_err());
+            let mut changed = envelope.clone();
+            changed["signed"]["release"]["metadata"]["installation"] = Value::Null;
+            sign(&mut changed);
+            assert!(check(&changed).is_err());
+            changed["signed"]["release"]["metadata"]
+                .as_object_mut()
+                .unwrap()
+                .remove("installation");
+            sign(&mut changed);
+            assert!(check(&changed).is_err());
+            for version in [1, 3] {
+                let mut changed = envelope.clone();
+                changed["signed"]["schemaVersion"] = version.into();
+                sign(&mut changed);
+                assert!(check(&changed).is_err());
+            }
+            let mut changed = envelope.clone();
+            changed["signed"]["release"]["metadata"]["installation"] =
+                fixtures["cases"]["valid"][0]["plan"].clone();
+            if changed != *envelope {
+                assert!(
+                    check(&changed).is_err(),
+                    "unsigned replacement plan accepted"
+                );
+            }
+        }
     }
 
     #[test]

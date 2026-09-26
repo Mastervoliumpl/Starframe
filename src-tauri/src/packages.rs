@@ -29,7 +29,7 @@ mod tests;
 mod transfer;
 pub mod watch;
 use archive::*;
-pub(crate) use archive::{layout, supported_files};
+pub(crate) use archive::{layout, lua_path, supported_files};
 use artifacts::*;
 pub(crate) use artifacts::{Directory, remove_artifact, verify_artifact};
 
