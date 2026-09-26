@@ -23,6 +23,29 @@ pub(crate) fn verify_artifact(store: &Storage, reference: &ModReference) -> Resu
     Ok(prepared)
 }
 
+pub(crate) fn verify_registry_artifact(
+    store: &Storage,
+    entry: &crate::storage::RegistryLibraryEntry,
+) -> Result<Prepared> {
+    let hash = entry.reference.sha256.as_str();
+    store
+        .require_registry_unblocked_hash(hash)
+        .map_err(|error| error.to_string())?;
+    let prepared = store
+        .prepared_artifact(hash)
+        .map_err(|error| error.to_string())?
+        .ok_or("The exact registry release has no verified file inventory. Install it again.")?;
+    entry.installation.validate_files(&prepared.files)?;
+    let mut directory = Directory::open(store.package_root())?;
+    verify_existing(
+        &mut directory,
+        &store.package_root().join("artifacts").join(hash),
+        &prepared,
+        &Cancel::default(),
+    )?;
+    Ok(prepared)
+}
+
 pub(crate) fn remove_artifact(store: &Storage, hash: &str) -> Result<()> {
     if store
         .load()

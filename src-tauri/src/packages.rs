@@ -33,7 +33,7 @@ pub mod watch;
 use archive::*;
 pub(crate) use archive::{layout, lua_path, supported_files};
 use artifacts::*;
-pub(crate) use artifacts::{Directory, remove_artifact, verify_artifact};
+pub(crate) use artifacts::{Directory, remove_artifact, verify_artifact, verify_registry_artifact};
 
 type Result<T> = std::result::Result<T, String>;
 const MAX_ENTRIES: usize = 4096;

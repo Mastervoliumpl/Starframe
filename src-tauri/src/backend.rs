@@ -120,6 +120,7 @@ pub fn prepare(
                 game,
                 resources,
                 activation,
+                &[],
                 cancelled,
             )
             .map(|_| ())

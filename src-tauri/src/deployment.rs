@@ -14,6 +14,7 @@ use std::{
 use uuid::Uuid;
 
 mod content;
+mod registry;
 #[cfg(test)]
 mod stream_tests;
 pub(crate) use content::Source;
@@ -697,6 +698,7 @@ pub fn prepare_desktop(
     game: &game::Installation,
     resources: &Path,
     activation: &serde_json::Value,
+    registry_content: &[crate::registry::ExactReference],
     cancelled: &impl Fn() -> bool,
 ) -> Result<usize> {
     crate::runtime_contract::read(
@@ -723,6 +725,7 @@ pub fn prepare_desktop(
         .map(|(path, bytes)| (path, Source::Bytes(bytes)))
         .collect();
     files.extend(crate::mods::payload(store, activation)?);
+    files.extend(registry::payload(store, registry_content)?);
     let mut guard = || {
         if cancelled() {
             return Err("Starframe is closing. Preparation stopped at a safe boundary.".into());
