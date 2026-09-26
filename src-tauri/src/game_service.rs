@@ -36,6 +36,10 @@ enum Request {
         starframe::sharing::Action,
         tokio::sync::oneshot::Sender<Result<starframe::sharing::Reply, String>>,
     ),
+    SharedRegistry(
+        starframe::sharing::OnlineAction,
+        tokio::sync::oneshot::Sender<Result<starframe::sharing::OnlineReply, String>>,
+    ),
     Mod(
         starframe::mods::Action,
         tokio::sync::oneshot::Sender<Result<starframe::mods::View, String>>,
@@ -60,12 +64,35 @@ enum Request {
     Select(String),
     Picked(Result<Option<PathBuf>, String>),
 }
+#[derive(Clone)]
 pub struct GameService {
     sender: SyncSender<Request>,
     busy: Arc<AtomicBool>,
     writing: Arc<AtomicBool>,
 }
 impl GameService {
+    pub async fn shared_registry(
+        &self,
+        action: starframe::sharing::OnlineAction,
+    ) -> Result<starframe::sharing::OnlineReply, CommandError> {
+        let (reply, result) = tokio::sync::oneshot::channel();
+        let sender = self.sender.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            sender.send(Request::SharedRegistry(action, reply))
+        })
+        .await
+        .map_err(|_| CommandError::new("sharing_unavailable", "The collection worker stopped."))?
+        .map_err(|_| CommandError::new("sharing_unavailable", "The collection worker stopped."))?;
+        result
+            .await
+            .map_err(|_| {
+                CommandError::new(
+                    "sharing_unavailable",
+                    "Collection sharing is unavailable. Restart Starframe.",
+                )
+            })?
+            .map_err(|message| CommandError::new("sharing_failed", &message))
+    }
     pub async fn update(&self, action: starframe::updates::Action) -> Result<(), CommandError> {
         let (reply, result) = tokio::sync::oneshot::channel();
         self.sender

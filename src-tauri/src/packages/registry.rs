@@ -193,6 +193,51 @@ fn network_error(error: RegistryError) -> String {
     }
 }
 
+impl super::RegistryApproval {
+    pub async fn fetch(request: &RegistryRequest) -> Result<Self> {
+        if *request.auth_cancel.borrow() {
+            return Err("Sign-in changed before the release could be checked.".into());
+        }
+        let (keys, security, release, detail) = tokio::try_join!(
+            request
+                .client
+                .registry_keys(&request.bearer, request.auth_cancel.clone()),
+            request
+                .client
+                .registry_security(&request.bearer, request.auth_cancel.clone()),
+            request.client.registry_manifest(
+                request.release_id,
+                &request.bearer,
+                request.auth_cancel.clone()
+            ),
+            request
+                .client
+                .mod_detail(request.mod_id, &request.bearer, request.auth_cancel.clone()),
+        )
+        .map_err(network_error)?;
+        let crate::registry::ModResult::Mod(detail) = detail.data else {
+            return Err("This registry listing is no longer available.".into());
+        };
+        let display = crate::storage::RegistryDisplay {
+            name: detail.listing.name,
+            author: detail
+                .listing
+                .owner
+                .map(|owner| owner.display_name)
+                .unwrap_or_default(),
+        };
+        if !display.valid() {
+            return Err("The registry display metadata is invalid.".into());
+        }
+        Ok(Self {
+            keys,
+            security,
+            release,
+            display,
+        })
+    }
+}
+
 impl Packages {
     pub(crate) fn verify_registry_installed(
         &mut self,
@@ -706,7 +751,11 @@ impl Packages {
                 }
                 RegistryEvent::Promoted(result) => match result {
                     Ok(current) => {
-                        active.operation.status = Status::Completed;
+                        active.operation.status = if active.install.is_some() {
+                            Status::Preparing
+                        } else {
+                            Status::Completed
+                        };
                         active.operation.message =
                             "Archive verified and saved. Download receipt pending; retry when signed in. Installation remains pending."
                                 .into();
@@ -1040,7 +1089,15 @@ mod tests {
             zip.write_all(bytes).unwrap();
         }
         let archive = zip.finish().unwrap().into_inner();
-        let (root_public, mod_id, release_id, identity) = declared_store(&mut store, &archive);
+        let fixture_root = tempfile::tempdir().unwrap();
+        let mut fixture_store = Storage::open(fixture_root.path()).unwrap();
+        let (root_public, mod_id, release_id, identity) =
+            declared_store(&mut fixture_store, &archive);
+        let manifest = fixture_store
+            .registry_document(&format!("release:{}", release_id.0))
+            .unwrap()
+            .unwrap();
+        let signed: serde_json::Value = serde_json::from_slice(&manifest).unwrap();
         let session_fixtures: serde_json::Value =
             serde_json::from_str(include_str!("../../../tests/fixtures/registry-v1.json")).unwrap();
         let mut session = session_fixtures
@@ -1055,7 +1112,31 @@ mod tests {
             .unwrap()
             .into();
         let session: Session = serde_json::from_value(session).unwrap();
-        let (origin, thread) = serve_download(&identity, &archive, &session, Some(true));
+        let mut listing = session_fixtures
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|value| value["name"] == "list")
+            .unwrap()["body"]["items"][0]
+            .clone();
+        listing["modType"] = "map".into();
+        listing["name"] = "Fixture map".into();
+        listing["owner"]["displayName"] = "Fixture author".into();
+        let approval_responses = std::collections::HashMap::from([
+            ("/v1/registry/keys".to_owned(), fixture_store.registry_document("keys").unwrap().unwrap()),
+            ("/v1/registry/security".to_owned(), fixture_store.registry_document("security").unwrap().unwrap()),
+            (format!("/v1/registry/releases/{}/manifest", release_id.0), manifest),
+            ("/v1/registry/mods/1".to_owned(), serde_json::to_vec(&serde_json::json!({"apiVersion":1,"data":{
+                "listing":listing,"description":"Inert fixture","sourceRepository":null,"media":{"iconId":null,"screenshotIds":[]},"latestRelease":signed["signed"]["release"]
+            }})).unwrap()),
+        ]);
+        let (origin, thread) = serve_download(
+            &identity,
+            &archive,
+            &session,
+            Some(true),
+            Some(approval_responses),
+        );
         let client = Client::new(
             crate::registry::Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true)
                 .unwrap(),
@@ -1067,23 +1148,109 @@ mod tests {
             author: "Fixture author".into(),
         };
         let mut queue = Packages::open(&mut store).unwrap();
-        let started = crate::backend::registry_install_action(
+        let request = RegistryRequest {
+            mod_id,
+            release_id,
+            root_public,
+            client: client.clone(),
+            session: session.clone(),
+            bearer: "fixture-token".into(),
+            auth_cancel: auth_cancel.clone(),
+        };
+        let document = crate::sharing::Portable {
+            format: "starframe-collection".into(),
+            schema_version: 2,
+            name: "Missing declared map".into(),
+            entries: vec![crate::references::Reference::Registry(
+                identity.reference.clone(),
+            )],
+        };
+        let expected_revision = store.load().unwrap().revision.to_string();
+        let id = crate::sharing::action(
+            &mut store,
+            crate::sharing::Action::Accept {
+                text: serde_json::to_string(&document).unwrap(),
+                request_id: Uuid::new_v4().to_string(),
+                expected_revision,
+            },
+        )
+        .unwrap()
+        .collection_id
+        .unwrap();
+        let planned = crate::sharing::online_action(
             &mut store,
             &mut queue,
-            &Uuid::new_v4().to_string(),
-            RegistryRequest {
-                mod_id,
-                release_id,
-                root_public,
-                client: client.clone(),
-                session: session.clone(),
-                bearer: "fixture-token".into(),
-                auth_cancel: auth_cancel.clone(),
-            },
-            display.clone(),
+            crate::sharing::OnlineAction::Plan { id: id.clone() },
         )
         .unwrap();
-        let operation_id = started[0].id.clone();
+        assert!(
+            matches!(planned, crate::sharing::OnlineReply::Plan(ref missing) if missing == std::slice::from_ref(&identity.reference))
+        );
+        let approval = super::super::RegistryApproval::fetch(&request)
+            .await
+            .unwrap();
+        assert_eq!(approval.display, display);
+        let mut wrong = identity.reference.clone();
+        wrong.sha256 = crate::registry::Sha256::try_from("ab".repeat(32)).unwrap();
+        assert!(
+            crate::backend::approved_registry_install(
+                &mut store,
+                &mut queue,
+                &Uuid::new_v4().to_string(),
+                &wrong,
+                request.clone(),
+                approval.clone()
+            )
+            .unwrap_err()
+            .contains("No replacement")
+        );
+        assert!(store.package_operations().unwrap().is_empty());
+        let mut tampered = approval.clone();
+        let mut envelope: serde_json::Value = serde_json::from_slice(&tampered.release).unwrap();
+        envelope["signed"]["release"]["versionLabel"] = "tampered".into();
+        tampered.release = serde_json::to_vec(&envelope).unwrap();
+        assert!(
+            crate::backend::approved_registry_install(
+                &mut store,
+                &mut queue,
+                &Uuid::new_v4().to_string(),
+                &identity.reference,
+                request.clone(),
+                tampered
+            )
+            .is_err()
+        );
+        assert!(store.package_operations().unwrap().is_empty());
+        let mut cancelled = request.clone();
+        let (_cancel_sender, auth_cancelled) = watch::channel(true);
+        cancelled.auth_cancel = auth_cancelled;
+        assert!(
+            crate::backend::approved_registry_install(
+                &mut store,
+                &mut queue,
+                &Uuid::new_v4().to_string(),
+                &identity.reference,
+                cancelled,
+                approval.clone()
+            )
+            .is_err()
+        );
+        assert!(store.package_operations().unwrap().is_empty());
+        let started = crate::sharing::online_action(
+            &mut store,
+            &mut queue,
+            crate::sharing::OnlineAction::Install {
+                id: id.clone(),
+                reference: identity.reference.clone(),
+                request: Box::new(request),
+                approval: Box::new(approval),
+            },
+        )
+        .unwrap();
+        let crate::sharing::OnlineReply::Install(Some(started)) = started else {
+            panic!("install must start");
+        };
+        let operation_id = started.id.clone();
         for _ in 0..150 {
             crate::backend::poll_packages(&mut store, &mut queue).unwrap();
             if !queue.busy() {
@@ -1117,7 +1284,15 @@ mod tests {
                 .unwrap()
                 .is_some()
         );
-        assert_eq!(thread.join().unwrap().len(), 4);
+        assert_eq!(thread.join().unwrap().len(), 8);
+        assert_eq!(
+            store.collection_imports().unwrap()[0].entries[0].status,
+            crate::sharing::Status::Ready
+        );
+        assert_eq!(
+            store.load().unwrap().collections[0].entries,
+            document.entries
+        );
         assert!(super::super::remove_artifact(&store, identity.reference.sha256.as_str()).is_err());
         drop(queue);
         drop(store);
@@ -1189,6 +1364,7 @@ mod tests {
         archive: &[u8],
         session: &Session,
         receipt_ok: Option<bool>,
+        approval: Option<std::collections::HashMap<String, Vec<u8>>>,
     ) -> (String, thread::JoinHandle<Vec<String>>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let origin = format!("http://{}", listener.local_addr().unwrap());
@@ -1202,6 +1378,29 @@ mod tests {
         let session = session.clone();
         let thread = thread::spawn(move || {
             let mut paths = Vec::new();
+            if let Some(mut approval) = approval {
+                for _ in 0..4 {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    let incoming = request(&mut stream);
+                    assert!(
+                        incoming
+                            .to_ascii_lowercase()
+                            .contains("authorization: bearer fixture-token")
+                    );
+                    let path = incoming
+                        .lines()
+                        .next()
+                        .unwrap()
+                        .split_whitespace()
+                        .nth(1)
+                        .unwrap();
+                    let body = approval.remove(path).unwrap();
+                    paths.push(incoming.lines().next().unwrap().to_owned());
+                    write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len()).unwrap();
+                    stream.write_all(&body).unwrap();
+                }
+                assert!(approval.is_empty());
+            }
             for step in 0..if receipt_ok.is_some() { 4 } else { 3 } {
                 let (mut stream, _) = listener.accept().unwrap();
                 let incoming = request(&mut stream);
@@ -1308,7 +1507,7 @@ mod tests {
             .into();
         let session: Session = serde_json::from_value(session).unwrap();
         let account = session.account_id;
-        let (origin, thread) = serve_download(&identity, archive, &session, Some(true));
+        let (origin, thread) = serve_download(&identity, archive, &session, Some(true), None);
         let client = Client::new(
             crate::registry::Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true)
                 .unwrap(),
@@ -1452,7 +1651,7 @@ mod tests {
             .unwrap()
             .into();
         let session: Session = serde_json::from_value(session).unwrap();
-        let (origin, thread) = serve_download(&identity, archive, &session, Some(false));
+        let (origin, thread) = serve_download(&identity, archive, &session, Some(false), None);
         let client = Client::new(
             crate::registry::Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true)
                 .unwrap(),
@@ -1722,7 +1921,7 @@ mod tests {
             .unwrap()
             .into();
         let session: Session = serde_json::from_value(session).unwrap();
-        let (origin, server) = serve_download(&identity, archive, &session, None);
+        let (origin, server) = serve_download(&identity, archive, &session, None, None);
         let client = Client::new(
             crate::registry::Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true)
                 .unwrap(),
@@ -1835,7 +2034,7 @@ mod tests {
             account_id: Uuid::new_v4(),
             ..session.clone()
         };
-        let (origin, server) = serve_download(&identity, archive, &other, None);
+        let (origin, server) = serve_download(&identity, archive, &other, None, None);
         let client = Client::new(
             crate::registry::Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true)
                 .unwrap(),

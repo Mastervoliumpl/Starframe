@@ -333,6 +333,109 @@ fn collection_documents_reject_legacy_ambiguous_and_untrusted_fields() {
 }
 
 #[test]
+fn missing_shared_registry_work_is_scoped_idempotent_and_recoverable() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut store = Storage::open(temp.path()).unwrap();
+    let installed = Reference::Registry(fixture_registry(&mut store, 0, 1, &[]));
+    let missing = crate::registry::ExactReference {
+        mod_id: crate::registry::ModId::try_from(2).unwrap(),
+        release_id: crate::registry::ReleaseId(Uuid::new_v4()),
+        sha256: crate::registry::Sha256::try_from("ab".repeat(32)).unwrap(),
+    };
+    let local = Reference::Local(crate::references::LocalReference {
+        mod_id: "fixture.missing".into(),
+        sha256: crate::registry::Sha256::try_from("cd".repeat(32)).unwrap(),
+    });
+    let document = sharing::Portable {
+        format: "starframe-collection".into(),
+        schema_version: 2,
+        name: "Mixed missing content".into(),
+        entries: vec![
+            installed.clone(),
+            Reference::Registry(missing.clone()),
+            local.clone(),
+        ],
+    };
+    let mut queue = packages::Packages::open(&mut store).unwrap();
+    let expected_revision = store.load().unwrap().revision.to_string();
+    let id = sharing::action(
+        &mut store,
+        sharing::Action::Accept {
+            text: serde_json::to_string(&document).unwrap(),
+            request_id: Uuid::new_v4().to_string(),
+            expected_revision,
+        },
+    )
+    .unwrap()
+    .collection_id
+    .unwrap();
+    let planned = sharing::online_action(
+        &mut store,
+        &mut queue,
+        sharing::OnlineAction::Plan { id: id.clone() },
+    )
+    .unwrap();
+    assert!(
+        matches!(planned, sharing::OnlineReply::Plan(ref entries) if entries == std::slice::from_ref(&missing))
+    );
+    assert!(
+        matches!(sharing::online_action(&mut store, &mut queue, sharing::OnlineAction::Plan { id:id.clone() }).unwrap(), sharing::OnlineReply::Plan(ref entries) if entries.is_empty())
+    );
+    for _ in 0..50 {
+        queue.poll(&mut store).unwrap();
+        sharing::poll(&mut store, &mut queue).unwrap();
+        if store.collection_imports().unwrap()[0].entries[0].status == sharing::Status::Ready {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    sharing::online_action(
+        &mut store,
+        &mut queue,
+        sharing::OnlineAction::Fail {
+            id: id.clone(),
+            reference: missing.clone(),
+            message: "Sign in to download this exact release.".into(),
+        },
+    )
+    .unwrap();
+    let entries = &store.collection_imports().unwrap()[0].entries;
+    assert_eq!(entries[0].status, sharing::Status::Ready);
+    assert_eq!(entries[1].status, sharing::Status::Unresolved);
+    assert!(entries[1].message.contains("Sign in"));
+    assert_eq!(entries[2].status, sharing::Status::Unresolved);
+    assert!(entries[2].message.contains("Local-only"));
+    assert_eq!(
+        store.load().unwrap().collections[0].entries,
+        document.entries
+    );
+    sharing::action(&mut store, sharing::Action::Retry { id: id.clone() }).unwrap();
+    sharing::online_action(
+        &mut store,
+        &mut queue,
+        sharing::OnlineAction::Plan { id: id.clone() },
+    )
+    .unwrap();
+    drop(queue);
+    drop(store);
+    let mut store = Storage::open(temp.path()).unwrap();
+    let _queue = packages::Packages::open(&mut store).unwrap();
+    assert_eq!(
+        store.collection_imports().unwrap()[0].entries[1].status,
+        sharing::Status::Unresolved
+    );
+    assert!(
+        store.collection_imports().unwrap()[0].entries[1]
+            .message
+            .contains("stopped")
+    );
+    assert_eq!(
+        store.load().unwrap().collections[0].entries,
+        document.entries
+    );
+}
+
+#[test]
 fn confirmed_uninstall_keeps_other_refs_and_rolls_back_on_storage_failure() {
     let temp = tempfile::tempdir().unwrap();
     let mut store = Storage::open(&temp.path().join("data")).unwrap();

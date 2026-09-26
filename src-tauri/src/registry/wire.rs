@@ -21,6 +21,14 @@ fn positive_u64<'de, D: serde::Deserializer<'de>>(input: D) -> Result<u64, D::Er
     }
 }
 
+fn required_option<'de, D, T>(input: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::deserialize(input)
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(try_from = "u8")]
 pub struct ApiVersion;
@@ -230,6 +238,8 @@ pub enum Capability {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ModSummary {
     pub mod_id: ModId,
+    #[serde(deserialize_with = "required_option")]
+    pub mod_type: Option<ModType>,
     pub name: String,
     pub summary: String,
     pub owner: Option<Profile>,
@@ -240,6 +250,10 @@ pub struct ModSummary {
     pub latest_release_id: Option<ReleaseId>,
     #[serde(deserialize_with = "safe_u64")]
     pub downloads: u64,
+    #[serde(deserialize_with = "safe_u64")]
+    pub likes: u64,
+    #[serde(deserialize_with = "required_option")]
+    pub archive_bytes: Option<u64>,
     pub icon_id: Option<ReleaseId>,
     pub published_at: Option<String>,
     pub latest_availability: Option<Availability>,
@@ -259,9 +273,92 @@ impl ModSummary {
                 == self.tags.len()
             && self.updated_at.ends_with('Z')
             && self
+                .archive_bytes
+                .is_none_or(|bytes| (1..=super::MAX_SAFE_INTEGER).contains(&bytes))
+            && self
                 .owner
                 .as_ref()
                 .is_none_or(|owner| (1..=120).contains(&owner.display_name.len()))
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModType {
+    Code,
+    Map,
+    Ai,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ModMedia {
+    #[serde(deserialize_with = "required_option")]
+    pub icon_id: Option<ReleaseId>,
+    pub screenshot_ids: Vec<ReleaseId>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ModDetail {
+    pub listing: ModSummary,
+    pub description: String,
+    #[serde(deserialize_with = "required_option")]
+    pub source_repository: Option<String>,
+    pub media: ModMedia,
+    pub latest_release: ReleaseResult,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged)]
+pub enum ModResult {
+    Mod(Box<ModDetail>),
+    Tombstone(Tombstone),
+}
+
+impl ModResult {
+    pub(super) fn valid(&self, expected: ModId) -> bool {
+        match self {
+            Self::Mod(detail) => {
+                detail.listing.mod_id == expected
+                    && detail.listing.valid()
+                    && detail.description.len() <= 20_000
+                    && detail.media.screenshot_ids.len() <= 10
+                    && detail
+                        .media
+                        .screenshot_ids
+                        .iter()
+                        .collect::<std::collections::HashSet<_>>()
+                        .len()
+                        == detail.media.screenshot_ids.len()
+                    && detail.latest_release.valid()
+                    && match &detail.latest_release {
+                        ReleaseResult::Release(release) => {
+                            release.mod_id == expected
+                                && Some(release.release_id) == detail.listing.latest_release_id
+                        }
+                        ReleaseResult::Tombstone(release) => {
+                            release.mod_id == expected
+                                && Some(release.release_id) == detail.listing.latest_release_id
+                        }
+                    }
+                    && detail.source_repository.as_ref().is_none_or(|source| {
+                        source.len() <= 2048
+                            && reqwest::Url::parse(source).is_ok_and(|url| {
+                                url.scheme() == "https"
+                                    && url.host_str() == Some("github.com")
+                                    && url.username().is_empty()
+                                    && url.password().is_none()
+                                    && url.query().is_none()
+                                    && url.fragment().is_none()
+                                    && url.path().trim_matches('/').split('/').count() == 2
+                            })
+                    })
+            }
+            Self::Tombstone(tombstone) => {
+                tombstone.mod_id == expected && ReleaseResult::Tombstone(tombstone.clone()).valid()
+            }
+        }
     }
 }
 

@@ -90,9 +90,84 @@ pub async fn save_collection_file(
 #[tauri::command]
 pub async fn sharing_action(
     service: State<'_, crate::game_service::GameService>,
+    auth: State<'_, crate::auth_service::AuthService>,
     action: starframe::sharing::Action,
 ) -> Result<starframe::sharing::Reply, CommandError> {
-    service.sharing(action).await
+    let online = matches!(
+        action,
+        starframe::sharing::Action::Accept { .. } | starframe::sharing::Action::Retry { .. }
+    );
+    let reply = service.sharing(action).await?;
+    if online && let Some(id) = reply.collection_id.clone() {
+        use starframe::sharing::{OnlineAction, OnlineReply};
+        if let OnlineReply::Plan(missing) = service
+            .shared_registry(OnlineAction::Plan { id: id.clone() })
+            .await?
+            && let Some(first) = missing.first()
+        {
+            let request = auth.registry_request(first.mod_id, first.release_id).await;
+            match request {
+                Ok(request) => {
+                    let service = service.inner().clone();
+                    tauri::async_runtime::spawn(async move {
+                        for reference in missing {
+                            let mut request = request.clone();
+                            request.mod_id = reference.mod_id;
+                            request.release_id = reference.release_id;
+                            let outcome = async {
+                                let approval =
+                                    starframe::packages::RegistryApproval::fetch(&request).await?;
+                                loop {
+                                    let reply = service
+                                        .shared_registry(OnlineAction::Install {
+                                            id: id.clone(),
+                                            reference: reference.clone(),
+                                            request: Box::new(request.clone()),
+                                            approval: Box::new(approval.clone()),
+                                        })
+                                        .await
+                                        .map_err(|error| error.message)?;
+                                    if matches!(reply, OnlineReply::Install(Some(_))) {
+                                        break;
+                                    }
+                                    if *request.auth_cancel.borrow() {
+                                        return Err(
+                                            "Sign-in changed. Retry import after signing in."
+                                                .into(),
+                                        );
+                                    }
+                                    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                                }
+                                Ok::<_, String>(())
+                            }
+                            .await;
+                            if let Err(message) = outcome {
+                                let _ = service
+                                    .shared_registry(OnlineAction::Fail {
+                                        id: id.clone(),
+                                        reference,
+                                        message,
+                                    })
+                                    .await;
+                            }
+                        }
+                    });
+                }
+                Err(error) => {
+                    for reference in missing {
+                        service
+                            .shared_registry(OnlineAction::Fail {
+                                id: id.clone(),
+                                reference,
+                                message: error.message.clone(),
+                            })
+                            .await?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(reply)
 }
 
 #[tauri::command]

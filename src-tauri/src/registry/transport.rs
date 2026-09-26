@@ -348,6 +348,25 @@ impl Client {
         Ok(result)
     }
 
+    pub async fn mod_detail(
+        &self,
+        mod_id: super::ModId,
+        bearer: &str,
+        cancel: watch::Receiver<bool>,
+    ) -> Result<ApiResponse<super::ModResult>, Error> {
+        let result: ApiResponse<super::ModResult> = self
+            .get(
+                &format!("/registry/mods/{}", u64::from(mod_id)),
+                Some(bearer),
+                cancel,
+            )
+            .await?;
+        if !result.data.valid(mod_id) {
+            return Err(Error::Protocol);
+        }
+        Ok(result)
+    }
+
     pub async fn registry_keys(
         &self,
         bearer: &str,
@@ -1607,6 +1626,52 @@ mod tests {
             client.list_mods(&invalid, "fixture-token", cancel).await,
             Err(Error::InvalidQuery)
         ));
+    }
+
+    #[tokio::test]
+    async fn mod_detail_binds_identity_and_rejects_invalid_display_shapes() {
+        let list: serde_json::Value = serde_json::from_str(&fixture("list")).unwrap();
+        let release: serde_json::Value = serde_json::from_str(&fixture("approved")).unwrap();
+        let body = serde_json::json!({"apiVersion":1,"data":{"listing":list["items"][0],"description":"Fixture detail","sourceRepository":null,"media":{"iconId":null,"screenshotIds":[]},"latestRelease":release["data"]}});
+        let id = super::super::ModId::try_from(1).unwrap();
+        for case in 0..7 {
+            let mut response = body.clone();
+            match case {
+                1 => response["data"]["listing"]["modId"] = 2.into(),
+                2 => response["data"]["latestRelease"]["modId"] = 2.into(),
+                3 => response["data"]["description"] = "x".repeat(20_001).into(),
+                4 => response["data"]["sourceRepository"] = "https://example.invalid/source".into(),
+                5 => response["data"]["listing"]["archiveBytes"] = 0.into(),
+                6 => {
+                    response["data"]["listing"]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("modType");
+                }
+                _ => (),
+            }
+            let (origin, thread) = serve("200 OK", &response.to_string(), "");
+            let client = Client::new(
+                Config::new(&format!("{origin}/v1"), &format!("{origin}/"), true).unwrap(),
+            )
+            .unwrap();
+            let (_sender, cancel) = watch::channel(false);
+            let outcome = client.mod_detail(id, "fixture-token", cancel).await;
+            if case == 0 {
+                assert!(matches!(
+                    outcome.unwrap().data,
+                    super::super::ModResult::Mod(_)
+                ));
+            } else {
+                assert!(matches!(outcome, Err(Error::Protocol)), "case {case}");
+            }
+            assert!(
+                thread
+                    .join()
+                    .unwrap()
+                    .starts_with("GET /v1/registry/mods/1 ")
+            );
+        }
     }
 
     #[tokio::test]

@@ -15,8 +15,8 @@ pub(crate) use dependencies::valid_dependencies;
 pub use transport::{Client, Config, Error, ErrorCode, FieldProblem, ResponseError};
 pub(crate) use transport::{ReceiptClaim, VerifiedArchive};
 pub use wire::{
-    ApiResponse, Artifact, Availability, Dependency, ListQuery, Maintenance, ModList, ModSummary,
-    Period, Release, ReleaseResult, Session, SessionContext, Sort,
+    ApiResponse, Artifact, Availability, Dependency, ListQuery, Maintenance, ModList, ModResult,
+    ModSummary, Period, Release, ReleaseResult, Session, SessionContext, Sort,
 };
 
 use serde::{Deserialize, Serialize};

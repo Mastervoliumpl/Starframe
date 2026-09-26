@@ -2,6 +2,28 @@ use super::*;
 
 impl Worker {
     pub(super) fn handle(&mut self, request: Request) {
+        if let Request::SharedRegistry(action, reply) = request {
+            let result = (|| {
+                if self.core.lock().expect("state lock").stopped {
+                    return Err("Starframe is closing.".into());
+                }
+                let queue = self
+                    .packages
+                    .as_mut()
+                    .map_err(|error| error.clone())?
+                    .as_mut()
+                    .ok_or("Package storage is unavailable.")?;
+                let store = self.storage.as_mut().ok_or("Saved data is unavailable.")?;
+                let result = starframe::sharing::online_action(store, queue, action);
+                self.core.lock().expect("state lock").saved_data(
+                    saved_status(store)
+                        .unwrap_or_else(|message| SavedData::Unavailable { message }),
+                );
+                result
+            })();
+            let _ = reply.send(result);
+            return;
+        }
         if let Request::Update(action, reply) = request {
             let result = (|| {
                 if self.core.lock().expect("state lock").stopped {
@@ -190,6 +212,7 @@ impl Worker {
             | Request::RemoveRuntime
             | Request::Mod(..)
             | Request::Sharing(..)
+            | Request::SharedRegistry(..)
             | Request::Package(..) => unreachable!(),
             Request::RegistryPackage(..) => unreachable!(),
             Request::RegistryReceipts(..) => unreachable!(),

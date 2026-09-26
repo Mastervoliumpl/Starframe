@@ -170,6 +170,49 @@ for (const [index, status] of ['blocked', 'cleared'].entries()) {
   );
 }
 expect(await readFile(file)).toEqual(bytes);
+await withDesktop(
+  data,
+  async (page) => {
+    const missing = {
+      kind: 'registry',
+      reference: { modId: 2, releaseId: randomUUID(), sha256: 'ab'.repeat(32) },
+    };
+    const mixed = {
+      ...document,
+      name: 'Scoped online requirement',
+      entries: [reference, missing],
+    };
+    const reply = await sharing(page, {
+      kind: 'accept',
+      text: JSON.stringify(mixed),
+      requestId: randomUUID(),
+      expectedRevision: (await view(page)).revision,
+    });
+    const imported = async () =>
+      (await view(page)).imports.find(
+        (entry) => entry.collectionId === reply.collectionId,
+      );
+    await expect
+      .poll(async () => (await imported()).entries[0].status)
+      .toBe('ready');
+    await expect
+      .poll(async () => (await imported()).entries[1].status)
+      .toBe('unresolved');
+    expect((await imported()).entries[1].message).toContain(
+      'independently provisioned registry root',
+    );
+    expect((await imported()).entries.map((entry) => entry.reference)).toEqual(
+      mixed.entries,
+    );
+    expect(
+      (await invoke(page, 'package_action', { kind: 'list' })).every(
+        (entry) => entry.kind === 'registry_verification',
+      ),
+    ).toBe(true);
+    expect((await view(page)).orderError).toBeNull();
+  },
+  offline,
+);
 console.log(
-  'Native exact-reference import, offline verification, corruption, restart, export and retained security controls passed.',
+  'Native exact-reference import, offline verification, corruption, restart, export, retained security controls and scoped missing registry requirements passed.',
 );

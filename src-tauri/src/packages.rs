@@ -191,6 +191,7 @@ struct RegistryReceiptRetry {
     cancel: Cancel,
 }
 
+#[derive(Clone)]
 pub struct RegistryRequest {
     pub mod_id: crate::registry::ModId,
     pub release_id: crate::registry::ReleaseId,
@@ -199,6 +200,14 @@ pub struct RegistryRequest {
     pub session: crate::registry::Session,
     pub bearer: String,
     pub auth_cancel: cancellation::Receiver<bool>,
+}
+
+#[derive(Clone)]
+pub struct RegistryApproval {
+    pub keys: Vec<u8>,
+    pub security: Vec<u8>,
+    pub release: Vec<u8>,
+    pub display: crate::storage::RegistryDisplay,
 }
 
 pub struct ReceiptRequest {

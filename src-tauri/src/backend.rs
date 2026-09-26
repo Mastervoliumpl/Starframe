@@ -87,6 +87,51 @@ pub fn registry_install_action(
     queue.operations(store)
 }
 
+pub fn approved_registry_install(
+    store: &mut Storage,
+    queue: &mut Packages,
+    request_id: &str,
+    expected: &crate::registry::ExactReference,
+    request: packages::RegistryRequest,
+    approval: packages::RegistryApproval,
+) -> Result<packages::Operation, String> {
+    crate::references::Reference::Registry(expected.clone()).validate()?;
+    if request.mod_id != expected.mod_id
+        || request.release_id != expected.release_id
+        || *request.auth_cancel.borrow()
+    {
+        return Err("The registry request no longer matches this exact selection.".into());
+    }
+    let now = time::OffsetDateTime::now_utc();
+    store
+        .accept_registry_keys(&approval.keys, &request.root_public, now)
+        .map_err(|error| error.to_string())?;
+    store
+        .accept_registry_security(&approval.security, &request.root_public, now)
+        .map_err(|error| error.to_string())?;
+    store
+        .accept_registry_release(
+            &approval.release,
+            &request.root_public,
+            request.mod_id,
+            request.release_id,
+            now,
+        )
+        .map_err(|error| error.to_string())?;
+    let signed = store
+        .ready_registry_download(
+            &request.root_public,
+            expected.mod_id,
+            expected.release_id,
+            now,
+        )
+        .map_err(|error| error.to_string())?;
+    if signed.reference() != expected {
+        return Err("The fresh signed approval differs from the selected ModID, ReleaseID or hash. No replacement was selected.".into());
+    }
+    queue.start_registry_install(store, request_id, request, approval.display)
+}
+
 pub fn poll_packages(store: &mut Storage, queue: &mut Packages) -> Result<bool, String> {
     queue.poll(store).and_then(|changed| {
         sharing::poll(store, queue).map(|imports_changed| changed || imports_changed)

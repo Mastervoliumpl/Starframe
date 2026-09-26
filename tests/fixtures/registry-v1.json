@@ -148,6 +148,7 @@
       "items": [
         {
           "modId": 1,
+          "modType": "code",
           "name": "Example mod",
           "summary": "Contract fixture.",
           "owner": {
@@ -159,7 +160,9 @@
           "replacementModId": null,
           "updatedAt": "2026-09-20T00:00:00Z",
           "latestReleaseId": "11111111-1111-4111-8111-111111111111",
-          "downloads": 10
+          "downloads": 10,
+          "likes": 1,
+          "archiveBytes": 1048576
         }
       ],
       "pagination": {
