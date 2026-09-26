@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.1 development - 2026-09-27
+
+Internal version is `0.7.1-dev.1`. No installer or app release is published.
+
+- Repair the in-game Mods entry for Sanctuary's updated sidebar and Home navigation (#93).
+- Preserve the native Settings singleton while cloning controls; clean partial pages and entries after construction failure or scene replacement.
+- Handle Escape once per frame across Starframe and the game pause-menu input path, with focus restored on return to Home.
+- Add menu lifecycle/input regressions and build a fresh Bootstrap against current game references. See [current-game menu verification](docs/verification/game-menu-update.md) for evidence and limits.
+
 ## 0.7.0 local implementation - 2026-09-26
 
 Internal version remains `0.7.0-dev.1`. Exact hosted/merge closeout is recorded in PR #78 and #90; no installer or app release is published.

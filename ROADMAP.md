@@ -1,6 +1,6 @@
 # Starframe version roadmap
 
-**[0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8)** is implemented through PR #78; its exact final-head and merged-main closeout is recorded in that PR and #90. It separates management operations from the graphical shell and replaces the GitHub catalog with the website registry. The development version is `0.7.0-dev.1`. No website deployment or app release is authorized. The completed 0.6.0 evidence remains in its [acceptance record](docs/verification/milestone-0.6.0.md).
+**[0.7.1](https://github.com/Mastervoliumpl/Starframe/milestone/12)** is the active corrective version, authorized on 27 September 2026. [#93](https://github.com/Mastervoliumpl/Starframe/issues/93) repairs the in-game Mods menu for Sanctuary's updated sidebar and retains existing settings behavior. The development version is `0.7.1-dev.1`. Milestone 0.7.0 is complete through PR #78; its exact final-head and merged-main checks are recorded there and in #90. No website deployment or app release is authorized.
 
 Work through one milestone at a time. Later milestones remain planned even though their GitHub state is open. Each issue lists prerequisites, acceptance criteria and verification. Milestone completion does not start later work or replace required design review. See [DEVELOPMENT.md](DEVELOPMENT.md) for checks, version preparation, commits and GitHub CLI use.
 
@@ -20,7 +20,8 @@ The owner's 17 September amendment reuses completed verification and narrows #30
 | [0.4.1](https://github.com/Mastervoliumpl/Starframe/milestone/11) | Exact approval identities, package/runtime limits and maintenance | Complete |
 | [0.5.0](https://github.com/Mastervoliumpl/Starframe/milestone/6) | Local mod development | Complete: #24–#26, #57–#58 verified |
 | [0.6.0](https://github.com/Mastervoliumpl/Starframe/milestone/7) | Windows alpha distribution | Complete: signed draft accepted and signed catalog live; app unpublished |
-| [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Shared backend and website registry integration | Active: #66, #82–#90 |
+| [0.7.0](https://github.com/Mastervoliumpl/Starframe/milestone/8) | Shared backend and website registry integration | Complete: #66, #82–#90; production/gameplay limits retained |
+| [0.7.1](https://github.com/Mastervoliumpl/Starframe/milestone/12) | Current-game Mods menu compatibility | Active: #93; focused corrective PR |
 
 AI-package support is deferred until the game provides suitable AI extension/selection facilities. Automated replacement of the shipped AI is outside the current scope. Assign that work to a future milestone after those facilities can be verified; it is not a promised 0.7.0 feature.
 

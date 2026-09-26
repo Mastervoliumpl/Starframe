@@ -1,6 +1,6 @@
 # Starframe development and checks
 
-Status: milestone 0.7.0 is active at `0.7.0-dev.1`. Milestone 0.6.0 is complete; its signed development draft remains unpublished. See the [0.6.0 acceptance record](docs/verification/milestone-0.6.0.md), [0.5.0 exit evidence](docs/verification/milestone-0.5.0.md), [BepInEx acceptance](docs/verification/bepinex-plugins.md) and [verification on another Windows PC](docs/verification/pc-setup.md).
+Status: corrective milestone 0.7.1 is active at `0.7.1-dev.1` for the current-game Mods menu fix. Milestone 0.7.0 is complete through PR #78. The signed 0.6.0 development draft remains unpublished. See the [0.6.0 acceptance record](docs/verification/milestone-0.6.0.md), [0.5.0 exit evidence](docs/verification/milestone-0.5.0.md), [BepInEx acceptance](docs/verification/bepinex-plugins.md) and [verification on another Windows PC](docs/verification/pc-setup.md).
 
 Issue #24 adds local DLL/folder imports through the package worker and SQLite schema 11. [Local import verification](docs/verification/local-imports.md) records the metadata format, source retention, recovery and native checks. Issue #25 adds source watching and schema 12; [watcher verification](docs/verification/local-watching.md) records debounce, recovery and game-exit checks.
 
