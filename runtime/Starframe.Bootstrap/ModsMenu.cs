@@ -34,12 +34,12 @@ internal sealed class ModsMenu : IDisposable
     private GameObject header = null!, body = null!, button = null!, toggle = null!, input = null!, choice = null!;
     private SidebarReveal sidebarReveal = null!;
     private PanelManager windowPanels = null!;
+    private PanelManager.PanelItem? windowPanel;
     private RectTransform sidebarIndicator = null!;
     private TMP_Text descriptionTitle = null!, description = null!;
     private Vector2 panelSize, panelPosition, buttonsSize, buttonsPosition;
     private ButtonManager back = null!, reset = null!;
     private Sprite? icon;
-    private Coroutine? transition;
     private bool opening;
     private bool exiting;
     private string? selected;
@@ -61,41 +61,35 @@ internal sealed class ModsMenu : IDisposable
                 prefix: new HarmonyMethod(typeof(ModsMenu), nameof(HandleGameEscape)));
             harmony.Patch(AccessTools.Method(typeof(SidebarReveal), nameof(SidebarReveal.Hide)),
                 prefix: new HarmonyMethod(typeof(ModsMenu), nameof(AllowSidebarHide)));
+            harmony.Patch(AccessTools.Method(typeof(PanelManager), nameof(PanelManager.OpenPanel)),
+                prefix: new HarmonyMethod(typeof(ModsMenu), nameof(OpenModsPanel)));
             current = this;
         }
         catch { harmony.UnpatchSelf(); throw; }
     }
 
-    private static void BeginTransition(out Animator? __state)
+    private static void BeginTransition(out bool __state)
     {
-        __state = null;
-        if (current?.page == null) return;
-        if (current.opening)
+        __state = current?.page != null && current.page.activeSelf && !current.exiting && !current.opening;
+        if (__state)
         {
-            var previous = current.windowPanels.panels[current.windowPanels.currentPanelIndex];
-            if (previous.panelName != nameof(InterfaceManager.Window.Background)) __state = previous.panelObject;
-            return;
+            current!.exiting = true;
+            var group = current.page!.GetComponent<CanvasGroup>();
+            group.interactable = group.blocksRaycasts = false;
+            current.entry?.SetSelected(false);
         }
-        if (current.page.activeSelf && !current.exiting)
-        {
-            __state = current.page.GetComponent<Animator>();
-            current.AnimateWindow(true);
-        }
-        current.entry?.SetSelected(false);
     }
 
-    private static void FinishNativeTransition(Animator? __state, ref InterfaceManager.Window ___returnWindow)
+    private static void FinishNativeTransition(bool __state, ref InterfaceManager.Window ___returnWindow)
     {
-        if (__state == null) return;
-        if (current?.opening != true)
-        {
-            // Mods uses Background internally; native Back must return to a visible page.
-            if (___returnWindow == InterfaceManager.Window.Background) ___returnWindow = InterfaceManager.Window.Home;
-            return;
-        }
-        // Background is earlier in the native panel order, which otherwise sends the departing page downward.
-        __state.enabled = true;
-        __state.Play("Out Top", 0, 0);
+        // Mods uses Background internally; native Back must return to a visible page.
+        if (__state && ___returnWindow == InterfaceManager.Window.Background) ___returnWindow = InterfaceManager.Window.Home;
+    }
+
+    private static void OpenModsPanel(PanelManager __instance, ref string newPanel)
+    {
+        if (current?.opening == true && __instance == current.windowPanels && newPanel == nameof(InterfaceManager.Window.Background))
+            newPanel = "StarframeMods";
     }
 
     private static bool HandleGameEscape()
@@ -206,6 +200,8 @@ internal sealed class ModsMenu : IDisposable
         entry.UpdateUI();
         entry.AddUINavigation();
         entry.GetComponentInParent<PanelButtonDimmer>()?.FetchButtons();
+        windowPanel = new PanelManager.PanelItem { panelName = "StarframeMods", panelObject = page.GetComponent<Animator>(), panelButton = entry };
+        windowPanels.panels.Add(windowPanel);
         Clear();
     }
 
@@ -229,8 +225,19 @@ internal sealed class ModsMenu : IDisposable
 
     private void ClearPage()
     {
-        if (transition != null) { host.StopCoroutine(transition); transition = null; }
-        if (entry != null && sidebarIndicator != null && sidebarIndicator.IsChildOf(entry.transform))
+        if (windowPanel != null && windowPanels != null)
+        {
+            if (windowPanels.currentPanelIndex == windowPanels.panels.IndexOf(windowPanel))
+            {
+                var manager = InterfaceManager.Instance;
+                if (manager != null && manager.GetComponent<PanelManager>() == windowPanels)
+                    manager.TransitionTo(InterfaceManager.Window.Home);
+                windowPanels.OpenPanel(nameof(InterfaceManager.Window.Home));
+            }
+            windowPanels.panels.Remove(windowPanel);
+            windowPanel = null;
+        }
+        if (entry != null && sidebarIndicator != null && windowPanels != null && sidebarIndicator.IsChildOf(entry.transform))
         {
             windowPanels.StopCoroutine("MoveIndicatorToParent");
             windowPanels.StopCoroutine("SetIndicatorHeight");
@@ -291,34 +298,12 @@ internal sealed class ModsMenu : IDisposable
         opening = true;
         try { InterfaceManager.Instance.TransitionTo(InterfaceManager.Window.Background); }
         finally { opening = false; }
-        // Background has no sidebar button, so its transition collapses the shared indicator.
-        windowPanels.StopCoroutine("MoveIndicatorToParent");
-        windowPanels.StartCoroutine("MoveIndicatorToParent", entry!.transform);
-        entry!.SetSelected(true);
-        AnimateWindow(false);
-        ShowList();
-    }
-
-    private void AnimateWindow(bool leave)
-    {
-        exiting = leave;
+        windowPanels.OpenPanel("StarframeMods");
+        exiting = false;
         page!.SetActive(true);
         var group = page.GetComponent<CanvasGroup>();
-        group.interactable = group.blocksRaycasts = !leave;
-        var animator = page.GetComponent<Animator>();
-        if (transition != null) host.StopCoroutine(transition);
-        animator.enabled = true;
-        animator.SetFloat("AnimSpeed", 1);
-        animator.Play(leave ? "Out Top" : "In Top", 0, 0);
-        transition = host.StartCoroutine(FinishTransition(animator, leave));
-    }
-
-    private IEnumerator FinishTransition(Animator animator, bool leave)
-    {
-        yield return new WaitForSecondsRealtime(BeamUIInternalTools.GetAnimatorClipLength(animator, leave ? "MainPanel_OutTop" : "MainPanel_InTop"));
-        if (animator != null) animator.enabled = false;
-        if (leave && page != null) page.SetActive(false);
-        transition = null;
+        group.interactable = group.blocksRaycasts = true;
+        ShowList();
     }
 
     private void Back()
