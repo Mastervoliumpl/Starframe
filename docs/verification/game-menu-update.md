@@ -58,6 +58,8 @@ The transition hook captures the native page leaving for Mods and starts its nat
 
 The focused current-game probe passes upward departure measurements for Home, Settings and Play, an upward Mods departure while Settings enters, completed exit deactivation, and immediate input release. It repeats the owner's exact Settings Back sequence through the real Settings button and checks visible Home/sidebar state. Rapid reopening cancels pending exit cleanup. The existing sidebar, indicator, settings, native Escape, reconstruction and disposal checks also pass. All 116 reference-free C# tests and Bootstrap formatting/build pass. Physical keyboard checks remain skipped if the isolated probe cannot acquire foreground; the owner smoke is still pending.
 
+The final departure/Back runtime archive builds from `07d74d3b9973f2b5ad037fe9ec1c4e91b99c1605`, with SHA-256 `af907f7a31390cb19bbde2be0afe0be95e3d42849661ea332633b29d3ed1e91f`. Its source/DLL inventory verifies, staged preflight and notices pass, and this source-bound candidate repeats the full focused game probe successfully. The earlier indicator-only candidate is superseded. Exact final-head hosted checks and owner confirmation remain required.
+
 ## Limits
 
 The former review kit's reused 0.6.0 Bootstrap is superseded only by a freshly built and verified candidate. No installer, release or tag is published by this PR. Production registry trust provisioning and hosted Steam readiness remain separate requirements. Map/AI gameplay and author plugins that patch orders, replay serialization or rendering remain outside this corrective acceptance.
