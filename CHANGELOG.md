@@ -8,6 +8,7 @@ Internal version is `0.7.1-dev.1`. No installer or app release is published.
 - Preserve the native Settings singleton while cloning controls; clean partial pages and entries after construction failure or scene replacement.
 - Reveal the cloned Mods window through the native panel animation so its root is visible.
 - Keep the native sidebar visible, rename the top heading to Mods, and remove the redundant category tab. Individual mods use vanilla Settings panel proportions, native enum selectors and descriptions that follow hover or keyboard focus.
+- Move the native blue sidebar selection line to Mods and reveal the page upward from below.
 - Handle Escape once per frame across Starframe and the game pause-menu input path, with focus restored on return to Home.
 - Add menu lifecycle/input regressions and build a fresh Bootstrap against current game references. See [current-game menu verification](docs/verification/game-menu-update.md) for evidence and limits.
 

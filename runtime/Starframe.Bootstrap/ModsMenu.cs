@@ -33,6 +33,8 @@ internal sealed class ModsMenu : IDisposable
     private Transform list = null!;
     private GameObject header = null!, body = null!, button = null!, toggle = null!, input = null!, choice = null!;
     private SidebarReveal sidebarReveal = null!;
+    private PanelManager windowPanels = null!;
+    private RectTransform sidebarIndicator = null!;
     private TMP_Text descriptionTitle = null!, description = null!;
     private Vector2 panelSize, panelPosition, buttonsSize, buttonsPosition;
     private ButtonManager back = null!, reset = null!;
@@ -103,6 +105,9 @@ internal sealed class ModsMenu : IDisposable
     {
         var original = settings.transform;
         RequireTemplates(original);
+        windowPanels = InterfaceManager.Instance.GetComponent<PanelManager>();
+        sidebarIndicator = (RectTransform)AccessTools.Field(typeof(PanelManager), "indicator").GetValue(windowPanels);
+        if (sidebarIndicator == null) throw new InvalidOperationException("The game's sidebar selection indicator is unavailable.");
         sidebarReveal = sidebar.GetComponentInParent<SidebarReveal>();
         if (sidebarReveal == null) throw new InvalidOperationException("The game's sidebar reveal control is unavailable.");
         var template = sidebar.settingsButton;
@@ -117,6 +122,8 @@ internal sealed class ModsMenu : IDisposable
             Object.DestroyImmediate(page.GetComponent<SanctuaryUI.SettingsInterface>());
             page.transform.SetParent(original.parent, false);
             entry = Object.Instantiate(template.gameObject, staging.transform).GetComponent<PanelButton>();
+            var copiedIndicator = entry.transform.Find(sidebarIndicator.name);
+            if (copiedIndicator != null) Object.DestroyImmediate(copiedIndicator.gameObject);
             entry.gameObject.SetActive(false);
             entry.transform.SetParent(template.transform.parent, false);
         }
@@ -196,6 +203,13 @@ internal sealed class ModsMenu : IDisposable
     private void ClearPage()
     {
         if (reveal != null) { host.StopCoroutine(reveal); reveal = null; }
+        if (entry != null && sidebarIndicator != null && sidebarIndicator.IsChildOf(entry.transform))
+        {
+            windowPanels.StopCoroutine("MoveIndicatorToParent");
+            windowPanels.StopCoroutine("SetIndicatorHeight");
+            sidebarIndicator.SetParent(entry.transform.parent, true);
+            sidebarIndicator.sizeDelta = new Vector2(sidebarIndicator.sizeDelta.x, 0);
+        }
         if (page != null) { page.SetActive(false); Object.Destroy(page); }
         if (entry != null) { entry.gameObject.SetActive(false); Object.Destroy(entry.gameObject); }
         page = null;
@@ -249,20 +263,23 @@ internal sealed class ModsMenu : IDisposable
         opening = true;
         try { InterfaceManager.Instance.TransitionTo(InterfaceManager.Window.Background); }
         finally { opening = false; }
+        // Background has no sidebar button, so its transition collapses the shared indicator.
+        windowPanels.StopCoroutine("MoveIndicatorToParent");
+        windowPanels.StartCoroutine("MoveIndicatorToParent", entry!.transform);
         entry!.SetSelected(true);
         page!.SetActive(true);
         var animator = page.GetComponent<Animator>();
         if (reveal != null) host.StopCoroutine(reveal);
         animator.enabled = true;
         animator.SetFloat("AnimSpeed", 1);
-        animator.Play("In Bottom", 0, 0);
+        animator.Play("In Top", 0, 0);
         reveal = host.StartCoroutine(FinishReveal(animator));
         ShowList();
     }
 
     private IEnumerator FinishReveal(Animator animator)
     {
-        yield return new WaitForSecondsRealtime(BeamUIInternalTools.GetAnimatorClipLength(animator, "MainPanel_InBottom"));
+        yield return new WaitForSecondsRealtime(BeamUIInternalTools.GetAnimatorClipLength(animator, "MainPanel_InTop"));
         if (animator != null) animator.enabled = false;
         reveal = null;
     }

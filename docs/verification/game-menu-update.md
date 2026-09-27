@@ -38,6 +38,16 @@ The game UI and its API changed, so the former menu smoke evidence cannot establ
 
 Local logs, tooling, game-copy fixtures and test-only probe code remain ignored. The packaged/staged product runtime contains no fixture or probe DLL. The PR remains in draft until the owner smoke and required hosted checks are satisfied.
 
+## Selection indicator and entrance direction follow-up
+
+The owner confirmed the sidebar is visible, then reported the missing blue selection line and the reversed entrance direction. The icon's selected state does not control that line: the native window panel manager owns a shared indicator. Opening its buttonless Background panel shrinks the indicator to zero height.
+
+Mods now starts the panel manager's existing indicator movement coroutine after the Background transition. It moves and sizes the same native line beside Mods, including when reopening while the native window is already Background. Cleanup detaches that shared object before destroying the owned entry. A copied indicator is removed if construction clones Settings while its native line is beneath that button.
+
+The entrance uses the native `In Top` state and its matching `MainPanel_InTop` duration. The game's state names describe the outgoing direction; measured page positions establish the requested movement. The focused probe measured the content moving from `y = -100` to `y = 0`, and verified the native indicator beneath Mods with nonzero height. The initial follow-up probe could not reach Home with restricted network access; the rerun reached native Home with network access. Its first physical Shift-Tab assertion sent and released Shift in the same input batch, so it did not establish a held Shift state across a Unity frame. The corrected probe holds Shift across frames before sending Tab. The completed rerun passes the entrance, full-height indicator, return to ordinary Settings, owner recreation and indicator-retention checks. It could not acquire foreground for physical keyboard input, so those checks remain skipped. All 116 reference-free C# tests, Bootstrap formatting/build and repository checks pass; the two known framework-reference warnings remain.
+
+Reproduce the regression on the isolated game copy after native Home appears: open Mods and wait for the entrance to finish; verify upward motion and the blue line beside Mods. Open a mod, return to the list, open ordinary Settings, then reopen Mods. The indicator must follow each native button, remain beside Mods on both pages, and survive reconstruction/disposal of Starframe's owned controls. Keep the owner's installation and settings outside this test.
+
 ## Limits
 
 The former review kit's reused 0.6.0 Bootstrap is superseded only by a freshly built and verified candidate. No installer, release or tag is published by this PR. Production registry trust provisioning and hosted Steam readiness remain separate requirements. Map/AI gameplay and author plugins that patch orders, replay serialization or rendering remain outside this corrective acceptance.
