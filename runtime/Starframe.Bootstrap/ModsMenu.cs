@@ -39,8 +39,9 @@ internal sealed class ModsMenu : IDisposable
     private Vector2 panelSize, panelPosition, buttonsSize, buttonsPosition;
     private ButtonManager back = null!, reset = null!;
     private Sprite? icon;
-    private Coroutine? reveal;
+    private Coroutine? transition;
     private bool opening;
+    private bool exiting;
     private string? selected;
     private int saves;
     private float listScroll = 1;
@@ -54,7 +55,8 @@ internal sealed class ModsMenu : IDisposable
         try
         {
             harmony.Patch(AccessTools.Method(typeof(InterfaceManager), nameof(InterfaceManager.TransitionTo)),
-                prefix: new HarmonyMethod(typeof(ModsMenu), nameof(HideForTransition)));
+                prefix: new HarmonyMethod(typeof(ModsMenu), nameof(BeginTransition)),
+                postfix: new HarmonyMethod(typeof(ModsMenu), nameof(FinishNativeTransition)));
             harmony.Patch(AccessTools.Method(typeof(InterfaceManager), nameof(InterfaceManager.ToggleInGameMenu)),
                 prefix: new HarmonyMethod(typeof(ModsMenu), nameof(HandleGameEscape)));
             harmony.Patch(AccessTools.Method(typeof(SidebarReveal), nameof(SidebarReveal.Hide)),
@@ -64,18 +66,43 @@ internal sealed class ModsMenu : IDisposable
         catch { harmony.UnpatchSelf(); throw; }
     }
 
-    private static void HideForTransition()
+    private static void BeginTransition(out Animator? __state)
     {
+        __state = null;
         if (current?.page == null) return;
-        current.page.SetActive(false);
+        if (current.opening)
+        {
+            var previous = current.windowPanels.panels[current.windowPanels.currentPanelIndex];
+            if (previous.panelName != nameof(InterfaceManager.Window.Background)) __state = previous.panelObject;
+            return;
+        }
+        if (current.page.activeSelf && !current.exiting)
+        {
+            __state = current.page.GetComponent<Animator>();
+            current.AnimateWindow(true);
+        }
         current.entry?.SetSelected(false);
+    }
+
+    private static void FinishNativeTransition(Animator? __state, ref InterfaceManager.Window ___returnWindow)
+    {
+        if (__state == null) return;
+        if (current?.opening != true)
+        {
+            // Mods uses Background internally; native Back must return to a visible page.
+            if (___returnWindow == InterfaceManager.Window.Background) ___returnWindow = InterfaceManager.Window.Home;
+            return;
+        }
+        // Background is earlier in the native panel order, which otherwise sends the departing page downward.
+        __state.enabled = true;
+        __state.Play("Out Top", 0, 0);
     }
 
     private static bool HandleGameEscape()
     {
         if (current == null) return true;
         if (current.lifecycle.HandledEscape(Time.frameCount)) return false;
-        if (current.page == null || !current.page.activeInHierarchy) return true;
+        if (current.page == null || !current.page.activeInHierarchy || current.exiting) return true;
         current.lifecycle.Escape(Time.frameCount, current.Back);
         return false;
     }
@@ -89,7 +116,7 @@ internal sealed class ModsMenu : IDisposable
         var settings = SanctuaryUI.SettingsInterface.Instance;
         if (sidebar != null && settings != null && InterfaceManager.Instance != null)
             lifecycle.Build(sidebar, settings, () => Build(sidebar, settings), ClearPage);
-        if (page == null || !page.activeSelf) return;
+        if (page == null || !page.activeSelf || exiting) return;
         if (Input.GetKeyDown(KeyCode.Escape)) { lifecycle.Escape(Time.frameCount, Back); return; }
         if (Input.GetKeyDown(KeyCode.Tab))
         {
@@ -202,7 +229,7 @@ internal sealed class ModsMenu : IDisposable
 
     private void ClearPage()
     {
-        if (reveal != null) { host.StopCoroutine(reveal); reveal = null; }
+        if (transition != null) { host.StopCoroutine(transition); transition = null; }
         if (entry != null && sidebarIndicator != null && sidebarIndicator.IsChildOf(entry.transform))
         {
             windowPanels.StopCoroutine("MoveIndicatorToParent");
@@ -217,6 +244,7 @@ internal sealed class ModsMenu : IDisposable
         focus.Clear();
         settingControls.Clear();
         selected = null;
+        exiting = false;
         listScroll = 1;
     }
 
@@ -267,27 +295,35 @@ internal sealed class ModsMenu : IDisposable
         windowPanels.StopCoroutine("MoveIndicatorToParent");
         windowPanels.StartCoroutine("MoveIndicatorToParent", entry!.transform);
         entry!.SetSelected(true);
-        page!.SetActive(true);
-        var animator = page.GetComponent<Animator>();
-        if (reveal != null) host.StopCoroutine(reveal);
-        animator.enabled = true;
-        animator.SetFloat("AnimSpeed", 1);
-        animator.Play("In Top", 0, 0);
-        reveal = host.StartCoroutine(FinishReveal(animator));
+        AnimateWindow(false);
         ShowList();
     }
 
-    private IEnumerator FinishReveal(Animator animator)
+    private void AnimateWindow(bool leave)
     {
-        yield return new WaitForSecondsRealtime(BeamUIInternalTools.GetAnimatorClipLength(animator, "MainPanel_InTop"));
+        exiting = leave;
+        page!.SetActive(true);
+        var group = page.GetComponent<CanvasGroup>();
+        group.interactable = group.blocksRaycasts = !leave;
+        var animator = page.GetComponent<Animator>();
+        if (transition != null) host.StopCoroutine(transition);
+        animator.enabled = true;
+        animator.SetFloat("AnimSpeed", 1);
+        animator.Play(leave ? "Out Top" : "In Top", 0, 0);
+        transition = host.StartCoroutine(FinishTransition(animator, leave));
+    }
+
+    private IEnumerator FinishTransition(Animator animator, bool leave)
+    {
+        yield return new WaitForSecondsRealtime(BeamUIInternalTools.GetAnimatorClipLength(animator, leave ? "MainPanel_OutTop" : "MainPanel_InTop"));
         if (animator != null) animator.enabled = false;
-        reveal = null;
+        if (leave && page != null) page.SetActive(false);
+        transition = null;
     }
 
     private void Back()
     {
         if (selected != null) { ShowList(); return; }
-        page!.SetActive(false);
         InterfaceManager.Instance.TransitionTo(InterfaceManager.Window.Home);
         if (entry != null) Select(entry.gameObject);
     }

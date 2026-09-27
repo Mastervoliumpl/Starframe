@@ -50,6 +50,14 @@ The final source-bound archive builds from `70a18bcef198ecdab9024831bb3d7e5aad9d
 
 Reproduce the regression on the isolated game copy after native Home appears: open Mods and wait for the entrance to finish; verify upward motion and the blue line beside Mods. Open a mod, return to the list, open ordinary Settings, then reopen Mods. The indicator must follow each native button, remain beside Mods on both pages, and survive reconstruction/disposal of Starframe's owned controls. Keep the owner's installation and settings outside this test.
 
+## Departures and native Back follow-up
+
+The owner confirmed the native blue indicator works, then reported downward native departures into Mods, the missing Mods departure animation, and a blank UI after Home → Mods → Settings → Settings Back. The native Background panel precedes the visible menus in panel order, so that transition chooses a downward exit. The adapter also deactivated Mods immediately, and Settings recorded Background as its return target.
+
+The transition hook captures the native page leaving for Mods and starts its native `Out Top` animation after the Background transition. Mods uses the same exit state, stops capturing input immediately, and remains rendered until the matching clip finishes. Reopening cancels pending exit completion; Update and Escape no longer treat an exiting page as the current menu. When a native transition leaves Mods and records Background as its return target, the hook replaces that target with Home. Native Back therefore returns to a visible page. Other native return targets and ordinary navigation retain their existing behavior.
+
+The focused current-game probe passes upward departure measurements for Home, Settings and Play, an upward Mods departure while Settings enters, completed exit deactivation, and immediate input release. It repeats the owner's exact Settings Back sequence through the real Settings button and checks visible Home/sidebar state. Rapid reopening cancels pending exit cleanup. The existing sidebar, indicator, settings, native Escape, reconstruction and disposal checks also pass. All 116 reference-free C# tests and Bootstrap formatting/build pass. Physical keyboard checks remain skipped if the isolated probe cannot acquire foreground; the owner smoke is still pending.
+
 ## Limits
 
 The former review kit's reused 0.6.0 Bootstrap is superseded only by a freshly built and verified candidate. No installer, release or tag is published by this PR. Production registry trust provisioning and hosted Steam readiness remain separate requirements. Map/AI gameplay and author plugins that patch orders, replay serialization or rendering remain outside this corrective acceptance.
