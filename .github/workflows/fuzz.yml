@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@94196ee1d15439c1b6651cd87ef14e88ec435966
+      - uses: actions/setup-node@7f84f1d52d0c56afb45c62fee31a93b843cea4d6
         with:
           node-version-file: .node-version
           cache: npm
