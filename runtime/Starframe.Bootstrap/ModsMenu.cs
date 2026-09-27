@@ -27,13 +27,21 @@ internal sealed class ModsMenu : IDisposable
     private readonly List<GameObject> focus = new();
     private readonly List<Action<bool>> settingControls = new();
     private static ModsMenu? current;
-    private MainMenuInterface? main;
+    private readonly MenuLifecycle lifecycle = new();
     private GameObject? page;
     private PanelButton? entry;
     private Transform list = null!;
-    private GameObject header = null!, body = null!, button = null!, toggle = null!, input = null!;
+    private GameObject header = null!, body = null!, button = null!, toggle = null!, input = null!, choice = null!;
+    private SidebarReveal sidebarReveal = null!;
+    private PanelManager windowPanels = null!;
+    private PanelManager.PanelItem? windowPanel;
+    private RectTransform sidebarIndicator = null!;
+    private TMP_Text descriptionTitle = null!, description = null!;
+    private Vector2 panelSize, panelPosition, buttonsSize, buttonsPosition;
     private ButtonManager back = null!, reset = null!;
     private Sprite? icon;
+    private bool opening;
+    private bool exiting;
     private string? selected;
     private int saves;
     private float listScroll = 1;
@@ -44,23 +52,66 @@ internal sealed class ModsMenu : IDisposable
         this.session = session;
         using var document = Contracts.Read(report, "report");
         outcomes = document.RootElement.GetProperty("mods").EnumerateArray().ToDictionary(m => m.GetProperty("modId").GetString()!, m => m.Clone());
-        current = this;
-        harmony.Patch(AccessTools.Method(typeof(InterfaceManager), nameof(InterfaceManager.TransitionTo)),
-            prefix: new HarmonyMethod(typeof(ModsMenu), nameof(HideForTransition)));
+        try
+        {
+            harmony.Patch(AccessTools.Method(typeof(InterfaceManager), nameof(InterfaceManager.TransitionTo)),
+                prefix: new HarmonyMethod(typeof(ModsMenu), nameof(BeginTransition)),
+                postfix: new HarmonyMethod(typeof(ModsMenu), nameof(FinishNativeTransition)));
+            harmony.Patch(AccessTools.Method(typeof(InterfaceManager), nameof(InterfaceManager.ToggleInGameMenu)),
+                prefix: new HarmonyMethod(typeof(ModsMenu), nameof(HandleGameEscape)));
+            harmony.Patch(AccessTools.Method(typeof(SidebarReveal), nameof(SidebarReveal.Hide)),
+                prefix: new HarmonyMethod(typeof(ModsMenu), nameof(AllowSidebarHide)));
+            harmony.Patch(AccessTools.Method(typeof(PanelManager), nameof(PanelManager.OpenPanel)),
+                prefix: new HarmonyMethod(typeof(ModsMenu), nameof(OpenModsPanel)));
+            current = this;
+        }
+        catch { harmony.UnpatchSelf(); throw; }
     }
 
-    private static void HideForTransition() { if (current?.page != null) current.page.SetActive(false); }
+    private static void BeginTransition(out bool __state)
+    {
+        __state = current?.page != null && current.page.activeSelf && !current.exiting && !current.opening;
+        if (__state)
+        {
+            current!.exiting = true;
+            var group = current.page!.GetComponent<CanvasGroup>();
+            group.interactable = group.blocksRaycasts = false;
+            current.entry?.SetSelected(false);
+        }
+    }
+
+    private static void FinishNativeTransition(bool __state, ref InterfaceManager.Window ___returnWindow)
+    {
+        // Mods uses Background internally; native Back must return to a visible page.
+        if (__state && ___returnWindow == InterfaceManager.Window.Background) ___returnWindow = InterfaceManager.Window.Home;
+    }
+
+    private static void OpenModsPanel(PanelManager __instance, ref string newPanel)
+    {
+        if (current?.opening == true && __instance == current.windowPanels && newPanel == nameof(InterfaceManager.Window.Background))
+            newPanel = "StarframeMods";
+    }
+
+    private static bool HandleGameEscape()
+    {
+        if (current == null) return true;
+        if (current.lifecycle.HandledEscape(Time.frameCount)) return false;
+        if (current.page == null || !current.page.activeInHierarchy || current.exiting) return true;
+        current.lifecycle.Escape(Time.frameCount, current.Back);
+        return false;
+    }
+
+    private static bool AllowSidebarHide(SidebarReveal __instance) =>
+        current == null || !current.opening || __instance != current.sidebarReveal;
 
     public void Tick()
     {
-        var found = MainMenuInterface.Instance;
-        if (found != null && found != main)
-        {
-            main = found;
-            Build(found);
-        }
-        if (page == null || !page.activeSelf) return;
-        if (Input.GetKeyDown(KeyCode.Escape)) { Back(); return; }
+        var sidebar = SideBarInterface.Instance;
+        var settings = SanctuaryUI.SettingsInterface.Instance;
+        if (sidebar != null && settings != null && InterfaceManager.Instance != null)
+            lifecycle.Build(sidebar, settings, () => Build(sidebar, settings), ClearPage);
+        if (page == null || !page.activeSelf || exiting) return;
+        if (Input.GetKeyDown(KeyCode.Escape)) { lifecycle.Escape(Time.frameCount, Back); return; }
         if (Input.GetKeyDown(KeyCode.Tab))
         {
             var available = focus.Where(g => g != null && g.activeInHierarchy && (g.GetComponent<Selectable>()?.IsInteractable() ?? true)).ToList();
@@ -71,15 +122,34 @@ internal sealed class ModsMenu : IDisposable
         }
     }
 
-    private void Build(MainMenuInterface menu)
+    private void Build(SideBarInterface sidebar, SanctuaryUI.SettingsInterface settings)
     {
-        if (page != null) Object.Destroy(page);
-        if (entry != null) Object.Destroy(entry.gameObject);
-        var original = menu.transform.parent.Find("SettingsInterface");
-        page = Object.Instantiate(original.gameObject, original.parent);
+        var original = settings.transform;
+        RequireTemplates(original);
+        windowPanels = InterfaceManager.Instance.GetComponent<PanelManager>();
+        sidebarIndicator = (RectTransform)AccessTools.Field(typeof(PanelManager), "indicator").GetValue(windowPanels);
+        if (sidebarIndicator == null) throw new InvalidOperationException("The game's sidebar selection indicator is unavailable.");
+        sidebarReveal = sidebar.GetComponentInParent<SidebarReveal>();
+        if (sidebarReveal == null) throw new InvalidOperationException("The game's sidebar reveal control is unavailable.");
+        var template = sidebar.settingsButton;
+        if (template == null) throw new InvalidOperationException("The game's Settings sidebar button is unavailable.");
+        var staging = new GameObject("StarframeMenuTemplates");
+        staging.SetActive(false);
+        try
+        {
+            // An inactive parent prevents the clone's native Awake from replacing SettingsInterface.Instance.
+            page = Object.Instantiate(original.gameObject, staging.transform);
+            page.SetActive(false);
+            Object.DestroyImmediate(page.GetComponent<SanctuaryUI.SettingsInterface>());
+            page.transform.SetParent(original.parent, false);
+            entry = Object.Instantiate(template.gameObject, staging.transform).GetComponent<PanelButton>();
+            var copiedIndicator = entry.transform.Find(sidebarIndicator.name);
+            if (copiedIndicator != null) Object.DestroyImmediate(copiedIndicator.gameObject);
+            entry.gameObject.SetActive(false);
+            entry.transform.SetParent(template.transform.parent, false);
+        }
+        finally { Object.Destroy(staging); }
         page.name = "StarframeMods";
-        page.SetActive(false);
-        Object.DestroyImmediate(page.GetComponent<SanctuaryUI.SettingsInterface>());
         var graphics = page.transform.Find("Content/Panels/Graphics");
         list = graphics.Find("Content/List/Layout Group");
         var layout = list.GetComponent<VerticalLayoutGroup>();
@@ -92,41 +162,97 @@ internal sealed class ModsMenu : IDisposable
         body = Keep(page.transform.Find("Content/Description Area/Description"), templates.transform);
         button = Keep(list.Find("ApplyButton"), templates.transform);
         input = Keep(list.Find("UI Scale"), templates.transform);
+        choice = Keep(list.Find("Window Mode"), templates.transform);
         toggle = Keep(page.transform.Find("Content/Panels/Controls/Content/List/Layout Group/EdgePanToggle"), templates.transform);
         foreach (Transform panel in page.transform.Find("Content/Panels"))
             if (panel.name is "General" or "Audio" or "Controls") panel.gameObject.SetActive(false);
-        var category = page.transform.Find("Content/Categories/Graphics").GetComponent<PanelButton>();
-        foreach (Transform tab in category.transform.parent) if (tab != category.transform) tab.gameObject.SetActive(false);
+        page.transform.Find("Content/Categories").gameObject.SetActive(false);
+        var title = page.transform.Find("Content/Panel Header");
+        foreach (var localized in title.GetComponentsInChildren<LocalizedObject>(true)) Object.DestroyImmediate(localized);
+        foreach (var text in title.GetComponentsInChildren<TMP_Text>(true)) { text.text = "Mods"; text.richText = false; }
         icon ??= LoadIcon();
-        Configure(category, "Mods");
-        category.useSeperator = false;
-        category.buttonIcon = category.selectedIcon = icon;
-        category.UpdateUI();
         var panels = page.GetComponent<PanelManager>();
-        panels.panels = new List<PanelManager.PanelItem> { new() { panelName = "Mods", panelObject = graphics.GetComponent<Animator>(), panelButton = category } };
+        panels.panels = new List<PanelManager.PanelItem> { new() { panelName = "Mods", panelObject = graphics.GetComponent<Animator>() } };
         panels.currentPanelIndex = 0;
-        page.transform.Find("Content/Description Area").gameObject.SetActive(false);
-        foreach (string path in new[] { "Content/Panels", "Content/Buttons" })
-        {
-            var rect = (RectTransform)page.transform.Find(path);
-            rect.sizeDelta = new Vector2(-70, rect.sizeDelta.y);
-            rect.anchoredPosition = new Vector2(0, rect.anchoredPosition.y);
-        }
+        var area = page.transform.Find("Content/Description Area");
+        foreach (var manager in area.GetComponentsInChildren<SettingsDescriptionManager>(true)) Object.DestroyImmediate(manager);
+        foreach (var localized in area.GetComponentsInChildren<LocalizedObject>(true)) Object.DestroyImmediate(localized);
+        descriptionTitle = area.Find("Title").GetComponent<TMP_Text>();
+        descriptionTitle.richText = false;
+        description = Object.Instantiate(body, area).GetComponent<TMP_Text>();
+        description.gameObject.name = "Description";
+        description.gameObject.SetActive(true);
+        area.Find("Cover/Image Parent/Image").GetComponent<Image>().sprite = icon;
+        var panelRect = (RectTransform)page.transform.Find("Content/Panels");
+        var buttonsRect = (RectTransform)page.transform.Find("Content/Buttons");
+        panelSize = panelRect.sizeDelta; panelPosition = panelRect.anchoredPosition;
+        buttonsSize = buttonsRect.sizeDelta; buttonsPosition = buttonsRect.anchoredPosition;
         back = page.transform.Find("Content/Buttons/BackButton").GetComponent<ButtonManager>();
         Configure(back, "Back", Back);
         reset = page.transform.Find("Content/Buttons/Reset Settings Button").GetComponent<ButtonManager>();
         Configure(reset, "Reset this mod", Reset);
-        var settings = menu.transform.Find("Left Sidebar/Content/Button List/Settings");
-        entry = Object.Instantiate(settings.gameObject, settings.parent).GetComponent<PanelButton>();
         entry.name = "StarframeModsButton";
-        entry.transform.SetSiblingIndex(settings.GetSiblingIndex() + 1);
+        entry.transform.SetSiblingIndex(template.transform.GetSiblingIndex() + 1);
         Configure(entry, "Mods");
         entry.buttonIcon = entry.selectedIcon = icon;
         entry.onClick.AddListener(Open);
+        entry.gameObject.SetActive(true);
         entry.UpdateUI();
         entry.AddUINavigation();
         entry.GetComponentInParent<PanelButtonDimmer>()?.FetchButtons();
+        windowPanel = new PanelManager.PanelItem { panelName = "StarframeMods", panelObject = page.GetComponent<Animator>(), panelButton = entry };
+        windowPanels.panels.Add(windowPanel);
         Clear();
+    }
+
+    private static void RequireTemplates(Transform original)
+    {
+        foreach (string path in new[]
+        {
+            "Content/Panels/Graphics/Content/List/Layout Group/Display Header",
+            "Content/Panels/Graphics/Content/List/Layout Group/ApplyButton",
+            "Content/Panels/Graphics/Content/List/Layout Group/UI Scale/Slider/Text Input",
+            "Content/Panels/Graphics/Content/List/Layout Group/Window Mode/Horizontal Selector",
+            "Content/Panels/Controls/Content/List/Layout Group/EdgePanToggle/Switch",
+            "Content/Categories", "Content/Panel Header", "Content/Description Area/Description", "Content/Description Area/Title", "Content/Description Area/Cover/Image Parent/Image",
+            "Content/Buttons/BackButton", "Content/Buttons/Reset Settings Button"
+        })
+            if (original.Find(path) == null) throw new InvalidOperationException("The game's Settings menu is missing " + path + ".");
+        if (original.GetComponent<PanelManager>() == null) throw new InvalidOperationException("The game's Settings panel manager is unavailable.");
+        if (original.GetComponent<Animator>()?.runtimeAnimatorController == null)
+            throw new InvalidOperationException("The game's Settings window animator is unavailable.");
+    }
+
+    private void ClearPage()
+    {
+        if (windowPanel != null && windowPanels != null)
+        {
+            if (windowPanels.currentPanelIndex == windowPanels.panels.IndexOf(windowPanel))
+            {
+                var manager = InterfaceManager.Instance;
+                if (manager != null && manager.GetComponent<PanelManager>() == windowPanels)
+                    manager.TransitionTo(InterfaceManager.Window.Home);
+                windowPanels.OpenPanel(nameof(InterfaceManager.Window.Home));
+            }
+            windowPanels.panels.Remove(windowPanel);
+            windowPanel = null;
+        }
+        if (entry != null && sidebarIndicator != null && windowPanels != null && sidebarIndicator.IsChildOf(entry.transform))
+        {
+            windowPanels.StopCoroutine("MoveIndicatorToParent");
+            windowPanels.StopCoroutine("SetIndicatorHeight");
+            sidebarIndicator.SetParent(entry.transform.parent, true);
+            sidebarIndicator.sizeDelta = new Vector2(sidebarIndicator.sizeDelta.x, 0);
+        }
+        if (page != null) { page.SetActive(false); Object.Destroy(page); }
+        if (entry != null) { entry.gameObject.SetActive(false); Object.Destroy(entry.gameObject); }
+        page = null;
+        entry = null;
+        focus.Clear();
+        settingControls.Clear();
+        selected = null;
+        exiting = false;
+        listScroll = 1;
     }
 
     private static GameObject Keep(Transform source, Transform parent)
@@ -168,16 +294,22 @@ internal sealed class ModsMenu : IDisposable
 
     private void Open()
     {
-        InterfaceManager.Instance.TransitionTo(InterfaceManager.Window.Background);
+        // The Background transition queues Hide; a same-frame Show does not cancel that native animation.
+        opening = true;
+        try { InterfaceManager.Instance.TransitionTo(InterfaceManager.Window.Background); }
+        finally { opening = false; }
+        windowPanels.OpenPanel("StarframeMods");
+        exiting = false;
         page!.SetActive(true);
+        var group = page.GetComponent<CanvasGroup>();
+        group.interactable = group.blocksRaycasts = true;
         ShowList();
     }
 
     private void Back()
     {
         if (selected != null) { ShowList(); return; }
-        page!.SetActive(false);
-        InterfaceManager.Instance.TransitionTo(InterfaceManager.Window.Main);
+        InterfaceManager.Instance.TransitionTo(InterfaceManager.Window.Home);
         if (entry != null) Select(entry.gameObject);
     }
 
@@ -194,6 +326,7 @@ internal sealed class ModsMenu : IDisposable
         selected = null;
         GameObject? restore = null;
         Clear();
+        SetDetails(false);
         reset.gameObject.SetActive(false);
         Text("Mods", heading: true);
         Text("The current game session. Change mods in Starframe, then restart the game.");
@@ -222,7 +355,9 @@ internal sealed class ModsMenu : IDisposable
         if (selected == null) listScroll = list.GetComponentInParent<ScrollRect>().verticalNormalizedPosition;
         selected = id;
         Clear();
+        SetDetails(true);
         var mod = session.InstalledMods.First(m => m.GetProperty("modId").GetString() == id);
+        Describe(mod.GetProperty("name").GetString()!, "Select a setting to see its description and default value.");
         Text(mod.GetProperty("name").GetString()!, heading: true);
         bool loaded = session.Settings.TryGetValue(id, out var settings);
         reset.gameObject.SetActive(loaded && settings!.Entries.Count > 0);
@@ -236,10 +371,29 @@ internal sealed class ModsMenu : IDisposable
     {
         focus.Add(back.gameObject);
         if (reset.gameObject.activeSelf) focus.Add(reset.gameObject);
+        foreach (Transform sibling in entry!.transform.parent)
+            if (sibling.GetComponent<PanelButton>() is { isInteractable: true } sidebarButton) focus.Add(sidebarButton.gameObject);
         Canvas.ForceUpdateCanvases();
         list.GetComponentInParent<ScrollRect>().verticalNormalizedPosition = scroll;
         reset.Interactable(saves == 0);
         Select(restore != null ? restore : focus[0]);
+    }
+
+    private void SetDetails(bool details)
+    {
+        page!.transform.Find("Content/Description Area").gameObject.SetActive(details);
+        var panels = (RectTransform)page.transform.Find("Content/Panels");
+        panels.sizeDelta = details ? panelSize : new Vector2(-70, panelSize.y);
+        panels.anchoredPosition = details ? panelPosition : new Vector2(0, panelPosition.y);
+        var buttons = (RectTransform)page.transform.Find("Content/Buttons");
+        buttons.sizeDelta = details ? buttonsSize : new Vector2(-70, buttonsSize.y);
+        buttons.anchoredPosition = details ? buttonsPosition : new Vector2(0, buttonsPosition.y);
+    }
+
+    private void Describe(string title, string text)
+    {
+        descriptionTitle.text = title;
+        description.text = text;
     }
 
     private void Select(GameObject target)
@@ -321,15 +475,21 @@ internal sealed class ModsMenu : IDisposable
         else if (setting.ValueType.IsEnum)
         {
             var choices = Enum.GetNames(setting.ValueType);
-            ButtonManager? control = null;
-            control = AddButton(setting.Label + ": " + setting.Text, () =>
-            {
-                string next = choices[(Array.IndexOf(choices, setting.Text) + 1) % choices.Length];
-                save(next);
-            });
-            enable = value => { if (control != null) control.Interactable(value); };
-            refresh = () => { if (control != null) control.SetText(setting.Label + ": " + setting.Text); };
-            control.gameObject.name = setting.Key;
+            var row = Object.Instantiate(choice, list);
+            row.transform.Find("Text").GetComponent<TMP_Text>().text = setting.Label;
+            var control = row.GetComponentInChildren<HorizontalSelector>(true);
+            control.useLocalization = control.saveSelected = control.invokeOnAwake = false;
+            control.items = choices.Select(value => new HorizontalSelector.Item { itemTitle = value }).ToList();
+            control.defaultIndex = Math.Max(0, Array.IndexOf(choices, setting.Text));
+            control.onValueChanged = new HorizontalSelector.HorizontalSelectorEvent();
+            control.onValueChanged.AddListener(index => save(choices[index]));
+            var arrows = control.GetComponentsInChildren<ButtonManager>(true);
+            foreach (var arrow in arrows) arrow.useUINavigation = true;
+            enable = value => { foreach (var arrow in arrows) if (arrow != null) arrow.Interactable(value); };
+            refresh = () => { if (control != null) { control.index = Math.Max(0, Array.IndexOf(choices, setting.Text)); control.UpdateUI(); } };
+            FitRow(row, (RectTransform)control.transform);
+            row.SetActive(true);
+            foreach (var arrow in arrows) focus.Add(arrow.gameObject);
         }
         else
         {
@@ -360,7 +520,12 @@ internal sealed class ModsMenu : IDisposable
             focus.Add(field.gameObject);
         }
         settingControls.Add(enable);
-        Text(setting.Description + " Default: " + setting.DefaultText + ". " + setting.ApplyDescription);
+        Action showDescription = () => Describe(setting.Label, setting.Description + "\n\nDefault: " + setting.DefaultText + ".\n" + setting.ApplyDescription);
+        var rowObject = focus[^1].transform;
+        while (rowObject.parent != list) rowObject = rowObject.parent;
+        rowObject.gameObject.AddComponent<ModSettingDescription>().Show = showDescription;
+        foreach (var target in focus.Where(target => target.transform.IsChildOf(rowObject)))
+            if (target.transform != rowObject) target.AddComponent<ModSettingDescription>().Show = showDescription;
         status = Text(setting.Error ?? (setting.RestartRequired ? "Restart required" : ""));
         status.gameObject.name = "Status-" + setting.Key;
     }
@@ -442,12 +607,18 @@ internal sealed class ModsMenu : IDisposable
 
     public void Dispose()
     {
-        if (page != null) Object.Destroy(page);
-        if (entry != null) Object.Destroy(entry.gameObject);
+        ClearPage();
         if (icon != null) { Object.Destroy(icon.texture); Object.Destroy(icon); }
         harmony.UnpatchSelf();
         if (current == this) current = null;
     }
+}
+
+internal sealed class ModSettingDescription : MonoBehaviour, IPointerEnterHandler, ISelectHandler
+{
+    public Action Show = null!;
+    public void OnPointerEnter(PointerEventData eventData) => Show();
+    public void OnSelect(BaseEventData eventData) => Show();
 }
 
 internal sealed class SettingsRowSize : MonoBehaviour
